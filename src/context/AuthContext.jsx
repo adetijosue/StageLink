@@ -147,6 +147,34 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
   };
 
+  const deleteUserAccount = async () => {
+    if (!currentUser) return { success: false };
+
+    const userId = currentUser.id;
+    const userEmail = currentUser.email;
+
+    // 1. Delete profile from Supabase Database table
+    if (isSupabaseConfigured() && userId) {
+      try {
+        await supabase.from('profiles').delete().eq('id', userId);
+      } catch (pe) {
+        console.warn('Supabase profile deletion note:', pe?.message || pe);
+      }
+    }
+
+    // 2. Remove user from local persistent registered users storage
+    const users = getStoredItem(STORAGE_KEYS.USERS, []);
+    const updatedUsers = users.filter(u => u.id !== userId && (!u.email || !userEmail || u.email.toLowerCase() !== userEmail.toLowerCase()));
+    setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
+
+    // 3. Clear current user session & logout
+    setCurrentUser(null);
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    await signOutUser();
+
+    return { success: true };
+  };
+
   const updateUserProfile = (updatedFields) => {
     if (!currentUser) return;
 
@@ -174,7 +202,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, isAuthenticated: !!currentUser, loading, login, signup, logout, updateUserProfile }}>
+    <AuthContext.Provider value={{ currentUser, isAuthenticated: !!currentUser, loading, supabaseActive, login, signup, logout, deleteUserAccount, updateUserProfile }}>
       {children}
     </AuthContext.Provider>
   );

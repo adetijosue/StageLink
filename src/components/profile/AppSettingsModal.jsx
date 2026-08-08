@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { X, Settings, User, Bell, Moon, Sun, Globe, ShieldCheck, FileText, HelpCircle, ChevronRight, LogOut } from 'lucide-react';
+import { X, Settings, User, Bell, Moon, Sun, Globe, ShieldCheck, FileText, HelpCircle, ChevronRight, LogOut, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { soundEngine } from '../../services/audioService';
 import CGUPage from '../legal/CGUPage';
 import PrivacyPage from '../legal/PrivacyPage';
 import CommunityCharterPopup from '../legal/CommunityCharterPopup';
+import DeleteAccountModal from './DeleteAccountModal';
 
 /**
  * AppSettingsModal - Ergonomic Bottom Sheet Version
@@ -15,6 +16,7 @@ export default function AppSettingsModal({ isOpen, onClose, onOpenEditProfile, i
   const { language, changeLanguage, t } = useLanguage();
 
   const [activeView, setActiveModal] = useState(null); // 'cgu' | 'privacy' | 'charter'
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   if (!isOpen) return null;
 
@@ -23,7 +25,7 @@ export default function AppSettingsModal({ isOpen, onClose, onOpenEditProfile, i
       <div style={{
         position: 'fixed', inset: 0, zIndex: 1000,
         background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(8px)',
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
+        display: 'flex', alignItems: 'center', justifyContent: 'center'
       }} onClick={onClose}>
 
         <div
@@ -120,9 +122,24 @@ export default function AppSettingsModal({ isOpen, onClose, onOpenEditProfile, i
               </div>
             </div>
 
-            <button onClick={logout} style={{ width: '100%', padding: '16px', borderRadius: '16px', border: 'none', background: '#FEF2F2', color: '#EF4444', fontWeight: 900, fontSize: '0.95rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-              <LogOut size={20} /> DÉCONNEXION
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button onClick={logout} style={{ width: '100%', padding: '16px', borderRadius: '16px', border: 'none', background: '#FEF2F2', color: '#EF4444', fontWeight: 900, fontSize: '0.95rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <LogOut size={20} /> DÉCONNEXION
+              </button>
+
+              <button
+                onClick={() => { soundEngine.playPopSound(); setShowDeleteModal(true); }}
+                style={{
+                  width: '100%', padding: '12px', borderRadius: '14px',
+                  border: '1px dashed #FCA5A5', background: 'transparent',
+                  color: '#EF4444', fontWeight: 700, fontSize: '0.8rem',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                }}
+              >
+                <Trash2 size={16} /> Zone Danger • Supprimer mon compte
+              </button>
+            </div>
+
             <p style={{ fontSize: '0.75rem', color: '#94A3B8', textAlign: 'center', marginTop: '20px', fontWeight: 600 }}>StageLink v2.4.5 • Powered by JABE PRODUCTION</p>
           </div>
         </div>
@@ -132,6 +149,12 @@ export default function AppSettingsModal({ isOpen, onClose, onOpenEditProfile, i
       <CGUPage isOpen={activeView === 'cgu'} onClose={() => setActiveModal(null)} />
       <PrivacyPage isOpen={activeView === 'privacy'} onClose={() => setActiveModal(null)} />
       <CommunityCharterPopup isOpen={activeView === 'charter'} onClose={() => setActiveModal(null)} />
+
+      <DeleteAccountModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        isDarkMode={isDarkMode}
+      />
     </>
   );
 }
