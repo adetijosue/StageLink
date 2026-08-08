@@ -177,29 +177,9 @@ function MainApp() {
         if (isSupabaseConfigured()) {
           try {
             const { data: supaProfiles } = await supabase.from('profiles').select('*');
-            let mappedSupaUsers = [];
-            if (supaProfiles && supaProfiles.length > 0) {
-              mappedSupaUsers = supaProfiles.map(mapSupabaseProfileToUser).filter(Boolean);
+            if (supaProfiles) {
+              loadedUsers = supaProfiles.map(mapSupabaseProfileToUser).filter(Boolean);
             }
-
-            const storedLocalUsers = getStoredItem(STORAGE_KEYS.USERS, []);
-            const mergedMap = new Map();
-
-            mappedSupaUsers.forEach(u => mergedMap.set(u.id, u));
-
-            storedLocalUsers.forEach(u => {
-              if (!mergedMap.has(u.id) && !Array.from(mergedMap.values()).some(m => m.name === u.name || (m.email && m.email === u.email))) {
-                mergedMap.set(u.id, u);
-              }
-            });
-
-            INITIAL_COMMUNITY_USERS.forEach(u => {
-              if (!mergedMap.has(u.id) && !Array.from(mergedMap.values()).some(m => m.name === u.name)) {
-                mergedMap.set(u.id, u);
-              }
-            });
-
-            loadedUsers = Array.from(mergedMap.values());
             setStoredItem(STORAGE_KEYS.USERS, loadedUsers);
           } catch (err) {
             console.warn('Supabase live profiles fetch note:', err.message);
@@ -211,7 +191,7 @@ function MainApp() {
               .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge)')
               .order('created_at', { ascending: false });
 
-            if (supaPosts && supaPosts.length > 0) {
+            if (supaPosts) {
               loadedPosts = supaPosts.map(mapSupabasePostToFeedCard).filter(Boolean);
             }
 
@@ -221,27 +201,28 @@ function MainApp() {
               .gte('expires_at', new Date().toISOString())
               .order('created_at', { ascending: false });
 
-            if (supaStories && supaStories.length > 0) {
+            if (supaStories) {
               loadedStories = supaStories.map(mapSupabaseStoryToStoryBar).filter(Boolean);
             }
 
             const { data: supaMatches } = await supabase.from('matches').select('*');
-            if (supaMatches && supaMatches.length > 0) {
+            if (supaMatches) {
               loadedMatches = supaMatches;
             }
           } catch (err) {
             console.warn('Supabase live data fetch note:', err.message);
           }
+        } else {
+          // Fallback only if Supabase is NOT configured
+          const finalMergedMap = new Map();
+          (loadedUsers || []).forEach(u => u && u.id && finalMergedMap.set(u.id, u));
+          INITIAL_COMMUNITY_USERS.forEach(u => {
+            if (!finalMergedMap.has(u.id) && !Array.from(finalMergedMap.values()).some(m => m.name === u.name)) {
+              finalMergedMap.set(u.id, u);
+            }
+          });
+          loadedUsers = Array.from(finalMergedMap.values());
         }
-
-        const finalMergedMap = new Map();
-        (loadedUsers || []).forEach(u => u && u.id && finalMergedMap.set(u.id, u));
-        INITIAL_COMMUNITY_USERS.forEach(u => {
-          if (!finalMergedMap.has(u.id) && !Array.from(finalMergedMap.values()).some(m => m.name === u.name)) {
-            finalMergedMap.set(u.id, u);
-          }
-        });
-        loadedUsers = Array.from(finalMergedMap.values());
 
         setAllUsers(loadedUsers);
         setPosts(loadedPosts);
@@ -311,24 +292,10 @@ function MainApp() {
         if (!isSupabaseConfigured()) return;
         try {
           const { data: supaProfiles } = await supabase.from('profiles').select('*');
-          if (supaProfiles && supaProfiles.length > 0) {
+          if (supaProfiles) {
             const mappedSupa = supaProfiles.map(mapSupabaseProfileToUser).filter(Boolean);
-
-            setAllUsers(prev => {
-              const uMap = new Map();
-              mappedSupa.forEach(u => uMap.set(u.id, u));
-              prev.forEach(u => {
-                if (!uMap.has(u.id) && !Array.from(uMap.values()).some(m => m.name === u.name)) {
-                  uMap.set(u.id, u);
-                }
-              });
-              INITIAL_COMMUNITY_USERS.forEach(u => {
-                if (!uMap.has(u.id) && !Array.from(uMap.values()).some(m => m.name === u.name)) {
-                  uMap.set(u.id, u);
-                }
-              });
-              return Array.from(uMap.values());
-            });
+            setAllUsers(mappedSupa);
+            setStoredItem(STORAGE_KEYS.USERS, mappedSupa);
           }
 
           const { data: supaPosts } = await supabase
