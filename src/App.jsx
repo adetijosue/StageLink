@@ -352,16 +352,10 @@ function MainApp() {
   };
 
   const handleStoryReplyToInbox = (storyUser, replyText, isFromViewersList = false) => {
-    if (isFromViewersList && activeStory) {
-      setSavedStoryContext({ story: activeStory, showViewers: true });
-    }
-
-    setActiveStory(null);
-
     const targetUserId = storyUser.userId || storyUser.id || `usr_story_${Date.now()}`;
     const targetUserName = storyUser.userName || storyUser.name;
-    const targetAvatar = storyUser.avatar;
-    const targetRole = storyUser.role || 'Artiste StageLink';
+    const targetAvatar = storyUser.userAvatar || storyUser.avatar;
+    const targetRole = storyUser.userRole || storyUser.role || 'Artiste StageLink';
 
     let targetChat = chats.find(
       (c) => c.participant.id === targetUserId || c.participant.name === targetUserName
@@ -413,8 +407,16 @@ function MainApp() {
 
     setChats(updatedChatsList);
     setStoredItem(STORAGE_KEYS.CHATS, updatedChatsList);
-    setSelectedChat(targetChat);
-    setActiveTab('discussions');
+
+    // Only navigate away if explicitly initiated from viewers list interaction
+    if (isFromViewersList) {
+      if (activeStory) {
+        setSavedStoryContext({ story: activeStory, showViewers: true });
+      }
+      setActiveStory(null);
+      setSelectedChat(targetChat);
+      setActiveTab('discussions');
+    }
   };
 
   const handleDeletePost = (postId) => {
