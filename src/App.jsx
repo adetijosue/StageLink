@@ -319,6 +319,7 @@ function MainApp() {
 
           setIsOnboardingOpen(true);
           setIsWelcomeEmailOpen(true);
+          updateUserProfile({ isNewRegistration: false });
         }
       };
 
@@ -1092,13 +1093,19 @@ function MainApp() {
       {/* Onboarding Wizard Modal */}
       <OnboardingWizard
         isOpen={isOnboardingOpen}
-        onClose={() => setIsOnboardingOpen(false)}
+        onClose={() => {
+          setIsOnboardingOpen(false);
+          updateUserProfile({ isNewRegistration: false });
+        }}
       />
 
       {/* Welcome Email Modal */}
       <WelcomeEmailModal
         isOpen={isWelcomeEmailOpen}
-        onClose={() => setIsWelcomeEmailOpen(false)}
+        onClose={() => {
+          setIsWelcomeEmailOpen(false);
+          updateUserProfile({ isNewRegistration: false });
+        }}
         userName={currentUser?.name}
         userRole={currentUser?.role}
       />
