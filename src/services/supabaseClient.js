@@ -92,10 +92,11 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
       
       // Upsert profile safely (onConflict: 'id') to avoid trigger duplicate key errors
       try {
-        await supabase.from('profiles').upsert({
+        const { error: pErr } = await supabase.from('profiles').upsert({
           id: authData.user.id,
           username: username,
           full_name: name,
+          email: email,
           avatar_url: '',
           bio: `Membre ${role} sur StageLink`,
           is_premium: false,
@@ -104,6 +105,21 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
           instruments: [],
           genres: []
         }, { onConflict: 'id' });
+
+        if (pErr && pErr.message && pErr.message.includes('email')) {
+          await supabase.from('profiles').upsert({
+            id: authData.user.id,
+            username: username,
+            full_name: name,
+            avatar_url: '',
+            bio: `Membre ${role} sur StageLink`,
+            is_premium: false,
+            verified_badge: 'none',
+            skills: [role],
+            instruments: [],
+            genres: []
+          }, { onConflict: 'id' });
+        }
       } catch (profileErr) {
         console.warn('Profile upsert note:', profileErr?.message || profileErr);
       }

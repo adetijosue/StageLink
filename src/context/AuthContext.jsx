@@ -74,13 +74,6 @@ export function AuthProvider({ children }) {
     const cleanEmail = userData.email.trim().toLowerCase();
     const cleanPassword = userData.password.trim();
     const cleanName = userData.name.trim();
-    const users = getStoredItem(STORAGE_KEYS.USERS, []);
-
-    // Check if account already exists
-    const existingUser = users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
-    if (existingUser) {
-      return { success: false, error: 'Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter.' };
-    }
 
     let newUser = null;
 
@@ -89,10 +82,12 @@ export function AuthProvider({ children }) {
       const supaRes = await signUpUser({ ...userData, email: cleanEmail, password: cleanPassword });
       if (supaRes.success && supaRes.user) {
         newUser = { ...supaRes.user, password: cleanPassword };
+      } else if (supaRes.error && supaRes.error.includes('déjà')) {
+        return { success: false, error: supaRes.error };
       }
     }
 
-    // 2. Fallback persistent user object if offline or Supabase unconfirmed
+    // 2. Fallback persistent user object
     if (!newUser) {
       const cleanHex = Array.from(cleanEmail).map(c => c.charCodeAt(0).toString(16)).join('');
       const paddedHex = (cleanHex + '0'.repeat(32)).slice(0, 32);
@@ -111,29 +106,47 @@ export function AuthProvider({ children }) {
         company: '',
         instruments: [],
         genres: [],
-        gear: []
+        gear: [],
+        isNewRegistration: true
       };
+    } else {
+      newUser.isNewRegistration = true;
     }
 
     // Persist permanently in stored users and active user session
-    newUser.isNewRegistration = true;
+    const users = getStoredItem(STORAGE_KEYS.USERS, []);
     const updatedUsers = [newUser, ...users.filter(u => !u.email || u.email.toLowerCase() !== cleanEmail)];
     setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
     setStoredItem(STORAGE_KEYS.CURRENT_USER, newUser);
     setCurrentUser(newUser);
 
-    // Attempt profile save in Supabase database
+    // Attempt profile save in Supabase database (with email fallback)
     try {
       if (isSupabaseConfigured() && newUser.id) {
-        await supabase.from('profiles').upsert({
+        // Try including email column first
+        const { error: profileErr } = await supabase.from('profiles').upsert({
           id: newUser.id,
           username: newUser.name,
           full_name: newUser.name,
+          email: cleanEmail,
           bio: `Membre ${newUser.role} sur StageLink`,
           skills: [newUser.role],
           is_premium: false,
           verified_badge: 'none'
         }, { onConflict: 'id' });
+
+        // If email column doesn't exist in schema yet, fallback without email
+        if (profileErr && profileErr.message && profileErr.message.includes('email')) {
+          await supabase.from('profiles').upsert({
+            id: newUser.id,
+            username: newUser.name,
+            full_name: newUser.name,
+            bio: `Membre ${newUser.role} sur StageLink`,
+            skills: [newUser.role],
+            is_premium: false,
+            verified_badge: 'none'
+          }, { onConflict: 'id' });
+        }
       }
     } catch (pe) {
       console.warn('Supabase profile persistence note:', pe?.message || pe);
