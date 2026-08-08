@@ -1,0 +1,308 @@
+import React, { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import Logo from '../common/Logo';
+import { Mail, Lock, User, Music, ArrowRight, CheckCircle } from 'lucide-react';
+
+export default function AuthScreen() {
+  const { login, signup } = useAuth();
+  const [isLogin, setIsLogin] = useState(false); // Default to Sign Up registration
+
+  // Form State
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('Beatmaker / Compositeur');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!email || !password) {
+      setError('Veuillez remplir tous les champs obligatoires.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    if (isLogin) {
+      const res = await login(email, password);
+      setIsSubmitting(false);
+      if (!res.success) {
+        setError(res.error);
+      }
+    } else {
+      if (!name) {
+        setError('Veuillez entrer votre nom ou pseudonyme d\'artiste.');
+        setIsSubmitting(false);
+        return;
+      }
+      const res = await signup({ email, password, name, role });
+      setIsSubmitting(false);
+      if (!res.success) {
+        setError(res.error);
+      }
+    }
+  };
+
+  const handleDemoLogin = (demoEmail) => {
+    login(demoEmail, 'password123');
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      zIndex: 100,
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      paddingTop: 'calc(16px + env(safe-area-inset-top, 16px))',
+      paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 24px))',
+      paddingLeft: 'max(16px, env(safe-area-inset-left, 16px))',
+      paddingRight: 'max(16px, env(safe-area-inset-right, 16px))',
+      background: 'linear-gradient(180deg, #F8FAFC 0%, #EFF6FF 100%)'
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: '420px',
+        margin: 'auto 0'
+      }}>
+        {/* Brand Hero Box - Ultra-Prominent & Imposing Full-Size Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+          <div style={{
+            display: 'inline-block',
+            padding: '16px 28px',
+            background: '#FFFFFF',
+            borderRadius: '28px',
+            boxShadow: '0 16px 40px rgba(0, 102, 255, 0.22)',
+            border: '1px solid #E2E8F0',
+            marginBottom: '8px'
+          }}>
+            <Logo size="xlarge" variant="vertical" />
+          </div>
+          <p style={{ color: '#64748B', fontSize: '0.82rem', marginTop: '4px', fontWeight: 600 }}>
+            Réseau social & opportunités 100% musique
+          </p>
+        </div>
+
+        {/* Auth Card */}
+        <div style={{
+          background: '#FFFFFF',
+          borderRadius: '24px',
+          padding: '16px',
+          boxShadow: '0 8px 24px rgba(148, 163, 184, 0.12)',
+          border: '1px solid #E2E8F0'
+        }}>
+          {/* Toggle Mode Header */}
+          <div style={{
+            display: 'flex',
+            background: '#F1F5F9',
+            borderRadius: '12px',
+            padding: '3px',
+            marginBottom: '12px'
+          }}>
+            <button
+              type="button"
+              onClick={() => { setIsLogin(true); setError(''); }}
+              style={{
+                flex: 1,
+                padding: '8px',
+                borderRadius: '10px',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                background: isLogin ? '#FFFFFF' : 'transparent',
+                color: isLogin ? '#0066FF' : '#64748B',
+                boxShadow: isLogin ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.2s'
+              }}
+            >
+              Se Connecter
+            </button>
+            <button
+              type="button"
+              onClick={() => { setIsLogin(false); setError(''); }}
+              style={{
+                flex: 1,
+                padding: '8px',
+                borderRadius: '10px',
+                border: 'none',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                background: !isLogin ? '#FFFFFF' : 'transparent',
+                color: !isLogin ? '#0066FF' : '#64748B',
+                boxShadow: !isLogin ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.2s'
+              }}
+            >
+              Créer un Compte
+            </button>
+          </div>
+
+          {error && (
+            <div style={{
+              background: '#FEF2F2',
+              color: '#EF4444',
+              padding: '8px 12px',
+              borderRadius: '12px',
+              fontSize: '0.8rem',
+              marginBottom: '10px',
+              border: '1px solid #FCA5A5'
+            }}>
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {!isLogin && (
+              <>
+                <div>
+                  <label style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569', marginBottom: '3px', display: 'block' }}>
+                    Nom d'artiste / Pseudonyme
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+                    <input
+                      type="text"
+                      placeholder="ex: Alex Chen"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px 8px 36px',
+                        borderRadius: '12px',
+                        border: '1px solid #CBD5E1',
+                        fontSize: '0.82rem',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569', marginBottom: '3px', display: 'block' }}>
+                    Rôle ou Métier Musical
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <Music size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+                    <select
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px 8px 36px',
+                        borderRadius: '12px',
+                        border: '1px solid #CBD5E1',
+                        fontSize: '0.82rem',
+                        outline: 'none',
+                        background: '#FFFFFF'
+                      }}
+                    >
+                      <option value="Artiste / Chanteur">Artiste / Chanteur</option>
+                      <option value="Rappeur / MC">Rappeur / MC</option>
+                      <option value="Beatmaker / Compositeur">Beatmaker / Compositeur</option>
+                      <option value="Producteur Musical">Producteur Musical</option>
+                      <option value="Ingénieur du Son">Ingénieur du Son</option>
+                      <option value="Guitariste">Guitariste</option>
+                      <option value="Pianiste / Claviériste">Pianiste / Claviériste</option>
+                      <option value="Bassiste">Bassiste</option>
+                      <option value="Batteur / Percussionniste">Batteur / Percussionniste</option>
+                      <option value="DJ / Performer">DJ / Performer</option>
+                      <option value="Auteur-Compositeur">Auteur-Compositeur</option>
+                      <option value="Directeur Artistique">Directeur Artistique</option>
+                      <option value="Label / Manager">Label / Manager</option>
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div>
+              <label style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569', marginBottom: '3px', display: 'block' }}>
+                E-mail Professionnel
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Mail size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+                <input
+                  type="email"
+                  placeholder="votre@musique.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px 8px 36px',
+                    borderRadius: '12px',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '0.82rem',
+                        outline: 'none'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569', marginBottom: '3px', display: 'block' }}>
+                Mot de passe
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px 8px 36px',
+                    borderRadius: '12px',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '0.82rem',
+                    outline: 'none'
+                  }}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="btn-primary"
+              style={{ width: '100%', marginTop: '4px', padding: '11px', fontSize: '0.86rem' }}
+            >
+              {isSubmitting ? 'Traitement...' : isLogin ? 'Se Connecter' : 'Rejoindre StageLink'} <ArrowRight size={16} />
+            </button>
+          </form>
+
+          {/* Single Clean Demo Account Fast-Track */}
+          <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #F1F5F9', textAlign: 'center' }}>
+            <button
+              type="button"
+              onClick={() => handleDemoLogin('sarah.jenkins@music.io')}
+              style={{
+                padding: '5px 12px',
+                borderRadius: '20px',
+                border: '1px solid #BFDBFE',
+                background: '#EFF6FF',
+                color: '#0066FF',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <CheckCircle size={13} /> Compte Démo Rapide (Sarah Jenkins)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

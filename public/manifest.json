@@ -1,0 +1,33 @@
+{
+  "short_name": "StageLink",
+  "name": "StageLink - Réseau Social & Co-Création Musicale",
+  "description": "Plateforme réseau social & marketplace pour l'écosystème musical par JABE PRODUCTION.",
+  "icons": [
+    {
+      "src": "/stagelink-logo.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/stagelink-logo.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/stagelink-logo.png",
+      "type": "image/png",
+      "sizes": "180x180",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "background_color": "#0B0F19",
+  "theme_color": "#0B0F19",
+  "display": "standalone",
+  "orientation": "portrait",
+  "categories": ["music", "social", "entertainment"]
+}
