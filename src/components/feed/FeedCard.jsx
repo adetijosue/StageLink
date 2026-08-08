@@ -30,29 +30,51 @@ export default function FeedCard({ post, onLike, onFollowUser, onAddComment, onD
     }
   };
 
-  // Double Tap to Like Media & Text Card
-  const triggerLikeBurst = () => {
+  // Double Click / Double Tap to Like Media & Card
+  const isLikingRef = useRef(false);
+
+  const triggerLikeBurst = (e) => {
+    if (e && e.stopPropagation) {
+      e.stopPropagation();
+    }
+
+    if (isLikingRef.current) return;
+    isLikingRef.current = true;
+
+    setTimeout(() => {
+      isLikingRef.current = false;
+    }, 450);
+
     soundEngine.playLikePopSound();
     setShowDoubleTapHeart(true);
+
     if (onLike) {
-      onLike(post.id);
-      confetti({
-        particleCount: 45,
-        spread: 65,
-        origin: { y: 0.6 }
-      });
+      if (!post.isLiked) {
+        onLike(post.id);
+      }
     }
+
+    confetti({
+      particleCount: 45,
+      spread: 65,
+      origin: { y: 0.6 }
+    });
+
     setTimeout(() => {
       setShowDoubleTapHeart(false);
-    }, 900);
+    }, 850);
   };
 
   const handleCardTouchOrClick = (e) => {
+    // Ignore clicks on buttons, inputs or options menu
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('textarea')) {
+      return;
+    }
+
     const now = Date.now();
-    const DOUBLE_TAP_DELAY = 320;
+    const DOUBLE_TAP_DELAY = 350;
     if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
-      e.stopPropagation();
-      triggerLikeBurst();
+      triggerLikeBurst(e);
       lastTapRef.current = 0;
     } else {
       lastTapRef.current = now;
@@ -92,25 +114,31 @@ export default function FeedCard({ post, onLike, onFollowUser, onAddComment, onD
         <div style={{
           position: 'absolute',
           inset: 0,
-          zIndex: 40,
+          zIndex: 50,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           pointerEvents: 'none',
-          background: 'rgba(255, 255, 255, 0.15)',
-          backdropFilter: 'blur(2px)',
-          animation: 'fadeIn 0.2s ease'
+          background: 'rgba(0, 0, 0, 0.3)',
+          backdropFilter: 'blur(3px)',
+          animation: 'fadeIn 0.15s ease'
         }}>
-          <Heart
-            size={90}
-            fill="#EF4444"
-            color="#EF4444"
-            style={{
-              filter: 'drop-shadow(0 10px 25px rgba(239, 68, 68, 0.6))',
-              transform: 'scale(1.25)',
-              animation: 'bounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-            }}
-          />
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            transform: 'scale(1.25)',
+            animation: 'likeHeartPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+          }}>
+            <Heart
+              size={96}
+              fill="#EF4444"
+              color="#EF4444"
+              style={{
+                filter: 'drop-shadow(0 12px 35px rgba(239, 68, 68, 0.9))'
+              }}
+            />
+          </div>
         </div>
       )}
 
