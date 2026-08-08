@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import Logo from '../common/Logo';
-import { ArrowRight, Check, Sparkles, MapPin, Music, Upload, SkipForward, Globe } from 'lucide-react';
+import { ArrowRight, Check, Sparkles, MapPin, Music, Upload, SkipForward, Globe, X } from 'lucide-react';
 import { COUNTRIES_AND_CITIES } from '../../services/locationData';
 import confetti from 'canvas-confetti';
 
@@ -110,22 +110,43 @@ export default function OnboardingWizard({ isOpen, onClose }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
           <Logo size="small" variant="horizontal" />
 
-          <button
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#94A3B8',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Ignorer <SkipForward size={14} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#94A3B8',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Ignorer <SkipForward size={14} />
+            </button>
+
+            <button
+              onClick={onClose}
+              style={{
+                background: '#FEF2F2',
+                border: '1px solid #FCA5A5',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                color: '#EF4444',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Fermer"
+            >
+              <X size={16} color="#EF4444" />
+            </button>
+          </div>
         </div>
 
         {/* Progress Bar Dots */}

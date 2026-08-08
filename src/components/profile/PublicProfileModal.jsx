@@ -67,7 +67,20 @@ export default function PublicProfileModal({ isOpen, onClose, user, onStartChat,
           />
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.6) 100%)', borderTopLeftRadius: '28px', borderTopRightRadius: '28px' }} />
 
-          <button onClick={onClose} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', padding: 8, color: '#FFF', backdropFilter: 'blur(4px)' }}><X size={20} /></button>
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute', top: 16, right: 16, zIndex: 10,
+              background: '#FEF2F2', border: '1.5px solid #FCA5A5',
+              borderRadius: '50%', width: '40px', height: '40px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#EF4444', cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+            }}
+            title="Fermer"
+          >
+            <X size={20} color="#EF4444" />
+          </button>
 
           <div style={{ position: 'absolute', bottom: '-40px', left: '20px', display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
             <img

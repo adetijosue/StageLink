@@ -51,12 +51,16 @@ export default function MusicalCVModal({ isOpen, onClose, user, isOwnProfile = t
           <button
             onClick={onClose}
             style={{
-              background: isDarkMode ? '#1E293B' : '#F1F5F9', border: 'none',
+              background: isDarkMode ? 'rgba(239, 68, 68, 0.2)' : '#FEF2F2',
+              border: '1px solid #FCA5A5',
               borderRadius: '50%', width: '38px', height: '38px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+              minWidth: '38px', minHeight: '38px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.15)'
             }}
+            title="Fermer"
           >
-            <X size={20} color="inherit" />
+            <X size={20} color="#EF4444" />
           </button>
         </div>
 

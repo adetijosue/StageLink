@@ -86,21 +86,22 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
             type="button"
             onClick={onClose}
             style={{
-              background: isDarkMode ? '#1E293B' : '#F1F5F9',
-              border: isDarkMode ? '1px solid rgba(255,255,255,0.15)' : '1px solid #CBD5E1',
+              background: isDarkMode ? 'rgba(239, 68, 68, 0.2)' : '#FEF2F2',
+              border: '1px solid #FCA5A5',
               borderRadius: '50%',
-              width: '42px',
-              height: '42px',
-              minWidth: '42px',
-              minHeight: '42px',
+              width: '38px',
+              height: '38px',
+              minWidth: '38px',
+              minHeight: '38px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.15)'
             }}
+            title="Fermer"
           >
-            <X size={20} color={isDarkMode ? '#F8FAFC' : '#0F172A'} />
+            <X size={18} color="#EF4444" />
           </button>
         </div>
 

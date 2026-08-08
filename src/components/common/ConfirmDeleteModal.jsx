@@ -16,15 +16,29 @@ export default function ConfirmDeleteModal({ isOpen, onClose, onConfirm, title, 
       justifyContent: 'center',
       padding: '20px'
     }}>
-      <div className="animate-scale-in" style={{
+      <div className="animate-scale-up" style={{
         width: '100%',
         maxWidth: '400px',
         background: '#FFFFFF',
         borderRadius: '24px',
         padding: '24px',
         boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
-        textAlign: 'center'
+        textAlign: 'center',
+        position: 'relative'
       }}>
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute', top: 14, right: 14,
+            background: '#FEF2F2', border: '1px solid #FCA5A5',
+            borderRadius: '50%', width: '32px', height: '32px',
+            color: '#EF4444', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}
+          title="Fermer"
+        >
+          <X size={18} color="#EF4444" />
+        </button>
         <div style={{
           width: '56px',
           height: '56px',

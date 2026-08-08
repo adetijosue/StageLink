@@ -192,7 +192,7 @@ export default function AuthScreen() {
               <>
                 <div>
                   <label style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569', marginBottom: '3px', display: 'block' }}>
-                    Nom d'artiste / Pseudonyme (en un seul bloc)
+                    Nom d'artiste / Pseudonyme
                   </label>
                   <div style={{ position: 'relative' }}>
                     <User size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: name.includes(' ') ? '#EF4444' : '#94A3B8' }} />

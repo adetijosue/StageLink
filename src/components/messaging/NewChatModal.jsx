@@ -85,8 +85,8 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
           <button
             onClick={onClose}
             style={{
-              background: '#F1F5F9',
-              border: '1px solid #CBD5E1',
+              background: '#FEF2F2',
+              border: '1px solid #FCA5A5',
               borderRadius: '50%',
               width: '40px',
               height: '40px',
@@ -95,10 +95,12 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.15)'
             }}
+            title="Fermer"
           >
-            <X size={20} color="#0F172A" />
+            <X size={20} color="#EF4444" />
           </button>
         </div>
 

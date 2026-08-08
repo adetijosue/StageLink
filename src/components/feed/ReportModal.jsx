@@ -43,8 +43,17 @@ export default function ReportModal({ isOpen, onClose, post, onReportSubmitted }
           <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#EF4444', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <AlertTriangle size={20} /> Signaler cette publication
           </h3>
-          <button onClick={onClose} style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <X size={18} />
+          <button
+            onClick={onClose}
+            style={{
+              background: '#FEF2F2', border: '1px solid #FCA5A5',
+              borderRadius: '50%', width: '36px', height: '36px',
+              color: '#EF4444', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}
+            title="Fermer"
+          >
+            <X size={18} color="#EF4444" />
           </button>
         </div>
 
