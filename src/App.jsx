@@ -652,25 +652,29 @@ function MainApp() {
     }
   };
 
-  const handleSendMessage = (chatId, messageInput) => {
+  const handleSendMessage = async (chatId, messageInput) => {
+    const isObj = typeof messageInput === 'object';
+    const msgUuid = generateUUID();
+
+    const newMsg = {
+      id: msgUuid,
+      sender: 'current',
+      text: isObj ? messageInput.text : messageInput,
+      quotedMessage: isObj ? messageInput.quotedMessage : null,
+      mediaUrl: isObj ? messageInput.mediaUrl : null,
+      audioUrl: isObj ? messageInput.audioUrl : null,
+      isAudio: isObj ? messageInput.isAudio : false,
+      audioDuration: isObj ? messageInput.audioDuration : null,
+      timestamp: 'À l\'instant',
+      createdAtTimestamp: Date.now(),
+      isRead: true
+    };
+
+    const targetChat = chats.find(c => c.id === chatId);
+    const recipientId = targetChat?.participant?.id;
+
     const updatedChats = chats.map((c) => {
       if (c.id === chatId) {
-        const isObj = typeof messageInput === 'object';
-
-        const newMsg = {
-          id: `msg_${Date.now()}`,
-          sender: 'current',
-          text: isObj ? messageInput.text : messageInput,
-          quotedMessage: isObj ? messageInput.quotedMessage : null,
-          mediaUrl: isObj ? messageInput.mediaUrl : null,
-          audioUrl: isObj ? messageInput.audioUrl : null,
-          isAudio: isObj ? messageInput.isAudio : false,
-          audioDuration: isObj ? messageInput.audioDuration : null,
-          timestamp: 'À l\'instant',
-          createdAtTimestamp: Date.now(),
-          isRead: true
-        };
-
         return {
           ...c,
           unreadCount: 0,
@@ -686,6 +690,22 @@ function MainApp() {
 
     const active = updatedChats.find((c) => c.id === chatId);
     if (active) setSelectedChat(active);
+
+    // Save message directly to Supabase Database for instant delivery to recipient
+    if (isSupabaseConfigured() && recipientId) {
+      try {
+        await supabase.from('messages').insert({
+          id: msgUuid,
+          sender_id: currentUser.id,
+          recipient_id: recipientId,
+          content: newMsg.text || '',
+          media_url: newMsg.mediaUrl || null,
+          audio_url: newMsg.audioUrl || null
+        });
+      } catch (me) {
+        console.warn('Supabase message send note:', me?.message || me);
+      }
+    }
   };
 
   const handleDeleteMessageForMe = (chatId, messageId) => {
