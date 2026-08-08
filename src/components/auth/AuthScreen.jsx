@@ -49,15 +49,6 @@ export default function AuthScreen() {
         return;
       }
 
-      // Enforce single-block nickname without spaces
-      if (name.trim().includes(' ')) {
-        const suggestion = name.trim().replace(/\s+/g, '');
-        const suggestionWithUnderscore = name.trim().replace(/\s+/g, '_');
-        setError(`⚠️ Votre pseudo doit être écrit en un seul bloc sans espace. Exemple suggéré : ${suggestion} ou ${suggestionWithUnderscore}.`);
-        setIsSubmitting(false);
-        return;
-      }
-
       const res = await signup({ email: email.trim(), password: password.trim(), name: name.trim(), role, gender });
       setIsSubmitting(false);
       if (!res.success) {
@@ -195,41 +186,29 @@ export default function AuthScreen() {
                     Nom d'artiste / Pseudonyme
                   </label>
                   <div style={{ position: 'relative' }}>
-                    <User size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: name.includes(' ') ? '#EF4444' : '#94A3B8' }} />
+                    <User size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94A3B8' }} />
                     <input
                       type="text"
-                      placeholder="ex: StageLink"
+                      placeholder="ex: StageLink Production"
                       value={name}
                       onChange={(e) => {
                         setName(e.target.value);
-                        if (e.target.value.includes(' ')) {
-                          const suggestion = e.target.value.trim().replace(/\s+/g, '');
-                          const suggestionWithUnderscore = e.target.value.trim().replace(/\s+/g, '_');
-                          setError(`⚠️ Votre pseudo doit être écrit en un seul bloc sans espace. Exemple : ${suggestion} ou ${suggestionWithUnderscore}`);
-                        } else if (error && error.includes('bloc')) {
-                          setError('');
-                        }
+                        if (error) setError('');
                       }}
                       style={{
                         width: '100%',
                         padding: '8px 12px 8px 36px',
                         borderRadius: '12px',
-                        border: name.includes(' ') ? '1.5px solid #EF4444' : '1px solid #CBD5E1',
+                        border: '1px solid #CBD5E1',
                         fontSize: '0.82rem',
                         outline: 'none',
-                        background: name.includes(' ') ? '#FEF2F2' : '#FFFFFF'
+                        background: '#FFFFFF'
                       }}
                     />
                   </div>
-                  {name.includes(' ') ? (
-                    <span style={{ fontSize: '0.72rem', color: '#EF4444', fontWeight: 700, marginTop: '4px', display: 'block' }}>
-                      ⚠️ Les espaces ne sont pas autorisés. Écrivez : <strong>{name.replace(/\s+/g, '')}</strong> ou <strong>{name.replace(/\s+/g, '_')}</strong>
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '3px', display: 'block' }}>
-                      💡 Votre pseudo doit être en un seul mot sans espace.
-                    </span>
-                  )}
+                  <span style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '3px', display: 'block' }}>
+                    💡 Entrez votre prénom, nom ou pseudonyme d'artiste.
+                  </span>
                 </div>
 
                 <div>
