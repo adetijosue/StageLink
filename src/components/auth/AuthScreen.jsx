@@ -198,7 +198,7 @@ export default function AuthScreen() {
                     <User size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: name.includes(' ') ? '#EF4444' : '#94A3B8' }} />
                     <input
                       type="text"
-                      placeholder="ex: JosuéApa ou Adeti_Apa"
+                      placeholder="ex: StageLink"
                       value={name}
                       onChange={(e) => {
                         setName(e.target.value);
