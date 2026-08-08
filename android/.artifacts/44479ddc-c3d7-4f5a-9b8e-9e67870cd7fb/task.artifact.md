@@ -1,0 +1,4 @@
+- [x] Créer la base de données musicale (`musicData.js`)
+- [x] Remplacer la saisie texte par une sélection de "Tags" (Chips) dans `ProfileView.jsx`
+- [x] Mettre à jour la logique de sauvegarde pour les listes
+- [ ] Vérifier le build et le comportement tactile

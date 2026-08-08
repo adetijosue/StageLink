@@ -1,0 +1,51 @@
+[versions]
+# Android SDK
+minSdk = "23"
+compileSdk = "35"
+targetSdk = "35"
+
+# Libraries
+androidxActivity = "1.9.2"
+androidxAppCompat = "1.7.0"
+androidxCoordinatorLayout = "1.2.0"
+androidxCore = "1.15.0"
+androidxFragment = "1.8.4"
+coreSplashScreen = "1.0.1"
+androidxWebkit = "1.12.1"
+material = "1.12.0"
+junit = "4.13.2"
+androidxJunit = "1.2.1"
+androidxEspressoCore = "3.6.1"
+cordovaAndroid = "10.1.1"
+androidxComposeBom = "2024.10.00"
+androidxComposeCompiler = "1.5.15" # This is often linked to Kotlin version, but modern Gradle uses Compose Compiler Plugin
+
+
+# Plugins
+androidGradlePlugin = "8.7.2"
+googleServices = "4.4.2"
+
+[libraries]
+androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "androidxActivity" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "androidxAppCompat" }
+androidx-coordinatorlayout = { group = "androidx.coordinatorlayout", name = "coordinatorlayout", version.ref = "androidxCoordinatorLayout" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCore" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashScreen" }
+androidx-fragment = { group = "androidx.fragment", name = "fragment", version.ref = "androidxFragment" }
+androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "androidxWebkit" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "androidxEspressoCore" }
+androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version = "1.4.1" }
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "androidxComposeBom" }
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "androidxActivity" }
+
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }

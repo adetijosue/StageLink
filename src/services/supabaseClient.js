@@ -17,7 +17,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 /**
  * Sign up a new user with Supabase Auth & insert into public.profiles
  */
-export async function signUpUser({ email, password, name, role }) {
+export async function signUpUser({ email, password, name, role, gender = 'male' }) {
   try {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
@@ -25,7 +25,8 @@ export async function signUpUser({ email, password, name, role }) {
       options: {
         data: {
           full_name: name,
-          role: role
+          role: role,
+          gender: gender
         }
       }
     });
@@ -41,6 +42,7 @@ export async function signUpUser({ email, password, name, role }) {
           email: email,
           name: name,
           role: role,
+          gender: gender,
           avatar: '',
           verified: false,
           badgeType: 'none',
@@ -122,6 +124,7 @@ export async function signUpUser({ email, password, name, role }) {
           email: sessionUser.email || email,
           name: name,
           role: role,
+          gender: gender,
           avatar: '',
           verified: false,
           badgeType: 'none',
@@ -142,6 +145,7 @@ export async function signUpUser({ email, password, name, role }) {
         email: email,
         name: name,
         role: role,
+        gender: gender,
         avatar: '',
         verified: false,
         badgeType: 'none',

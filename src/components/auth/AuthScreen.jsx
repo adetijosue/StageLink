@@ -12,6 +12,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('Beatmaker / Compositeur');
+  const [gender, setGender] = useState('male');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -57,7 +58,7 @@ export default function AuthScreen() {
         return;
       }
 
-      const res = await signup({ email: email.trim(), password: password.trim(), name: name.trim(), role });
+      const res = await signup({ email: email.trim(), password: password.trim(), name: name.trim(), role, gender });
       setIsSubmitting(false);
       if (!res.success) {
         let errText = typeof res.error === 'string' ? res.error : res.error?.message;
@@ -263,6 +264,31 @@ export default function AuthScreen() {
                       <option value="Auteur-Compositeur">Auteur-Compositeur</option>
                       <option value="Directeur Artistique">Directeur Artistique</option>
                       <option value="Label / Manager">Label / Manager</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569', marginBottom: '3px', display: 'block' }}>
+                    Sexe / Genre
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+                    <select
+                      value={gender}
+                      onChange={(e) => setGender(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px 8px 36px',
+                        borderRadius: '12px',
+                        border: '1px solid #CBD5E1',
+                        fontSize: '0.82rem',
+                        outline: 'none',
+                        background: '#FFFFFF'
+                      }}
+                    >
+                      <option value="male">Homme (Garçon 👦)</option>
+                      <option value="female">Femme (Fille 👧)</option>
                     </select>
                   </div>
                 </div>

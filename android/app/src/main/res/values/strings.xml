@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">StageLink</string>
+    <string name="title_activity_main"></string>
+    <string name="package_name">com.jabeproduction.stagelink</string>
+    <string name="custom_url_scheme">com.jabeproduction.stagelink</string>
+    <string name="email_label">Email</string>
+    <string name="password_label">Password</string>
+    <string name="login_button">Log In</string>
+    <string name="signup_link">Sign Up</string>
+    <string name="tab_all">All</string>
+    <string name="tab_recommended">Recommended</string>
+    <string name="tab_applied">Applied</string>
+    <string name="add_to_favorites">Add to Favorites</string>
+    <string name="apply_by">Apply by</string>
+    <string name="key_skills">Key Skills</string>
+    <string name="messages_title">Messages</string>
+    <string name="type_message_hint">Écrivez un message...</string>
+    <string name="publish_hint">Partagez un stage ou une actu...</string>
+    <string name="search_messages_hint">Recherche...</string>
+    <string name="audio_call_label">Appel Audio</string>
+    <string name="video_call_label">Appel Vidéo</string>
+    <string name="end_call_label">Quitter</string>
+    <string name="calling_status">Appel en cours...</string>
+    <string name="my_status">Ma Story</string>
+    <string name="calls_title">Calls</string>
+    <string name="tab_all_calls">All</string>
+    <string name="tab_missed_calls">Missed</string>
+    <string name="incoming_call">Incoming</string>
+    <string name="outgoing_call">Outgoing</string>
+    <string name="missed_call">Missed</string>
+</resources>

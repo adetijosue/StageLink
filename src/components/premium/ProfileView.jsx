@@ -12,7 +12,7 @@ import AppSettingsModal from '../profile/AppSettingsModal';
 import ProfileQRCodeModal from '../profile/ProfileQRCodeModal';
 import MusicalCVModal from '../profile/MusicalCVModal';
 import AvatarCropModal from '../profile/AvatarCropModal';
-import SocialBrandLogo, { getBrandLogoSVG } from '../common/SocialBrandLogo';
+import UserAvatar from '../common/UserAvatar';
 
 export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMode, onSimulateIncomingCall }) {
   const { currentUser, logout, updateUserProfile } = useAuth();
@@ -114,7 +114,7 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
 
         <div style={{ position: 'absolute', bottom: '-45px', left: '20px', display: 'flex', alignItems: 'flex-end', gap: '16px' }}>
           <div style={{ position: 'relative' }}>
-            <img src={currentUser.avatar} style={{ width: '100px', height: '100px', borderRadius: '50%', border: `4px solid ${isDarkMode ? '#0B0F19' : '#FFF'}`, objectFit: 'cover', boxShadow: '0 8px 25px rgba(0,0,0,0.3)' }} alt="Avatar" />
+            <UserAvatar user={currentUser} size={100} border={`4px solid ${isDarkMode ? '#0B0F19' : '#FFF'}`} style={{ boxShadow: '0 8px 25px rgba(0,0,0,0.3)' }} />
             <button onClick={() => avatarRef.current?.click()} style={{ position: 'absolute', bottom: 0, right: 0, background: '#0066FF', color: '#FFF', borderRadius: '50%', padding: '7px', border: '3px solid #FFF', cursor: 'pointer' }}><Camera size={14} /></button>
             <input type="file" ref={avatarRef} onChange={(e) => handleFileAction(e, 'avatar')} style={{ display: 'none' }} accept="image/*" />
           </div>

@@ -1,9 +1,12 @@
 import React from 'react';
 import { Home, Users, MessageCircle, ShoppingBag, User } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
+import UserAvatar from '../common/UserAvatar';
 
 export default function BottomNav({ activeTab, setActiveTab, unreadMessagesCount = 1, isDarkMode }) {
   const { t } = useLanguage();
+  const { currentUser } = useAuth();
 
   const tabs = [
     { id: 'match', label: t('nav_match'), icon: Users },
@@ -78,23 +81,14 @@ export default function BottomNav({ activeTab, setActiveTab, unreadMessagesCount
                   boxShadow: isActive
                     ? '0 10px 25px rgba(0, 102, 255, 0.65)'
                     : isDarkMode
-                    ? '0 6px 18px rgba(0, 0, 0, 0.5)'
-                    : '0 6px 18px rgba(0, 102, 255, 0.35)',
+                    ? '0 4px 15px rgba(0,0,0,0.3)'
+                    : '0 8px 20px rgba(0, 102, 255, 0.4)',
                   border: `4px solid ${bgColor}`,
-                  transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                  transition: 'all 0.25s ease',
                   transform: isActive ? 'scale(1.08)' : 'scale(1)'
                 }}>
-                  <Icon size={24} strokeWidth={2.5} color={isActive ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#FFFFFF'} />
+                  <Icon size={26} strokeWidth={2.2} />
                 </div>
-                <span style={{
-                  fontSize: '0.68rem',
-                  fontWeight: isActive ? 800 : 600,
-                  color: isActive ? '#0066FF' : isDarkMode ? '#64748B' : '#94A3B8',
-                  marginTop: '2px',
-                  lineHeight: 1
-                }}>
-                  {tab.label}
-                </span>
               </button>
             );
           }
@@ -120,7 +114,15 @@ export default function BottomNav({ activeTab, setActiveTab, unreadMessagesCount
               }}
             >
               <div style={{ position: 'relative' }}>
-                <Icon size={22} strokeWidth={isActive ? 2.5 : 1.8} />
+                {tab.id === 'profile' ? (
+                  <UserAvatar
+                    user={currentUser}
+                    size={24}
+                    border={isActive ? '2px solid #0066FF' : '1px solid transparent'}
+                  />
+                ) : (
+                  <Icon size={22} strokeWidth={isActive ? 2.5 : 1.8} />
+                )}
                 {tab.badge && tab.badge > 0 ? (
                   <span style={{
                     position: 'absolute',

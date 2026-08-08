@@ -4,6 +4,7 @@ import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
 import confetti from 'canvas-confetti';
+import UserAvatar from '../common/UserAvatar';
 
 export default function FeedCard({ post, onLike, onFollowUser, onAddComment, onDeletePost, onOpenShare, onOpenReport, onOpenPublicProfile }) {
   const { currentUser } = useAuth();
@@ -41,44 +42,32 @@ export default function FeedCard({ post, onLike, onFollowUser, onAddComment, onD
     if (isLikingRef.current) return;
     isLikingRef.current = true;
 
-    setTimeout(() => {
-      isLikingRef.current = false;
-    }, 450);
-
-    soundEngine.playLikePopSound();
     setShowDoubleTapHeart(true);
+    soundEngine.playPopSound();
 
-    if (onLike) {
-      if (!post.isLiked) {
-        onLike(post.id);
-      }
-    }
+    onLike(post.id);
 
-    confetti({
-      particleCount: 45,
-      spread: 65,
-      origin: { y: 0.6 }
-    });
+    try {
+      confetti({
+        particleCount: 25,
+        spread: 60,
+        origin: { y: 0.65 }
+      });
+    } catch (err) {}
 
     setTimeout(() => {
       setShowDoubleTapHeart(false);
-    }, 850);
+      isLikingRef.current = false;
+    }, 600);
   };
 
   const handleCardTouchOrClick = (e) => {
-    // Ignore clicks on buttons, inputs or options menu
-    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('textarea')) {
-      return;
-    }
-
     const now = Date.now();
-    const DOUBLE_TAP_DELAY = 350;
+    const DOUBLE_TAP_DELAY = 300;
     if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
       triggerLikeBurst(e);
-      lastTapRef.current = 0;
-    } else {
-      lastTapRef.current = now;
     }
+    lastTapRef.current = now;
   };
 
   const handleFollowClick = () => {
@@ -145,14 +134,13 @@ export default function FeedCard({ post, onLike, onFollowUser, onAddComment, onD
       {/* Post Header with Clickable Profile Avatar & Name */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <img
-            src={post.userAvatar}
-            alt={post.userName}
+          <UserAvatar
+            user={{ name: post.userName, avatar: post.userAvatar, gender: post.userGender || post.gender }}
+            size={44}
             onClick={(e) => {
               e.stopPropagation();
               if (onOpenPublicProfile) onOpenPublicProfile(post);
             }}
-            style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', cursor: 'pointer' }}
           />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

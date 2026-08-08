@@ -1,10 +1,10 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import UserAvatar from '../common/UserAvatar';
 
 export default function StoryBar({ stories, onSelectStory, onAddStory }) {
   const { currentUser } = useAuth();
-  const userAvatar = currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
 
   return (
     <div style={{
@@ -39,16 +39,10 @@ export default function StoryBar({ stories, onSelectStory, onAddStory }) {
           padding: '2px',
           background: 'linear-gradient(135deg, rgba(0, 102, 255, 0.2), rgba(0, 71, 255, 0.1))'
         }}>
-          <img
-            src={userAvatar}
-            alt="Mon Statut"
-            style={{
-              width: '100%',
-              height: '100%',
-              borderRadius: '50%',
-              objectFit: 'cover',
-              border: '2px solid var(--card-bg)'
-            }}
+          <UserAvatar
+            user={currentUser}
+            size={68}
+            border="2px solid var(--card-bg)"
           />
           {/* Plus Badge Icon on Bottom Right */}
           <div style={{
@@ -111,16 +105,10 @@ export default function StoryBar({ stories, onSelectStory, onAddStory }) {
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <img
-                src={story.avatar}
-                alt={story.userName}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: '50%',
-                  objectFit: 'cover',
-                  border: '2.5px solid var(--card-bg)'
-                }}
+              <UserAvatar
+                user={{ name: story.userName, avatar: story.userAvatar, gender: story.gender }}
+                size={66}
+                border="2px solid var(--card-bg)"
               />
             </div>
 

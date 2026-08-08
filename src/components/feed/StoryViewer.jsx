@@ -3,6 +3,7 @@ import { X, Heart, Send, Repeat, Trash2, Eye, MessageCircle, Check } from 'lucid
 import { useAuth } from '../../context/AuthContext';
 import { soundEngine } from '../../services/audioService';
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
+import UserAvatar from '../common/UserAvatar';
 import confetti from 'canvas-confetti';
 
 export default function StoryViewer({
@@ -204,7 +205,7 @@ export default function StoryViewer({
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <img src={story.userAvatar || story.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'} style={{ width: '38px', height: '38px', borderRadius: '50%', border: '2px solid #FFF', objectFit: 'cover' }} />
+              <UserAvatar user={{ name: story.userName, avatar: story.userAvatar || story.avatar, gender: story.gender }} size={38} border="2px solid #FFF" />
               <div>
                 <h4 style={{ color: '#FFF', margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>{story.userName}</h4>
                 <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>{story.time}</span>
