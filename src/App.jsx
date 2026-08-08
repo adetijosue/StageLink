@@ -381,15 +381,23 @@ function MainApp() {
     }
 
     if (replyText) {
+      const rawMedia = storyUser.storyMedia || storyUser.image || storyUser.mediaUrl || null;
       const newMsg = {
         id: `msg_story_${Date.now()}`,
         sender: 'current',
         text: replyText,
         isStoryComment: true,
-        storyThumbnail: storyUser.storyMedia || storyUser.image || storyUser.mediaUrl || null,
+        storyId: storyUser.id,
+        storyUserId: targetUserId,
+        storyUserName: targetUserName,
+        storyUserAvatar: targetAvatar,
+        storyThumbnail: rawMedia,
+        storyMedia: rawMedia,
         storyCaption: storyUser.caption || null,
         storyBgGradient: storyUser.bgGradient || 'linear-gradient(135deg, #0066FF, #0047FF)',
         storyIsText: storyUser.isTextStory || false,
+        storyFilter: storyUser.filter || 'none',
+        storyStickers: storyUser.stickers || [],
         timestamp: 'À l\'instant',
         createdAtTimestamp: Date.now(),
         isRead: true
@@ -417,6 +425,35 @@ function MainApp() {
       setSelectedChat(targetChat);
       setActiveTab('discussions');
     }
+  };
+
+  const handleOpenStoryFromMessage = (msg) => {
+    if (!msg) return;
+
+    // Search in existing stories list first
+    const existingStory = stories.find(s => s.id === msg.storyId || s.userId === msg.storyUserId);
+    if (existingStory) {
+      setActiveStory(existingStory);
+      return;
+    }
+
+    // Dynamically reconstruct story payload from message metadata
+    const reconstructedStory = {
+      id: msg.storyId || `story_msg_${Date.now()}`,
+      userId: msg.storyUserId || selectedChat?.participant?.id || 'usr_story',
+      userName: msg.storyUserName || selectedChat?.participant?.name || 'Artiste StageLink',
+      userAvatar: msg.storyUserAvatar || selectedChat?.participant?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
+      mediaUrl: msg.storyThumbnail || msg.storyMedia || null,
+      storyMedia: msg.storyThumbnail || msg.storyMedia || null,
+      caption: msg.storyCaption || '',
+      bgGradient: msg.storyBgGradient || 'linear-gradient(135deg, #0066FF, #0047FF)',
+      isTextStory: msg.storyIsText || false,
+      filter: msg.storyFilter || 'none',
+      stickers: msg.storyStickers || [],
+      time: 'Depuis le chat'
+    };
+
+    setActiveStory(reconstructedStory);
   };
 
   const handleDeletePost = (postId) => {
@@ -813,6 +850,7 @@ function MainApp() {
             window.history.pushState({ page: 'profile' }, '');
             setPublicProfileUser(usr);
           }}
+          onOpenStory={handleOpenStoryFromMessage}
         />
       )}
 

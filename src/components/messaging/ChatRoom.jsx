@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Phone, Video, MoreVertical, Send, Paperclip, Smile, Mic, Play, Pause, ShieldCheck, CheckCheck, Trash2, Trash, Copy, X, PhoneCall, VideoOff, Reply, PhoneMissed } from 'lucide-react';
+import { ArrowLeft, Phone, Video, MoreVertical, Send, Paperclip, Smile, Mic, Play, Pause, ShieldCheck, CheckCheck, Trash2, Trash, Copy, X, PhoneCall, VideoOff, Reply, PhoneMissed, Eye } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
 
-export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoCall, onOpenEphemeralModal, onSendMessage, onDeleteMessageForMe, onDeleteMessageForEveryone, onOpenPublicProfile }) {
+export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoCall, onOpenEphemeralModal, onSendMessage, onDeleteMessageForMe, onDeleteMessageForEveryone, onOpenPublicProfile, onOpenStory }) {
   const [inputText, setInputText] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activeEmojiCategory, setActiveEmojiCategory] = useState('smileys');
@@ -631,23 +631,35 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
                     </div>
                   )}
 
-                  {/* Embedded Story Media Miniature Thumbnail Card (WITHOUT WRITTEN MENTION TEXT) */}
+                  {/* Embedded Story Media Miniature Thumbnail Card (CLICKABLE TO OPEN STORY) */}
                   {msg.isStoryComment && (
-                    <div style={{
-                      width: '100%',
-                      maxWidth: '220px',
-                      height: '150px',
-                      borderRadius: '12px',
-                      overflow: 'hidden',
-                      marginBottom: '8px',
-                      position: 'relative',
-                      background: msg.storyBgGradient || 'linear-gradient(135deg, #0066FF, #0047FF)',
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                      border: '1.5px solid rgba(255, 255, 255, 0.4)'
-                    }}>
-                      {msg.storyThumbnail ? (
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        soundEngine.playPopSound();
+                        if (onOpenStory) {
+                          onOpenStory(msg);
+                        }
+                      }}
+                      title="Cliquer pour ouvrir et regarder la story"
+                      style={{
+                        width: '100%',
+                        maxWidth: '220px',
+                        height: '150px',
+                        borderRadius: '14px',
+                        overflow: 'hidden',
+                        marginBottom: '8px',
+                        position: 'relative',
+                        background: msg.storyBgGradient || 'linear-gradient(135deg, #0066FF, #0047FF)',
+                        boxShadow: '0 6px 16px rgba(0, 0, 0, 0.25)',
+                        border: '2px solid rgba(255, 255, 255, 0.6)',
+                        cursor: 'pointer',
+                        transition: 'transform 0.15s ease'
+                      }}
+                    >
+                      {msg.storyThumbnail || msg.storyMedia ? (
                         <img
-                          src={msg.storyThumbnail}
+                          src={msg.storyThumbnail || msg.storyMedia}
                           alt="Miniature Story"
                           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                         />
@@ -668,8 +680,28 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
                         </div>
                       )}
 
+                      {/* Top Story View Badge */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '8px',
+                        left: '8px',
+                        background: 'rgba(0, 102, 255, 0.9)',
+                        backdropFilter: 'blur(8px)',
+                        color: '#FFFFFF',
+                        padding: '4px 10px',
+                        borderRadius: '12px',
+                        fontSize: '0.68rem',
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                      }}>
+                        <Eye size={12} /> Story • Regarder 👁️
+                      </div>
+
                       {/* Subtle overlay caption on top of story media thumbnail if caption exists */}
-                      {msg.storyThumbnail && msg.storyCaption && (
+                      {(msg.storyThumbnail || msg.storyMedia) && msg.storyCaption && (
                         <div style={{
                           position: 'absolute',
                           bottom: 0,
