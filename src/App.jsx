@@ -35,6 +35,7 @@ import PullToRefresh from './components/common/PullToRefresh';
 import { getStoredItem, setStoredItem, STORAGE_KEYS } from './services/mockData';
 import { soundEngine } from './services/audioService';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
+import { generateUUID } from './utils/uuid';
 
 function MainApp() {
   const { isAuthenticated, currentUser, updateUserProfile } = useAuth();
@@ -311,6 +312,13 @@ function MainApp() {
       };
 
       loadInitialData();
+
+      // Live multi-user background synchronization every 8 seconds
+      const pollInterval = setInterval(() => {
+        loadInitialData();
+      }, 8000);
+
+      return () => clearInterval(pollInterval);
     }
   }, [isAuthenticated, currentUser?.id]);
 
@@ -538,9 +546,10 @@ function MainApp() {
     setStoredItem(STORAGE_KEYS.POSTS, updated);
   };
 
-  const handleCreatePost = (newPostData) => {
+  const handleCreatePost = async (newPostData) => {
+    const postUuid = generateUUID();
     const newPost = {
-      id: `post_${Date.now()}`,
+      id: postUuid,
       userId: currentUser.id,
       userName: currentUser.name,
       userRole: `${currentUser.role}, ${currentUser.company}`,
@@ -563,7 +572,22 @@ function MainApp() {
     setPosts(updated);
     setStoredItem(STORAGE_KEYS.POSTS, updated);
 
-    // Also trigger global player demo
+    // Save post directly to Supabase Database for all users
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('posts').insert({
+          id: postUuid,
+          user_id: currentUser.id,
+          content: newPostData.text || '',
+          media_url: newPostData.image || (newPostData.mediaList && newPostData.mediaList[0]) || null,
+          audio_url: newPostData.audioUrl || null,
+          audio_title: newPostData.audioTitle || null
+        });
+      } catch (pe) {
+        console.warn('Supabase post creation note:', pe?.message || pe);
+      }
+    }
+
     if (newPost.hasAudio) {
       handleStartGlobalAudio({
         title: newPost.audioTitle || 'Composition Audio',
@@ -573,10 +597,11 @@ function MainApp() {
     }
   };
 
-  const handleCreateStory = (storyData) => {
+  const handleCreateStory = async (storyData) => {
     const rawMedia = storyData.storyMedia || storyData.mediaUrl || storyData.media || null;
+    const storyUuid = generateUUID();
     const newStory = {
-      id: `story_${Date.now()}`,
+      id: storyUuid,
       userId: currentUser.id,
       userName: currentUser.name,
       userAvatar: currentUser.avatar,
@@ -600,6 +625,20 @@ function MainApp() {
     const updated = [newStory, ...stories];
     setStories(updated);
     setStoredItem(STORAGE_KEYS.STORIES, updated);
+
+    // Save story directly to Supabase Database for all users
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('stories').insert({
+          id: storyUuid,
+          user_id: currentUser.id,
+          media_url: rawMedia,
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        });
+      } catch (se) {
+        console.warn('Supabase story creation note:', se?.message || se);
+      }
+    }
   };
 
   const handleSendMessage = (chatId, messageInput) => {
