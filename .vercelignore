@@ -1,0 +1,12 @@
+node_modules
+dist
+android
+caches
+daemon
+kotlin-profile
+lib
+native
+wrapper
+.git
+.vercel
+*.log
