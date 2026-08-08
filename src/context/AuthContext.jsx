@@ -170,18 +170,20 @@ export function AuthProvider({ children }) {
       if (supaRes.success && supaRes.user) {
         newUser = { ...supaRes.user, password: cleanPassword };
       } else if (supaRes.error) {
-        // Return real error to user — don't create a phantom local account
-        return { success: false, error: supaRes.error };
+        const isNetworkErr = supaRes.error.includes('Failed to fetch') || 
+                             supaRes.error.includes('réseau') || 
+                             supaRes.error.includes('connexion') || 
+                             supaRes.error.includes('anti-trackers');
+        if (!isNetworkErr) {
+          // Validation errors (email exists, short password, etc) -> Return to UI
+          return { success: false, error: supaRes.error };
+        }
+        console.warn('[StageLink] Supabase network fetch error, activating local session fallback...');
       }
     }
 
-    // 2. Fallback: only create local user if Supabase is NOT configured
+    // 2. Fallback: create user locally if network/Supabase unavailable
     if (!newUser) {
-      if (isSupabaseConfigured()) {
-        // Supabase is configured but signup failed — don't create local phantom user
-        return { success: false, error: 'Erreur lors de la création du compte. Veuillez réessayer.' };
-      }
-
       const cleanHex = Array.from(cleanEmail).map(c => c.charCodeAt(0).toString(16)).join('');
       const paddedHex = (cleanHex + '0'.repeat(32)).slice(0, 32);
       const uuidStr = `${paddedHex.slice(0, 8)}-${paddedHex.slice(8, 12)}-4${paddedHex.slice(13, 16)}-a${paddedHex.slice(17, 20)}-${paddedHex.slice(20, 32)}`;

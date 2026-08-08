@@ -160,6 +160,8 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
         rawMsg = 'Le mot de passe doit contenir au moins 6 caractères.';
       } else if (rawMsg.includes('invalid email') || rawMsg.includes('Unable to validate email')) {
         rawMsg = 'Adresse e-mail invalide.';
+      } else if (rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError') || rawMsg.includes('fetch failed')) {
+        rawMsg = 'Impossible de se connecter au serveur Supabase (Échec du réseau). Si vous utilisez un bloqueur de publicités ou d\'anti-trackers (uBlock, Brave, etc.), veuillez autoriser ce site ou vérifier votre connexion internet.';
       }
 
       return { success: false, error: rawMsg };
@@ -231,13 +233,21 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
     };
   } catch (err) {
     console.error('[StageLink] Supabase Auth Signup Exception:', err);
-    // Try auto-login if account exists
-    const fallbackLogin = await signInUser({ email: cleanEmail, password: cleanPassword });
-    if (fallbackLogin.success) return fallbackLogin;
+    try {
+      const fallbackLogin = await signInUser({ email: cleanEmail, password: cleanPassword });
+      if (fallbackLogin.success) return fallbackLogin;
+    } catch (e) {}
+
+    let errMsg = err?.message || (typeof err === 'string' ? err : '');
+    if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError') || errMsg.includes('fetch failed')) {
+      errMsg = 'Impossible de se connecter au serveur Supabase (Échec du réseau). Si vous utilisez un bloqueur de publicités ou d\'anti-trackers, veuillez autoriser ce site ou vérifier votre connexion internet.';
+    } else if (!errMsg || errMsg === '{}') {
+      errMsg = 'Erreur lors de la création du compte. Veuillez réessayer.';
+    }
 
     return {
       success: false,
-      error: 'Erreur lors de la création du compte. Veuillez réessayer.'
+      error: errMsg
     };
   }
 }
@@ -263,6 +273,8 @@ export async function signInUser({ email, password }) {
         rawMsg = 'Adresse e-mail ou mot de passe incorrect.';
       } else if (rawMsg.includes('Email not confirmed')) {
         rawMsg = 'Veuillez confirmer votre adresse e-mail pour vous connecter.';
+      } else if (rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError') || rawMsg.includes('fetch failed')) {
+        rawMsg = 'Impossible de se connecter au serveur Supabase (Échec du réseau). Si vous utilisez un bloqueur de publicités ou d\'anti-trackers, veuillez autoriser ce site ou vérifier votre connexion internet.';
       }
       return { success: false, error: rawMsg };
     }
@@ -302,7 +314,9 @@ export async function signInUser({ email, password }) {
   } catch (err) {
     console.error('[StageLink] Supabase Auth Signin Exception:', err);
     let errMsg = err?.message || (typeof err === 'string' ? err : '');
-    if (typeof errMsg !== 'string' || !errMsg.trim()) {
+    if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError') || errMsg.includes('fetch failed')) {
+      errMsg = 'Impossible de se connecter au serveur Supabase (Échec du réseau). Si vous utilisez un bloqueur de publicités ou d\'anti-trackers, veuillez autoriser ce site ou vérifier votre connexion internet.';
+    } else if (typeof errMsg !== 'string' || !errMsg.trim() || errMsg === '{}') {
       errMsg = 'Erreur lors de la connexion. Veuillez réessayer.';
     }
     return {
