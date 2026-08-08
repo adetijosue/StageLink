@@ -55,8 +55,8 @@ export default function ShareModal({ isOpen, onClose, post }) {
       display: 'flex',
       alignItems: 'flex-end',
       justifyContent: 'center'
-    }}>
-      <div className="animate-slide-up" style={{
+    }} onClick={onClose}>
+      <div className="animate-slide-up" onClick={(e) => e.stopPropagation()} style={{
         width: '100%',
         maxWidth: '440px',
         background: '#FFFFFF',

@@ -19,8 +19,8 @@ export default function CommunityCharterPopup({ isOpen, onClose }) {
       alignItems: 'center',
       justifyContent: 'center',
       padding: '20px'
-    }}>
-      <div className="animate-scale-in" style={{
+    }} onClick={onClose}>
+      <div className="animate-scale-in" onClick={(e) => e.stopPropagation()} style={{
         width: '100%',
         maxWidth: '420px',
         maxHeight: '90vh',

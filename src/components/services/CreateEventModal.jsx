@@ -36,8 +36,8 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated }) {
       alignItems: 'center',
       justifyContent: 'center',
       padding: '16px'
-    }}>
-      <div className="animate-scale-in" style={{
+    }} onClick={onClose}>
+      <div className="animate-scale-in" onClick={(e) => e.stopPropagation()} style={{
         width: '100%',
         maxWidth: '440px',
         background: '#FFFFFF',

@@ -59,8 +59,8 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
       alignItems: 'center',
       justifyContent: 'center',
       padding: 'calc(14px + env(safe-area-inset-top, 14px)) 14px calc(20px + env(safe-area-inset-bottom, 20px)) 14px'
-    }}>
-      <div className="animate-scale-in" style={{
+    }} onClick={onClose}>
+      <div className="animate-scale-in" onClick={(e) => e.stopPropagation()} style={{
         width: '100%',
         maxWidth: '440px',
         maxHeight: 'calc(100dvh - max(48px, env(safe-area-inset-top, 16px) + env(safe-area-inset-bottom, 20px)))',

@@ -15,8 +15,8 @@ export default function ConfirmDeleteModal({ isOpen, onClose, onConfirm, title, 
       alignItems: 'center',
       justifyContent: 'center',
       padding: '20px'
-    }}>
-      <div className="animate-scale-up" style={{
+    }} onClick={onClose}>
+      <div className="animate-scale-up" onClick={(e) => e.stopPropagation()} style={{
         width: '100%',
         maxWidth: '400px',
         background: '#FFFFFF',

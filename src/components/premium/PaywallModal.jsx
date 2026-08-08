@@ -38,8 +38,8 @@ export default function PaywallModal({ isOpen, onClose, onUpgradeSuccess }) {
       alignItems: 'center',
       justifyContent: 'center',
       padding: '16px'
-    }}>
-      <div className="animate-fade-in" style={{
+    }} onClick={onClose}>
+      <div className="animate-fade-in" onClick={(e) => e.stopPropagation()} style={{
         width: '100%',
         maxWidth: '680px',
         background: '#FFFFFF',

@@ -52,8 +52,8 @@ export default function PublicProfileModal({ isOpen, onClose, user, onStartChat,
     <div style={{
       position: 'fixed', inset: 0, zIndex: 220, background: 'rgba(15, 23, 42, 0.85)',
       backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
-    }}>
-      <div className="animate-scale-in" style={{
+    }} onClick={onClose}>
+      <div className="animate-scale-in" onClick={(e) => e.stopPropagation()} style={{
         width: '100%', maxWidth: '440px', background: '#F8FAFC', borderRadius: '28px',
         maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 25px 60px rgba(0,0,0,0.4)', position: 'relative'
       }}>

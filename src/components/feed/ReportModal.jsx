@@ -29,8 +29,8 @@ export default function ReportModal({ isOpen, onClose, post, onReportSubmitted }
       alignItems: 'center',
       justifyContent: 'center',
       padding: '20px'
-    }}>
-      <div className="animate-fade-in" style={{
+    }} onClick={onClose}>
+      <div className="animate-fade-in" onClick={(e) => e.stopPropagation()} style={{
         background: '#FFFFFF',
         borderRadius: '24px',
         width: '100%',

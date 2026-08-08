@@ -30,6 +30,7 @@ export default function MusicalCVModal({ isOpen, onClose, user, isOwnProfile = t
 
       <div
         className="animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%', maxWidth: '500px', maxHeight: '88vh',
           background: isDarkMode ? '#151D2A' : '#FFFFFF',

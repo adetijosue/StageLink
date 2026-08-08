@@ -96,8 +96,8 @@ export default function OnboardingWizard({ isOpen, onClose }) {
       paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
       paddingLeft: '16px',
       paddingRight: '16px'
-    }}>
-      <div className="animate-fade-in" style={{
+    }} onClick={onClose}>
+      <div className="animate-fade-in" onClick={(e) => e.stopPropagation()} style={{
         background: '#FFFFFF',
         borderRadius: '28px',
         width: '100%',

@@ -41,6 +41,7 @@ export default function ProfileQRCodeModal({ isOpen, onClose, user, isDarkMode }
 
       <div
         className="animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%', maxWidth: '500px',
           background: isDarkMode ? '#151D2A' : '#FFFFFF',
