@@ -330,8 +330,8 @@ function MainApp() {
 
       loadInitialData();
 
-      // Background Live Posts and Stories Polling Sync (Pure data update, no modals)
-      const pollInterval = setInterval(async () => {
+      // Function to sync posts & stories from Supabase
+      const syncPostsAndStories = async () => {
         if (!isSupabaseConfigured()) return;
         try {
           const { data: supaPosts } = await supabase
@@ -382,9 +382,47 @@ function MainApp() {
             setStories(freshStories);
           }
         } catch (e) {}
+      };
+
+      // 1. Instant Realtime Subscription Setup (<100ms sync)
+      let postsSub, storiesSub, messagesSub;
+      if (isSupabaseConfigured()) {
+        try {
+          postsSub = supabase
+            .channel('realtime:posts')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => syncPostsAndStories())
+            .subscribe();
+
+          storiesSub = supabase
+            .channel('realtime:stories')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'stories' }, () => syncPostsAndStories())
+            .subscribe();
+
+          messagesSub = supabase
+            .channel('realtime:messages')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+              const newMsg = payload.new;
+              if (newMsg && newMsg.recipient_id === currentUser.id) {
+                soundEngine.playMessagePopSound();
+              }
+            })
+            .subscribe();
+        } catch (re) {
+          console.warn('Realtime subscription fallback note:', re);
+        }
+      }
+
+      // 2. Background Live Posts and Stories Polling Sync (Fallback every 8 seconds)
+      const pollInterval = setInterval(() => {
+        syncPostsAndStories();
       }, 8000);
 
-      return () => clearInterval(pollInterval);
+      return () => {
+        clearInterval(pollInterval);
+        if (postsSub) supabase.removeChannel(postsSub);
+        if (storiesSub) supabase.removeChannel(storiesSub);
+        if (messagesSub) supabase.removeChannel(messagesSub);
+      };
     }
   }, [isAuthenticated, currentUser?.id]);
 
