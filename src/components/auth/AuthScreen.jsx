@@ -19,26 +19,31 @@ export default function AuthScreen() {
     e.preventDefault();
     setError('');
 
-    if (!email || !password) {
+    if (!email.trim() || !password.trim()) {
       setError('Veuillez remplir tous les champs obligatoires.');
+      return;
+    }
+
+    if (password.trim().length < 6) {
+      setError('Le mot de passe doit contenir au moins 6 caractères.');
       return;
     }
 
     setIsSubmitting(true);
 
     if (isLogin) {
-      const res = await login(email, password);
+      const res = await login(email.trim(), password.trim());
       setIsSubmitting(false);
       if (!res.success) {
         setError(res.error);
       }
     } else {
-      if (!name) {
+      if (!name.trim()) {
         setError('Veuillez entrer votre nom ou pseudonyme d\'artiste.');
         setIsSubmitting(false);
         return;
       }
-      const res = await signup({ email, password, name, role });
+      const res = await signup({ email: email.trim(), password: password.trim(), name: name.trim(), role });
       setIsSubmitting(false);
       if (!res.success) {
         setError(res.error);

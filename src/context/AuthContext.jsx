@@ -33,7 +33,11 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     if (isSupabaseConfigured()) {
       const supaRes = await signInUser({ email, password });
-      if (supaRes.success) {
+      if (supaRes.success && supaRes.user) {
+        const users = getStoredItem(STORAGE_KEYS.USERS, []);
+        const updatedUsers = [supaRes.user, ...users.filter(u => u.email !== supaRes.user.email)];
+        setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
+
         setCurrentUser(supaRes.user);
         setStoredItem(STORAGE_KEYS.CURRENT_USER, supaRes.user);
         return { success: true, user: supaRes.user };
@@ -46,7 +50,11 @@ export function AuthProvider({ children }) {
   const signup = async (userData) => {
     if (isSupabaseConfigured()) {
       const supaRes = await signUpUser(userData);
-      if (supaRes.success) {
+      if (supaRes.success && supaRes.user) {
+        const users = getStoredItem(STORAGE_KEYS.USERS, []);
+        const updatedUsers = [supaRes.user, ...users.filter(u => u.email !== supaRes.user.email)];
+        setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
+
         setCurrentUser(supaRes.user);
         setStoredItem(STORAGE_KEYS.CURRENT_USER, supaRes.user);
         return { success: true, user: supaRes.user };
