@@ -116,6 +116,7 @@ export function AuthProvider({ children }) {
     }
 
     // Persist permanently in stored users and active user session
+    newUser.isNewRegistration = true;
     const updatedUsers = [newUser, ...users.filter(u => !u.email || u.email.toLowerCase() !== cleanEmail)];
     setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
     setStoredItem(STORAGE_KEYS.CURRENT_USER, newUser);

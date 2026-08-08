@@ -73,7 +73,8 @@ export default function OnboardingWizard({ isOpen, onClose }) {
       bio,
       location: finalLocation,
       avatar: selectedAvatar,
-      genres: selectedGenres
+      genres: selectedGenres,
+      isNewRegistration: false
     });
 
     onClose();

@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import AuthScreen from './components/auth/AuthScreen';
 import OnboardingWizard from './components/auth/OnboardingWizard';
+import WelcomeEmailModal from './components/auth/WelcomeEmailModal';
 import TopBar from './components/navigation/TopBar';
 import GlobalUserSearchModal from './components/navigation/GlobalUserSearchModal';
 import BottomNav from './components/navigation/BottomNav';
@@ -73,6 +74,7 @@ function MainApp() {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(2);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [isWelcomeEmailOpen, setIsWelcomeEmailOpen] = useState(false);
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
 
   // Social Share, Report, and Public Profile Modals
@@ -266,8 +268,45 @@ function MainApp() {
           }
         } catch (e) {}
 
+        // Handle Welcome Onboarding & Welcome Chat for New Registrations
         if (currentUser.isNewRegistration) {
+          const welcomeChatId = 'chat_stagelink_official';
+          const hasWelcomeChat = loadedChats.some(c => c.id === welcomeChatId || (c.participant && c.participant.name && c.participant.name.includes('StageLink')));
+
+          if (!hasWelcomeChat) {
+            const welcomeChat = {
+              id: welcomeChatId,
+              participant: {
+                id: 'usr_stagelink_team',
+                name: 'StageLink Support Officiel',
+                avatar: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150&auto=format&fit=crop&q=80',
+                online: true,
+                verified: true,
+                badgeType: 'gold',
+                role: 'Équipe Officielle StageLink'
+              },
+              unreadCount: 1,
+              lastMessageTime: 'À l\'instant',
+              messages: [
+                {
+                  id: 'msg_welcome_1',
+                  senderId: 'usr_stagelink_team',
+                  senderName: 'StageLink Support Officiel',
+                  senderAvatar: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150&auto=format&fit=crop&q=80',
+                  text: `Bonjour ${currentUser.name} ! 👋\n\nBienvenue sur StageLink, la plateforme officielle de co-création et de connexion artistique.\n\nNous sommes ravis de vous compter parmi nos membres en tant que ${currentUser.role || 'Artiste'} !\n\n💡 Quelques conseils pour débuter :\n1. Complétez votre profil EPK (démos audio, instruments, biographie).\n2. Publiez des Stories et des extraits pour vous faire connaître.\n3. Collaborez via nos salons de discussion sécurisés.\n\nL'équipe StageLink vous souhaite une expérience musicale exceptionnelle ! 🎵`,
+                  timestamp: 'À l\'instant',
+                  isMe: false,
+                  type: 'text'
+                }
+              ]
+            };
+            loadedChats = [welcomeChat, ...loadedChats];
+            setChats(loadedChats);
+            setStoredItem(STORAGE_KEYS.CHATS, loadedChats);
+          }
+
           setIsOnboardingOpen(true);
+          setIsWelcomeEmailOpen(true);
         }
       };
 
@@ -978,6 +1017,20 @@ function MainApp() {
           setIsNotificationsOpen(false);
           setActiveTab(tab);
         }}
+      />
+
+      {/* Onboarding Wizard Modal */}
+      <OnboardingWizard
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+      />
+
+      {/* Welcome Email Modal */}
+      <WelcomeEmailModal
+        isOpen={isWelcomeEmailOpen}
+        onClose={() => setIsWelcomeEmailOpen(false)}
+        userName={currentUser?.name}
+        userRole={currentUser?.role}
       />
 
       {/* Persistent Bottom Navigation Bar */}
