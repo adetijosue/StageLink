@@ -270,7 +270,7 @@ export default function AuthScreen() {
 
                 <div>
                   <label style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569', marginBottom: '3px', display: 'block' }}>
-                    Sexe / Genre
+                    Civilité / Sexe
                   </label>
                   <div style={{ position: 'relative' }}>
                     <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
@@ -287,8 +287,8 @@ export default function AuthScreen() {
                         background: '#FFFFFF'
                       }}
                     >
-                      <option value="male">Homme (Garçon 👦)</option>
-                      <option value="female">Femme (Fille 👧)</option>
+                      <option value="male">Homme</option>
+                      <option value="female">Femme</option>
                     </select>
                   </div>
                 </div>
