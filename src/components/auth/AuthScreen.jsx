@@ -35,7 +35,11 @@ export default function AuthScreen() {
       const res = await login(email.trim(), password.trim());
       setIsSubmitting(false);
       if (!res.success) {
-        setError(res.error);
+        let errText = typeof res.error === 'string' ? res.error : res.error?.message;
+        if (!errText || errText === '{}' || errText.includes('{')) {
+          errText = 'Identifiants ou mot de passe incorrect.';
+        }
+        setError(errText);
       }
     } else {
       if (!name.trim()) {
@@ -43,10 +47,24 @@ export default function AuthScreen() {
         setIsSubmitting(false);
         return;
       }
+
+      // Enforce single-block nickname without spaces
+      if (name.trim().includes(' ')) {
+        const suggestion = name.trim().replace(/\s+/g, '');
+        const suggestionWithUnderscore = name.trim().replace(/\s+/g, '_');
+        setError(`⚠️ Votre pseudo doit être écrit en un seul bloc sans espace. Exemple suggéré : ${suggestion} ou ${suggestionWithUnderscore}.`);
+        setIsSubmitting(false);
+        return;
+      }
+
       const res = await signup({ email: email.trim(), password: password.trim(), name: name.trim(), role });
       setIsSubmitting(false);
       if (!res.success) {
-        setError(res.error);
+        let errText = typeof res.error === 'string' ? res.error : res.error?.message;
+        if (!errText || errText === '{}' || errText.includes('{')) {
+          errText = 'Erreur lors de l’inscription. Veuillez réessayer.';
+        }
+        setError(errText);
       }
     }
   };
@@ -173,25 +191,44 @@ export default function AuthScreen() {
               <>
                 <div>
                   <label style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569', marginBottom: '3px', display: 'block' }}>
-                    Nom d'artiste / Pseudonyme
+                    Nom d'artiste / Pseudonyme (en un seul bloc)
                   </label>
                   <div style={{ position: 'relative' }}>
-                    <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+                    <User size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: name.includes(' ') ? '#EF4444' : '#94A3B8' }} />
                     <input
                       type="text"
-                      placeholder="ex: Alex Chen"
+                      placeholder="ex: JosuéApa ou Adeti_Apa"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        if (e.target.value.includes(' ')) {
+                          const suggestion = e.target.value.trim().replace(/\s+/g, '');
+                          const suggestionWithUnderscore = e.target.value.trim().replace(/\s+/g, '_');
+                          setError(`⚠️ Votre pseudo doit être écrit en un seul bloc sans espace. Exemple : ${suggestion} ou ${suggestionWithUnderscore}`);
+                        } else if (error && error.includes('bloc')) {
+                          setError('');
+                        }
+                      }}
                       style={{
                         width: '100%',
                         padding: '8px 12px 8px 36px',
                         borderRadius: '12px',
-                        border: '1px solid #CBD5E1',
+                        border: name.includes(' ') ? '1.5px solid #EF4444' : '1px solid #CBD5E1',
                         fontSize: '0.82rem',
-                        outline: 'none'
+                        outline: 'none',
+                        background: name.includes(' ') ? '#FEF2F2' : '#FFFFFF'
                       }}
                     />
                   </div>
+                  {name.includes(' ') ? (
+                    <span style={{ fontSize: '0.72rem', color: '#EF4444', fontWeight: 700, marginTop: '4px', display: 'block' }}>
+                      ⚠️ Les espaces ne sont pas autorisés. Écrivez : <strong>{name.replace(/\s+/g, '')}</strong> ou <strong>{name.replace(/\s+/g, '_')}</strong>
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '3px', display: 'block' }}>
+                      💡 Votre pseudo doit être en un seul mot sans espace.
+                    </span>
+                  )}
                 </div>
 
                 <div>
