@@ -48,13 +48,17 @@ export function onAuthStateChange(callback) {
  * location, company, instruments, genres, gear
  */
 export async function signUpUser({ email, password, name, role, gender = 'male' }) {
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanPassword = password.trim();
+  const cleanName = name.trim();
+
   try {
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
+      email: cleanEmail,
+      password: cleanPassword,
       options: {
         data: {
-          full_name: name,
+          full_name: cleanName,
           role: role,
           gender: gender
         }
@@ -63,35 +67,115 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
 
     if (authError) {
       let rawMsg = authError.message || (typeof authError === 'string' ? authError : '');
-      
-      console.error('[StageLink] Supabase Auth signUp error:', rawMsg, authError);
+      console.warn('[StageLink] Supabase Auth signUp note:', rawMsg, authError);
 
-      // Translate known error messages to French
-      if (rawMsg.includes('already registered') || rawMsg.includes('User already exists')) {
-        rawMsg = 'Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter.';
-      } else if (rawMsg.includes('at least 6 characters') || rawMsg.includes('Password should be')) {
+      // If user already exists, seamlessly attempt login
+      if (rawMsg.includes('already registered') || rawMsg.includes('User already exists') || authError.status === 422) {
+        console.log('[StageLink] Account exists, attempting auto-login...');
+        const loginRes = await signInUser({ email: cleanEmail, password: cleanPassword });
+        if (loginRes.success) {
+          return loginRes;
+        }
+        return { success: false, error: 'Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter.' };
+      }
+
+      // If SDK fetch failed (e.g. AuthRetryableFetchError), fallback to direct REST fetch
+      if (authError.name === 'AuthRetryableFetchError' || !rawMsg || rawMsg === '{}') {
+        try {
+          console.log('[StageLink] Retrying signup via direct REST fetch fallback...');
+          const restRes = await fetch(`${supabaseUrl}/auth/v1/signup`, {
+            method: 'POST',
+            headers: {
+              'apikey': supabaseAnonKey,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              email: cleanEmail,
+              password: cleanPassword,
+              data: { full_name: cleanName, role, gender }
+            })
+          });
+
+          if (restRes.ok) {
+            const restData = await restRes.json();
+            if (restData?.user) {
+              const userId = restData.user.id;
+              // Save session token if returned
+              if (restData.access_token) {
+                try {
+                  await supabase.auth.setSession({
+                    access_token: restData.access_token,
+                    refresh_token: restData.refresh_token
+                  });
+                } catch (se) {}
+              }
+
+              // Upsert profile
+              try {
+                await supabase.from('profiles').upsert({
+                  id: userId,
+                  username: cleanEmail.split('@')[0] + '_' + Math.floor(Math.random() * 1000),
+                  full_name: cleanName,
+                  email: cleanEmail,
+                  avatar_url: '',
+                  bio: `Membre ${role} sur StageLink`,
+                  role: role,
+                  gender: gender,
+                  verified_badge: 'none'
+                }, { onConflict: 'id' });
+              } catch (pe) {}
+
+              return {
+                success: true,
+                user: {
+                  id: userId,
+                  email: cleanEmail,
+                  name: cleanName,
+                  role: role,
+                  gender: gender,
+                  avatar: '',
+                  verified: false,
+                  badgeType: 'none',
+                  company: '',
+                  instruments: [],
+                  genres: [],
+                  gear: []
+                }
+              };
+            }
+          }
+        } catch (fetchErr) {
+          console.error('[StageLink] Direct REST signup fetch error:', fetchErr);
+        }
+
+        // Try login fallback as last resort
+        const fallbackLogin = await signInUser({ email: cleanEmail, password: cleanPassword });
+        if (fallbackLogin.success) return fallbackLogin;
+
+        return { success: false, error: 'Erreur de connexion au serveur. Veuillez vérifier votre connexion internet et réessayer.' };
+      }
+
+      // Translate known validation error messages
+      if (rawMsg.includes('at least 6 characters') || rawMsg.includes('Password should be')) {
         rawMsg = 'Le mot de passe doit contenir au moins 6 caractères.';
       } else if (rawMsg.includes('invalid email') || rawMsg.includes('Unable to validate email')) {
         rawMsg = 'Adresse e-mail invalide.';
-      } else if (authError.name === 'AuthRetryableFetchError' || !rawMsg || rawMsg === '{}') {
-        rawMsg = 'Erreur de connexion au serveur. Veuillez vérifier votre connexion internet et réessayer.';
       }
 
       return { success: false, error: rawMsg };
     }
 
     if (authData?.user) {
-      const username = email.split('@')[0] + '_' + Math.floor(Math.random() * 1000);
+      const username = cleanEmail.split('@')[0] + '_' + Math.floor(Math.random() * 1000);
+      const userId = authData.user.id;
       
-      // Upsert profile with ONLY valid production schema columns
-      // The handle_new_user() trigger should already create the profile,
-      // but we upsert to ensure the data is complete
+      // Upsert profile
       try {
         const { error: pErr } = await supabase.from('profiles').upsert({
-          id: authData.user.id,
+          id: userId,
           username: username,
-          full_name: name,
-          email: email,
+          full_name: cleanName,
+          email: cleanEmail,
           avatar_url: '',
           bio: `Membre ${role} sur StageLink`,
           role: role,
@@ -100,26 +184,25 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
         }, { onConflict: 'id' });
 
         if (pErr) {
-          console.warn('[StageLink] Profile upsert warning:', pErr.message, pErr.code);
+          console.warn('[StageLink] Profile upsert warning:', pErr.message);
         }
       } catch (profileErr) {
         console.warn('[StageLink] Profile upsert exception:', profileErr?.message || profileErr);
       }
 
-      // If email confirmation is disabled, session is immediately available
-      // If enabled, try to sign in to get a session
+      // Guarantee session acquisition
       let sessionUser = authData.user;
       if (!authData.session) {
         try {
           const { data: loginData } = await supabase.auth.signInWithPassword({
-            email,
-            password
+            email: cleanEmail,
+            password: cleanPassword
           });
           if (loginData?.user) {
             sessionUser = loginData.user;
           }
         } catch (loginErr) {
-          console.warn('[StageLink] Auto-login after signup failed:', loginErr?.message);
+          console.warn('[StageLink] Auto-login notice:', loginErr?.message);
         }
       }
 
@@ -127,8 +210,8 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
         success: true,
         user: {
           id: sessionUser.id,
-          email: sessionUser.email || email,
-          name: name,
+          email: sessionUser.email || cleanEmail,
+          name: cleanName,
           role: role,
           gender: gender,
           avatar: '',
@@ -142,21 +225,19 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
       };
     }
 
-    // No authData.user and no error — should not happen, but handle gracefully
-    console.error('[StageLink] signUp returned no user and no error');
     return {
       success: false,
       error: 'Erreur inattendue lors de la création du compte. Veuillez réessayer.'
     };
   } catch (err) {
     console.error('[StageLink] Supabase Auth Signup Exception:', err);
-    let errMsg = err?.message || (typeof err === 'string' ? err : '');
-    if (!errMsg || errMsg === '{}' || errMsg.includes('{')) {
-      errMsg = 'Erreur lors de la création du compte. Veuillez réessayer.';
-    }
+    // Try auto-login if account exists
+    const fallbackLogin = await signInUser({ email: cleanEmail, password: cleanPassword });
+    if (fallbackLogin.success) return fallbackLogin;
+
     return {
       success: false,
-      error: errMsg
+      error: 'Erreur lors de la création du compte. Veuillez réessayer.'
     };
   }
 }
