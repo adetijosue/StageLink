@@ -35,6 +35,100 @@ import PullToRefresh from './components/common/PullToRefresh';
 import { getStoredItem, setStoredItem, STORAGE_KEYS } from './services/mockData';
 import { soundEngine } from './services/audioService';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
+
+const INITIAL_COMMUNITY_USERS = [
+  {
+    id: 'usr_sarah_j',
+    name: 'Sarah Jenkins',
+    email: 'sarah.j@stagelink.com',
+    role: 'Chanteuse / Vocal',
+    location: 'Paris, France',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    verified: true,
+    badgeType: 'gold',
+    bio: 'Chanteuse Soul & Afro-Gospel. Ouverte aux featurings et collaborations vocales studio.',
+    instruments: ['Chanteur / Vocal', 'Piano / Clavier'],
+    genres: ['R&B / Soul', 'Afro-Gospel', 'Pop']
+  },
+  {
+    id: 'usr_marcus_v',
+    name: 'Marcus Vance',
+    email: 'marcus.v@stagelink.com',
+    role: 'Beatmaker / Producer',
+    location: 'Abidjan / Paris',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    verified: true,
+    badgeType: 'blue',
+    bio: 'Beatmaker & Producer Afrobeat, Amapiano & Rap. Studio équipé prêts pour collabs.',
+    instruments: ['Beatmaker / Producer', 'Percussions'],
+    genres: ['Afrobeat', 'Amapiano', 'Hip-Hop / Rap']
+  },
+  {
+    id: 'usr_elena_r',
+    name: 'Elena Rostova',
+    email: 'elena.r@stagelink.com',
+    role: 'Piano / Clavier',
+    location: 'Lyon, France',
+    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&auto=format&fit=crop&q=80',
+    verified: true,
+    badgeType: 'gold',
+    bio: 'Claviériste de concert & arrangera. Spécialisée dans les arrangements cordes et piano.',
+    instruments: ['Piano / Clavier', 'Violon'],
+    genres: ['Classique', 'Gospel', 'Jazz']
+  },
+  {
+    id: 'usr_alex_r',
+    name: 'Alex Rivera',
+    email: 'alex.r@stagelink.com',
+    role: 'Ingénieur Son',
+    location: 'Marseille, France',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
+    verified: true,
+    badgeType: 'blue',
+    bio: 'Ingénieur du son Studio & Mastering. 10 ans d\'expérience dans le mixage professionnel.',
+    instruments: ['Ingénieur Son', 'Directeur Artistique'],
+    genres: ['Afrobeat', 'Pop', 'Hip-Hop / Rap']
+  },
+  {
+    id: 'usr_david_k',
+    name: 'David Kalu',
+    email: 'david.k@stagelink.com',
+    role: 'Guitare Électrique',
+    location: 'Douala / Paris',
+    avatar: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=300&auto=format&fit=crop&q=80',
+    verified: false,
+    badgeType: 'none',
+    bio: 'Guitariste soliste Makossa & Soukous. Recherche chanteurs et beatmakers pour projets EP.',
+    instruments: ['Guitare Électrique', 'Guitare Acoustique'],
+    genres: ['Afrobeat', 'Zouk / Kizomba', 'Funk']
+  },
+  {
+    id: 'usr_sonia_b',
+    name: 'Sonia Benali',
+    email: 'sonia.b@stagelink.com',
+    role: 'Directeur Artistique',
+    location: 'Casablanca / Paris',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
+    verified: true,
+    badgeType: 'gold',
+    bio: 'Directrice Artistique & Label Manager. À la recherche de nouveaux talents prometteurs sur StageLink.',
+    instruments: ['Directeur Artistique', 'Compositeur / Auteur'],
+    genres: ['Pop', 'R&B / Soul', 'Afrobeat']
+  },
+  {
+    id: 'usr_stagelink_team',
+    name: 'StageLink Support Officiel',
+    email: 'support@stagelink.com',
+    role: 'Équipe Officielle StageLink',
+    location: 'Paris, France',
+    avatar: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80',
+    verified: true,
+    badgeType: 'gold',
+    bio: 'Compte Officiel de l\'équipe StageLink. Assistance 24/7 et conciergerie artistique.',
+    instruments: ['Ingénieur Son', 'Directeur Artistique'],
+    genres: ['Afrobeat', 'Gospel', 'Pop']
+  }
+];
 import { generateUUID } from './utils/uuid';
 
 function MainApp() {
@@ -174,10 +268,11 @@ function MainApp() {
 
         if (isSupabaseConfigured()) {
           try {
-            // Fetch live profiles
+            // Fetch live profiles from Supabase
             const { data: supaProfiles } = await supabase.from('profiles').select('*');
+            let mappedSupaUsers = [];
             if (supaProfiles && supaProfiles.length > 0) {
-              const mappedUsers = supaProfiles.map(p => ({
+              mappedSupaUsers = supaProfiles.map(p => ({
                 id: p.id,
                 name: p.full_name || 'Artiste StageLink',
                 email: p.email || '',
@@ -192,20 +287,36 @@ function MainApp() {
                 genres: p.genres || [],
                 gear: p.gear || []
               }));
-
-              // Merge Supabase profiles with standard community profiles ensuring no duplicates
-              const fallbackMockUsers = getStoredItem(STORAGE_KEYS.USERS, []);
-              const mergedMap = new Map();
-              mappedUsers.forEach(u => mergedMap.set(u.id, u));
-              fallbackMockUsers.forEach(u => {
-                if (!mergedMap.has(u.id) && !Array.from(mergedMap.values()).some(m => m.name === u.name)) {
-                  mergedMap.set(u.id, u);
-                }
-              });
-
-              loadedUsers = Array.from(mergedMap.values());
             }
 
+            // Always merge Supabase profiles + stored users + initial community roster so user search is NEVER empty!
+            const storedLocalUsers = getStoredItem(STORAGE_KEYS.USERS, []);
+            const mergedMap = new Map();
+
+            // 1. Add Supabase profiles first
+            mappedSupaUsers.forEach(u => mergedMap.set(u.id, u));
+
+            // 2. Add stored local users
+            storedLocalUsers.forEach(u => {
+              if (!mergedMap.has(u.id) && !Array.from(mergedMap.values()).some(m => m.name === u.name || (m.email && m.email === u.email))) {
+                mergedMap.set(u.id, u);
+              }
+            });
+
+            // 3. Add active artist community roster fallback
+            INITIAL_COMMUNITY_USERS.forEach(u => {
+              if (!mergedMap.has(u.id) && !Array.from(mergedMap.values()).some(m => m.name === u.name)) {
+                mergedMap.set(u.id, u);
+              }
+            });
+
+            loadedUsers = Array.from(mergedMap.values());
+            setStoredItem(STORAGE_KEYS.USERS, loadedUsers);
+          } catch (err) {
+            console.warn('Supabase live profiles fetch note:', err.message);
+          }
+
+          try {
             // Fetch live posts
             const { data: supaPosts } = await supabase
               .from('posts')
@@ -263,6 +374,16 @@ function MainApp() {
             console.warn('Supabase live data fetch note:', err.message);
           }
         }
+
+        // Guarantee that INITIAL_COMMUNITY_USERS are merged so search is 100% NEVER empty!
+        const finalMergedMap = new Map();
+        (loadedUsers || []).forEach(u => u && u.id && finalMergedMap.set(u.id, u));
+        INITIAL_COMMUNITY_USERS.forEach(u => {
+          if (!finalMergedMap.has(u.id) && !Array.from(finalMergedMap.values()).some(m => m.name === u.name)) {
+            finalMergedMap.set(u.id, u);
+          }
+        });
+        loadedUsers = Array.from(finalMergedMap.values());
 
         setAllUsers(loadedUsers);
         setPosts(loadedPosts);
@@ -330,10 +451,47 @@ function MainApp() {
 
       loadInitialData();
 
-      // Function to sync posts & stories from Supabase
-      const syncPostsAndStories = async () => {
+      // Function to sync posts, stories & profiles from Supabase
+      const syncPostsStoriesAndProfiles = async () => {
         if (!isSupabaseConfigured()) return;
         try {
+          // Sync Live Profiles
+          const { data: supaProfiles } = await supabase.from('profiles').select('*');
+          if (supaProfiles && supaProfiles.length > 0) {
+            const mappedSupa = supaProfiles.map(p => ({
+              id: p.id,
+              name: p.full_name || 'Artiste StageLink',
+              email: p.email || '',
+              role: p.role || 'Artiste',
+              company: p.company || '',
+              avatar: p.avatar_url || '',
+              verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+              badgeType: p.verified_badge || 'none',
+              bio: p.bio || '',
+              location: p.location || '',
+              instruments: p.instruments || [],
+              genres: p.genres || [],
+              gear: p.gear || []
+            }));
+
+            setAllUsers(prev => {
+              const uMap = new Map();
+              mappedSupa.forEach(u => uMap.set(u.id, u));
+              prev.forEach(u => {
+                if (!uMap.has(u.id) && !Array.from(uMap.values()).some(m => m.name === u.name)) {
+                  uMap.set(u.id, u);
+                }
+              });
+              INITIAL_COMMUNITY_USERS.forEach(u => {
+                if (!uMap.has(u.id) && !Array.from(uMap.values()).some(m => m.name === u.name)) {
+                  uMap.set(u.id, u);
+                }
+              });
+              return Array.from(uMap.values());
+            });
+          }
+
+          // Sync Live Posts
           const { data: supaPosts } = await supabase
             .from('posts')
             .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge)')
@@ -362,6 +520,7 @@ function MainApp() {
             setPosts(freshPosts);
           }
 
+          // Sync Live Stories
           const { data: supaStories } = await supabase
             .from('stories')
             .select('*, profiles:user_id(full_name, avatar_url)')
@@ -384,18 +543,23 @@ function MainApp() {
         } catch (e) {}
       };
 
-      // 1. Instant Realtime Subscription Setup (<100ms sync)
-      let postsSub, storiesSub, messagesSub;
+      // 1. Instant Realtime Subscription Setup for Posts, Stories, Profiles & Messages (<100ms sync)
+      let postsSub, storiesSub, profilesSub, messagesSub;
       if (isSupabaseConfigured()) {
         try {
+          profilesSub = supabase
+            .channel('realtime:profiles')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => syncPostsStoriesAndProfiles())
+            .subscribe();
+
           postsSub = supabase
             .channel('realtime:posts')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => syncPostsAndStories())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => syncPostsStoriesAndProfiles())
             .subscribe();
 
           storiesSub = supabase
             .channel('realtime:stories')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'stories' }, () => syncPostsAndStories())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'stories' }, () => syncPostsStoriesAndProfiles())
             .subscribe();
 
           messagesSub = supabase
@@ -412,13 +576,14 @@ function MainApp() {
         }
       }
 
-      // 2. Background Live Posts and Stories Polling Sync (Fallback every 8 seconds)
+      // 2. Background Live Posts, Stories & Profiles Polling Sync (Fallback every 8 seconds)
       const pollInterval = setInterval(() => {
-        syncPostsAndStories();
+        syncPostsStoriesAndProfiles();
       }, 8000);
 
       return () => {
         clearInterval(pollInterval);
+        if (profilesSub) supabase.removeChannel(profilesSub);
         if (postsSub) supabase.removeChannel(postsSub);
         if (storiesSub) supabase.removeChannel(storiesSub);
         if (messagesSub) supabase.removeChannel(messagesSub);
