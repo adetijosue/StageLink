@@ -42,15 +42,31 @@ export default function PWAInstallPrompt({ isDarkMode }) {
     }
 
     // 3. Native Browser Install Event Listener (Android / Chrome / Edge / Desktop)
+    let autoHideTimer = null;
+
+    const triggerBriefBanner = () => {
+      const isAlreadyDismissed = localStorage.getItem('stagelink_pwa_dismissed') === 'true';
+      if (isAlreadyDismissed || isAppStandalone) return;
+
+      setShowBanner(true);
+      if (autoHideTimer) clearTimeout(autoHideTimer);
+      // Strictly auto-hide after 4 seconds so it NEVER remains fixed on screen
+      autoHideTimer = setTimeout(() => {
+        setShowBanner(false);
+        localStorage.setItem('stagelink_pwa_dismissed', 'true');
+      }, 4000);
+    };
+
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setShowBanner(true);
+      triggerBriefBanner();
     };
 
     // 4. Listen to appinstalled event when user completes installation
     const handleAppInstalled = () => {
       localStorage.setItem('stagelink_app_installed', 'true');
+      localStorage.setItem('stagelink_pwa_dismissed', 'true');
       setIsStandalone(true);
       setShowBanner(false);
       setShowModal(false);
@@ -75,21 +91,10 @@ export default function PWAInstallPrompt({ isDarkMode }) {
     window.addEventListener('appinstalled', handleAppInstalled);
     window.addEventListener('openPWAInstallPrompt', handleManualOpen);
 
-    // Check if prompt was ALREADY shown or dismissed in this session
-    const isDismissedInSession = sessionStorage.getItem('stagelink_pwa_dismissed') === 'true';
-
-    // Auto-show BRIEF banner after 2 seconds on app opening (ONLY IF not already installed & not dismissed in session)
-    let autoHideTimer = null;
+    // Auto-show BRIEF banner after 3 seconds on app opening (ONLY IF not already installed & not dismissed)
     const showTimer = setTimeout(() => {
-      if (!isAppStandalone && !isDismissedInSession) {
-        setShowBanner(true);
-        // Automatically hide after 6 seconds so it NEVER blocks user navigation
-        autoHideTimer = setTimeout(() => {
-          setShowBanner(false);
-          sessionStorage.setItem('stagelink_pwa_dismissed', 'true');
-        }, 6000);
-      }
-    }, 2000);
+      triggerBriefBanner();
+    }, 3000);
 
     return () => {
       clearTimeout(showTimer);
@@ -102,7 +107,7 @@ export default function PWAInstallPrompt({ isDarkMode }) {
 
   const handleBannerAction = async () => {
     soundEngine.playPopSound();
-    sessionStorage.setItem('stagelink_pwa_dismissed', 'true');
+    localStorage.setItem('stagelink_pwa_dismissed', 'true');
     setShowBanner(false);
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -119,7 +124,7 @@ export default function PWAInstallPrompt({ isDarkMode }) {
 
   const handleDismissBanner = () => {
     soundEngine.playPopSound();
-    sessionStorage.setItem('stagelink_pwa_dismissed', 'true');
+    localStorage.setItem('stagelink_pwa_dismissed', 'true');
     setShowBanner(false);
   };
 
