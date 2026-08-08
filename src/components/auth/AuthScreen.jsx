@@ -150,7 +150,7 @@ export default function AuthScreen() {
             </button>
           </div>
 
-          {error && (
+          {error && error !== '{}' && (
             <div style={{
               background: '#FEF2F2',
               color: '#EF4444',
@@ -162,7 +162,9 @@ export default function AuthScreen() {
               border: '1px solid #FCA5A5',
               textAlign: 'center'
             }}>
-              {typeof error === 'string' ? error : (error?.message || 'Erreur lors du traitement. Veuillez réessayer.')}
+              {typeof error === 'string' && error !== '{}' && !error.includes('{')
+                ? error
+                : 'Erreur lors du traitement. Veuillez vérifier vos identifiants.'}
             </div>
           )}
 
