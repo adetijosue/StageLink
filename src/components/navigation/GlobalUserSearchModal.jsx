@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Search, User, MessageSquare, MapPin, Music, Check, Sparkles, ChevronRight } from 'lucide-react';
+import { X, Search, User, MessageSquare, MapPin, Music, Check, Sparkles, ChevronRight, UserPlus, UserCheck } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
 
@@ -7,6 +7,7 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
   const { currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('All');
+  const [followedUsers, setFollowedUsers] = useState({});
 
   if (!isOpen) return null;
 
@@ -266,6 +267,30 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
 
                 {/* Action Buttons */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      soundEngine.playPopSound();
+                      setFollowedUsers(prev => ({ ...prev, [usr.id]: !prev[usr.id] }));
+                    }}
+                    title={followedUsers[usr.id] ? "Membre Suivi" : "Se connecter / Suivre"}
+                    style={{
+                      background: followedUsers[usr.id] ? '#ECFDF5' : '#F1F5F9',
+                      color: followedUsers[usr.id] ? '#047857' : '#0F172A',
+                      border: followedUsers[usr.id] ? '1px solid #A7F3D0' : '1px solid #CBD5E1',
+                      borderRadius: '20px',
+                      padding: '8px 12px',
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {followedUsers[usr.id] ? <><UserCheck size={14} color="#047857" /> Suivi</> : <><UserPlus size={14} color="#0F172A" /> Suivre</>}
+                  </button>
+
                   <button
                     onClick={(e) => handleStartChatClick(e, usr)}
                     title="Démarrer une discussion"
