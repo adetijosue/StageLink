@@ -1,1 +1,1 @@
-{"buildCommand": "npm run build", "outputDirectory": "dist", "rewrites": [{"source": "/(.*)", "destination": "/index.html"}]}
+{"name": "stagelink", "buildCommand": "npm run build", "outputDirectory": "dist", "rewrites": [{"source": "/(.*)", "destination": "/index.html"}]}
