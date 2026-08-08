@@ -73,20 +73,26 @@ export default function AppSplashScreen({ onFinish }) {
         alignItems: 'center',
         animation: 'splashScaleIn 0.8s cubic-bezier(0.16, 1, 0.3, 1)'
       }}>
-        {/* Animated Glowing Logo */}
+        {/* Animated Glowing Official StageLink Logo */}
         <div style={{
-          width: '90px',
-          height: '90px',
+          width: '104px',
+          height: '104px',
           borderRadius: '26px',
-          background: 'linear-gradient(135deg, #0066FF 0%, #0047FF 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 0 45px rgba(0, 102, 255, 0.65)',
+          overflow: 'hidden',
+          boxShadow: '0 0 50px rgba(0, 102, 255, 0.8), 0 10px 30px rgba(0, 0, 0, 0.5)',
           marginBottom: '20px',
+          border: '2.5px solid rgba(255, 255, 255, 0.3)',
           animation: 'splashBounce 1.8s infinite ease-in-out'
         }}>
-          <Logo size="large" variant="icon-only" />
+          <img
+            src="/stagelink-logo.png"
+            alt="StageLink Official Logo"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover'
+            }}
+          />
         </div>
 
         {/* Brand Name */}
