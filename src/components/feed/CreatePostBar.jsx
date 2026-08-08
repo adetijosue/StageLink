@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Image, Send, PlusCircle } from 'lucide-react';
+import UserAvatar from '../common/UserAvatar';
 
 export default function CreatePostBar({ onClickOpenModal }) {
   const { currentUser } = useAuth();
@@ -23,17 +24,11 @@ export default function CreatePostBar({ onClickOpenModal }) {
     >
       {/* Top Row: User Avatar & Input Prompt */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-        <img
-          src={currentUser.avatar}
-          alt={currentUser.name}
-          style={{
-            width: '46px',
-            height: '46px',
-            borderRadius: '50%',
-            objectFit: 'cover',
-            border: '2px solid #0066FF',
-            boxShadow: '0 4px 12px rgba(0, 102, 255, 0.15)'
-          }}
+        <UserAvatar
+          user={currentUser}
+          size={46}
+          border="2px solid #0066FF"
+          style={{ boxShadow: '0 4px 12px rgba(0, 102, 255, 0.15)' }}
         />
         <div style={{
           flex: 1,

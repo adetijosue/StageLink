@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Image, Video, Trash2, Send, Eye, Globe, Lock, Mic, Play, Pause, X, Plus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { soundEngine } from '../../services/audioService';
+import UserAvatar from '../common/UserAvatar';
 import confetti from 'canvas-confetti';
 
 export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
@@ -216,7 +217,7 @@ export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
         {activeTabMode === 'preview' ? (
           <div style={{ background: isDarkMode ? '#151D2A' : '#FFFFFF', borderRadius: '20px', padding: '16px', border: '1px solid var(--border-light)' }}>
             <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
-              <img src={currentUser.avatar} style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
+              <UserAvatar user={currentUser} size={40} />
               <div><h4 style={{ margin: 0, fontSize: '0.9rem' }}>{currentUser.name}</h4><span style={{ fontSize: '0.7rem', opacity: 0.6 }}>{currentUser.role}</span></div>
             </div>
             <p style={{ whiteSpace: 'pre-line', fontSize: '0.95rem' }}>{postText || 'Texte de la publication...'}</p>

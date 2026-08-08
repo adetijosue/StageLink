@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, Image, Video, Music, Check, Eye, Trash2, Send, Mic, Play, Pause, Square } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { soundEngine } from '../../services/audioService';
+import UserAvatar from '../common/UserAvatar';
 import confetti from 'canvas-confetti';
 
 export default function CreatePostModal({ isOpen, onClose, onSubmitPost }) {
@@ -249,7 +250,7 @@ export default function CreatePostModal({ isOpen, onClose, onSubmitPost }) {
         {isPreviewMode ? (
           <div style={{ background: '#F8FAFC', borderRadius: '18px', padding: '16px', border: '1px solid #E2E8F0', marginBottom: '18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-              <img src={currentUser.avatar} alt={currentUser.name} style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
+              <UserAvatar user={currentUser} size={40} />
               <div>
                 <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F172A' }}>{currentUser.name}</h4>
                 <span style={{ fontSize: '0.75rem', color: '#64748B' }}>{currentUser.role} • À l'instant</span>
@@ -296,7 +297,7 @@ export default function CreatePostModal({ isOpen, onClose, onSubmitPost }) {
           <form onSubmit={handleSubmit}>
             {/* Author Row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-              <img src={currentUser.avatar} alt={currentUser.name} style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover' }} />
+              <UserAvatar user={currentUser} size={42} />
               <div>
                 <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F172A' }}>{currentUser.name}</h4>
                 <span style={{ fontSize: '0.75rem', color: '#0066FF', fontWeight: 600 }}>{currentUser.role}</span>
