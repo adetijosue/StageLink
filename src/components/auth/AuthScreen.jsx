@@ -154,13 +154,15 @@ export default function AuthScreen() {
             <div style={{
               background: '#FEF2F2',
               color: '#EF4444',
-              padding: '8px 12px',
-              borderRadius: '12px',
-              fontSize: '0.8rem',
-              marginBottom: '10px',
-              border: '1px solid #FCA5A5'
+              padding: '10px 14px',
+              borderRadius: '14px',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              marginBottom: '12px',
+              border: '1px solid #FCA5A5',
+              textAlign: 'center'
             }}>
-              {error}
+              {typeof error === 'string' ? error : (error?.message || 'Erreur lors du traitement. Veuillez réessayer.')}
             </div>
           )}
 
@@ -245,7 +247,7 @@ export default function AuthScreen() {
                     borderRadius: '12px',
                     border: '1px solid #CBD5E1',
                     fontSize: '0.82rem',
-                        outline: 'none'
+                    outline: 'none'
                   }}
                 />
               </div>
@@ -283,29 +285,6 @@ export default function AuthScreen() {
               {isSubmitting ? 'Traitement...' : isLogin ? 'Se Connecter' : 'Rejoindre StageLink'} <ArrowRight size={16} />
             </button>
           </form>
-
-          {/* Single Clean Demo Account Fast-Track */}
-          <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid #F1F5F9', textAlign: 'center' }}>
-            <button
-              type="button"
-              onClick={() => handleDemoLogin('sarah.jenkins@music.io')}
-              style={{
-                padding: '5px 12px',
-                borderRadius: '20px',
-                border: '1px solid #BFDBFE',
-                background: '#EFF6FF',
-                color: '#0066FF',
-                fontSize: '0.74rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <CheckCircle size={13} /> Compte Démo Rapide (Sarah Jenkins)
-            </button>
-          </div>
         </div>
       </div>
     </div>

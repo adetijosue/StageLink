@@ -31,11 +31,18 @@ export async function signUpUser({ email, password, name, role }) {
     });
 
     if (authError) {
-      let msg = authError.message;
-      if (msg.includes('already registered')) msg = 'Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter.';
-      if (msg.includes('at least 6 characters')) msg = 'Le mot de passe doit contenir au moins 6 caractères.';
-      if (msg.includes('invalid email')) msg = 'Adresse e-mail invalide.';
-      throw new Error(msg);
+      let rawMsg = authError.message || (typeof authError === 'string' ? authError : '');
+      if (typeof rawMsg !== 'string' || !rawMsg.trim()) {
+        rawMsg = 'Erreur lors de l’inscription avec Supabase.';
+      }
+      if (rawMsg.includes('already registered') || rawMsg.includes('User already exists')) {
+        rawMsg = 'Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter.';
+      } else if (rawMsg.includes('at least 6 characters') || rawMsg.includes('Password should be')) {
+        rawMsg = 'Le mot de passe doit contenir au moins 6 caractères.';
+      } else if (rawMsg.includes('invalid email') || rawMsg.includes('Unable to validate email')) {
+        rawMsg = 'Adresse e-mail invalide.';
+      }
+      return { success: false, error: rawMsg };
     }
 
     if (authData?.user) {
@@ -56,7 +63,7 @@ export async function signUpUser({ email, password, name, role }) {
           genres: []
         }, { onConflict: 'id' });
       } catch (profileErr) {
-        console.warn('Profile upsert note:', profileErr.message);
+        console.warn('Profile upsert note:', profileErr?.message || profileErr);
       }
 
       // If email confirmation is disabled or session acquired, user is ready
@@ -76,7 +83,7 @@ export async function signUpUser({ email, password, name, role }) {
         success: true,
         user: {
           id: sessionUser.id,
-          email: sessionUser.email,
+          email: sessionUser.email || email,
           name: name,
           role: role,
           avatar: '',
@@ -90,12 +97,16 @@ export async function signUpUser({ email, password, name, role }) {
       };
     }
 
-    throw new Error('Impossible de créer le compte.');
+    return { success: false, error: 'Impossible de créer le compte. Veuillez vérifier vos informations.' };
   } catch (err) {
-    console.error('Supabase Auth Signup Error:', err.message);
+    console.error('Supabase Auth Signup Error:', err);
+    let errMsg = err?.message || (typeof err === 'string' ? err : '');
+    if (typeof errMsg !== 'string' || !errMsg.trim()) {
+      errMsg = 'Erreur lors de la création de votre compte. Veuillez réessayer.';
+    }
     return {
       success: false,
-      error: err.message || 'Erreur lors de l’inscription.'
+      error: errMsg
     };
   }
 }
@@ -111,10 +122,16 @@ export async function signInUser({ email, password }) {
     });
 
     if (authError) {
-      let msg = authError.message;
-      if (msg.includes('Invalid login credentials')) msg = 'Adresse e-mail ou mot de passe incorrect.';
-      if (msg.includes('Email not confirmed')) msg = 'Veuillez confirmer votre adresse e-mail pour vous connecter.';
-      throw new Error(msg);
+      let rawMsg = authError.message || (typeof authError === 'string' ? authError : '');
+      if (typeof rawMsg !== 'string' || !rawMsg.trim()) {
+        rawMsg = 'Adresse e-mail ou mot de passe incorrect.';
+      }
+      if (rawMsg.includes('Invalid login credentials')) {
+        rawMsg = 'Adresse e-mail ou mot de passe incorrect.';
+      } else if (rawMsg.includes('Email not confirmed')) {
+        rawMsg = 'Veuillez confirmer votre adresse e-mail pour vous connecter.';
+      }
+      return { success: false, error: rawMsg };
     }
 
     // Fetch profile details with maybeSingle() to avoid single() row missing exception
@@ -127,7 +144,7 @@ export async function signInUser({ email, password }) {
         .maybeSingle();
       profile = data;
     } catch (pe) {
-      console.warn('Profile fetch notice:', pe.message);
+      console.warn('Profile fetch notice:', pe?.message || pe);
     }
 
     return {
@@ -147,10 +164,14 @@ export async function signInUser({ email, password }) {
       }
     };
   } catch (err) {
-    console.error('Supabase Auth Signin Error:', err.message);
+    console.error('Supabase Auth Signin Error:', err);
+    let errMsg = err?.message || (typeof err === 'string' ? err : '');
+    if (typeof errMsg !== 'string' || !errMsg.trim()) {
+      errMsg = 'Erreur lors de la connexion. Veuillez réessayer.';
+    }
     return {
       success: false,
-      error: err.message || 'Identifiants invalides.'
+      error: errMsg
     };
   }
 }
