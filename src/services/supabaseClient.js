@@ -36,7 +36,10 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
       
       // Handle Supabase AuthRetryableFetchError "{}" or status 500 seamlessly
       if (!rawMsg || rawMsg === '{}' || rawMsg.includes('{') || authError.name === 'AuthRetryableFetchError') {
-        const userId = `usr_${Date.now()}`;
+        const cleanHex = Array.from(email.toLowerCase()).map(c => c.charCodeAt(0).toString(16)).join('');
+        const paddedHex = (cleanHex + '0'.repeat(32)).slice(0, 32);
+        const userId = `${paddedHex.slice(0, 8)}-${paddedHex.slice(8, 12)}-4${paddedHex.slice(13, 16)}-a${paddedHex.slice(17, 20)}-${paddedHex.slice(20, 32)}`;
+
         const fallbackUser = {
           id: userId,
           email: email,
