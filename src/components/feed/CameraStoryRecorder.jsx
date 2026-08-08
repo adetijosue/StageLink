@@ -470,7 +470,10 @@ export default function CameraStoryRecorder({ isOpen, onClose, onStoryCreated, r
           /* WhatsApp Style Live Camera Stream Viewport */
           <>
             {capturedImage ? (
-              <img src={capturedImage} alt="Preview Story" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <div style={{ position: 'relative', width: '100%', height: '100%', background: '#000', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img src={capturedImage} alt="Preview Backdrop" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(28px) brightness(0.4)', opacity: 0.75 }} />
+                <img src={capturedImage} alt="Preview Story" style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', objectFit: 'contain' }} />
+              </div>
             ) : (
               <div style={{ position: 'relative', width: '100%', height: '100%', background: '#030712' }}>
                 <video

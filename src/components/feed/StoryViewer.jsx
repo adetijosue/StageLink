@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Heart, Send, Repeat, Trash2, Eye, MessageCircle, Check } from 'lucide-react';
+import { X, Heart, Send, Repeat, Trash2, Eye, MessageCircle, Check, Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { soundEngine } from '../../services/audioService';
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
@@ -19,6 +19,7 @@ export default function StoryViewer({
   const [progress, setProgress] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(story?.likesCount || 8);
+  const [isMuted, setIsMuted] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [replySent, setReplySent] = useState(false);
   const [showViewersModal, setShowViewersModal] = useState(initialShowViewers || false);
@@ -128,30 +129,65 @@ export default function StoryViewer({
         padding: 'env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 16px)',
         overflow: 'hidden'
       }}>
-        {/* Background Media Render */}
+        {/* Background Media Render with Smart Framing (Contain + Blur Backdrop) */}
         {activeMediaUrl ? (
-          <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {isVideoMedia ? (
-              <video
-                ref={videoRef}
-                src={activeMediaUrl}
-                autoPlay
-                muted
-                playsInline
-                loop
-                style={{ width: '100%', height: '100%', objectFit: 'cover', filter: filterCss }}
-              />
+              <>
+                {/* Blurred Video Backdrop */}
+                <video
+                  src={activeMediaUrl}
+                  muted
+                  playsInline
+                  style={{
+                    position: 'absolute', inset: 0, width: '100%', height: '100%',
+                    objectFit: 'cover', filter: 'blur(28px) brightness(0.4)', opacity: 0.75
+                  }}
+                />
+
+                {/* Main Crisp Video (Full Uncropped Frame + Original Audio) */}
+                <video
+                  ref={videoRef}
+                  src={activeMediaUrl}
+                  autoPlay
+                  playsInline
+                  loop
+                  muted={isMuted}
+                  style={{
+                    position: 'relative', zIndex: 2,
+                    width: '100%', height: '100%',
+                    objectFit: 'contain', filter: filterCss
+                  }}
+                />
+              </>
             ) : (
-              <img
-                src={activeMediaUrl}
-                alt="Story Content"
-                style={{ width: '100%', height: '100%', objectFit: 'cover', filter: filterCss }}
-              />
+              <>
+                {/* Blurred Image Backdrop */}
+                <img
+                  src={activeMediaUrl}
+                  alt="Story Backdrop"
+                  style={{
+                    position: 'absolute', inset: 0, width: '100%', height: '100%',
+                    objectFit: 'cover', filter: 'blur(28px) brightness(0.4)', opacity: 0.75
+                  }}
+                />
+
+                {/* Main Crisp Image (Full Uncropped Frame) */}
+                <img
+                  src={activeMediaUrl}
+                  alt="Story Content"
+                  style={{
+                    position: 'relative', zIndex: 2,
+                    width: '100%', height: '100%',
+                    objectFit: 'contain', filter: filterCss
+                  }}
+                />
+              </>
             )}
 
             {/* Stickers Overlay */}
             {story.stickers?.map(s => (
-              <div key={s.id} style={{ position: 'absolute', left: s.x, top: s.y, color: s.color, fontSize: '1.5rem', fontWeight: 900, textShadow: '0 2px 10px rgba(0,0,0,0.6)' }}>
+              <div key={s.id} style={{ position: 'absolute', zIndex: 5, left: s.x, top: s.y, color: s.color, fontSize: '1.5rem', fontWeight: 900, textShadow: '0 2px 10px rgba(0,0,0,0.6)' }}>
                 {s.text}
               </div>
             ))}
@@ -169,7 +205,7 @@ export default function StoryViewer({
         )}
 
         {/* Dark Overlay Gradient for Legibility */}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 25%, transparent 75%, rgba(0,0,0,0.7) 100%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', inset: 0, zIndex: 3, background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 25%, transparent 75%, rgba(0,0,0,0.7) 100%)', pointerEvents: 'none' }} />
 
         {/* Toast Sent Reply Confirmation */}
         {replySent && (
@@ -211,7 +247,27 @@ export default function StoryViewer({
                 <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>{story.time}</span>
               </div>
             </div>
-            <button onClick={onClose} style={{ background: 'rgba(0,0,0,0.4)', border: 'none', color: '#FFF', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><X size={20} /></button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {isVideoMedia && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsMuted(!isMuted);
+                  }}
+                  style={{
+                    background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.25)',
+                    color: '#FFF', width: '36px', height: '36px', borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                  }}
+                  title={isMuted ? 'Activer le son de la vidéo' : 'Désactiver le son'}
+                >
+                  {isMuted ? <VolumeX size={18} color="#FF4D4D" /> : <Volume2 size={18} color="#FFF" />}
+                </button>
+              )}
+
+              <button onClick={onClose} style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #FCA5A5', color: '#EF4444', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} title="Fermer"><X size={18} color="#EF4444" /></button>
+            </div>
           </div>
         </div>
 
