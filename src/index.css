@@ -58,7 +58,8 @@ html, body {
   width: 100%;
   height: 100%;
   height: 100dvh;
-  background-color: #0F172A;
+  min-height: -webkit-fill-available;
+  background-color: var(--bg-light);
   color: var(--text-dark);
   overflow: hidden;
   -webkit-text-size-adjust: 100%;
@@ -82,10 +83,11 @@ input, select, textarea {
   width: 100%;
   height: 100%;
   height: 100dvh;
+  min-height: -webkit-fill-available;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: radial-gradient(circle at 50% 0%, #1E293B 0%, #0F172A 100%);
+  background-color: var(--bg-light);
   padding: 0;
 }
 
@@ -95,6 +97,7 @@ input, select, textarea {
   max-width: 480px;
   height: 100%;
   height: 100dvh;
+  min-height: -webkit-fill-available;
   background-color: var(--bg-light);
   display: flex;
   flex-direction: column;

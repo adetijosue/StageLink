@@ -43,6 +43,17 @@ function MainApp() {
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem('stagelink_theme') === 'dark';
   });
+
+  useEffect(() => {
+    const activeBgColor = isDarkMode ? '#0B0F19' : '#F8FAFC';
+    document.documentElement.style.backgroundColor = activeBgColor;
+    document.body.style.backgroundColor = activeBgColor;
+
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeColorMeta) {
+      themeColorMeta.setAttribute('content', activeBgColor);
+    }
+  }, [isDarkMode]);
   const [activeGlobalTrack, setActiveGlobalTrack] = useState({
     title: 'Jam Session Afro-Gospel (Demo)',
     artist: 'StageLink Studio • Live Track',
@@ -746,38 +757,7 @@ function MainApp() {
         />
       )}
 
-      {/* Ultra-Premium Single Floating Action Button (FAB Plus) for Feed Post Creation */}
-      {activeTab === 'feed' && !selectedChat && !activeStory && (
-        <button
-          onClick={() => {
-            soundEngine.playPopSound();
-            setIsCreatePostOpen(true);
-          }}
-          title="Créer une publication"
-          style={{
-            position: 'fixed',
-            bottom: showGlobalPlayer
-              ? 'calc(152px + env(safe-area-inset-bottom, 0px))'
-              : 'calc(86px + env(safe-area-inset-bottom, 0px))',
-            right: '18px',
-            width: '56px',
-            height: '56px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #0066FF 0%, #0047FF 100%)',
-            color: '#FFFFFF',
-            border: '2px solid rgba(255, 255, 255, 0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 85,
-            boxShadow: '0 10px 28px rgba(0, 102, 255, 0.45), 0 4px 12px rgba(0, 0, 0, 0.2)',
-            cursor: 'pointer',
-            transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-          }}
-        >
-          <Plus size={26} strokeWidth={2.8} />
-        </button>
-      )}
+
 
       {/* PWA INSTALLATION ASSISTANT & TUTORIAL */}
       <PWAInstallPrompt isDarkMode={isDarkMode} />
