@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, Printer, FileText } from 'lucide-react';
+import { ChevronLeft, Printer, FileText, X } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 
 export default function CGUPage({ isOpen, onClose }) {
@@ -50,35 +50,60 @@ export default function CGUPage({ isOpen, onClose }) {
               justifyContent: 'center',
               cursor: 'pointer'
             }}
+            title="Retour"
           >
-            <ChevronLeft size={22} />
+            <ChevronLeft size={24} />
           </button>
           <div>
-            <h2 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: '#0F172A' }}>
-              {isEn ? 'Terms of Service (ToS)' : 'Conditions Générales d\'Utilisation (CGU)'}
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FileText size={20} color="#0066FF" /> CGU • StageLink
             </h2>
-            <span style={{ fontSize: '0.75rem', color: '#64748B' }}>StageLink • Powered by JABE PRODUCTION</span>
+            <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Conditions Générales d'Utilisation</span>
           </div>
         </div>
 
-        <button
-          onClick={() => window.print()}
-          style={{
-            background: '#0066FF',
-            color: '#FFF',
-            border: 'none',
-            borderRadius: '12px',
-            padding: '8px 14px',
-            fontSize: '0.78rem',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            cursor: 'pointer'
-          }}
-        >
-          <Printer size={15} /> {isEn ? 'Print / PDF' : 'Imprimer / PDF'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={() => window.print()}
+            style={{
+              background: '#F1F5F9',
+              color: '#475569',
+              border: '1px solid #CBD5E1',
+              borderRadius: '12px',
+              padding: '8px 12px',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            <Printer size={15} /> Imprimer
+          </button>
+
+          <button
+            onClick={onClose}
+            style={{
+              background: '#FEF2F2',
+              border: '1px solid #FCA5A5',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              minWidth: '40px',
+              minHeight: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#EF4444',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.15)'
+            }}
+            title="Fermer"
+          >
+            <X size={20} />
+          </button>
+        </div>
       </div>
 
       {/* Standalone CGU Page Content */}

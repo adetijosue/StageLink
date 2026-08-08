@@ -46,7 +46,17 @@ export default function CommunityCharterPopup({ isOpen, onClose }) {
               {isEn ? 'Community Guidelines' : 'Charte StageLink'}
             </h3>
           </div>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}><X size={24} color="#64748B" /></button>
+          <button
+            onClick={onClose}
+            style={{
+              background: '#F1F5F9', border: '1px solid #CBD5E1',
+              borderRadius: '50%', width: '36px', height: '36px',
+              color: '#0F172A', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}
+          >
+            <X size={18} />
+          </button>
         </div>
 
         {/* Body */}
