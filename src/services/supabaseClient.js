@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://rtshwspmvbdopgmzvmzq.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0c2h3c3BtdmJkb3BnbXp2bXpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4NDQwMzAsImV4cCI6MjEwMDQyMDAzMH0.9YQXTX92kKgqT3xR89niZrNXY6Yh52m7QI3UOUAH9vU';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://shklbnxxpcioavsplbem.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNoa2xibnh4cGNpb2F2c3BsYmVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxOTQzODcsImV4cCI6MjEwMTc3MDM4N30.xG1YWOQAX4jiD3M66OFRByK5R85-a2MaAIAxKPca4RM';
 
 export function isSupabaseConfigured() {
   return (
