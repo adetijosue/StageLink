@@ -163,6 +163,8 @@ function MainApp() {
 
   useEffect(() => {
     if (isAuthenticated && currentUser) {
+      const welcomeSeenKey = `stagelink_welcome_shown_${currentUser.id}`;
+
       const loadInitialData = async () => {
         let loadedPosts = getStoredItem(STORAGE_KEYS.POSTS, []);
         let loadedStories = getStoredItem(STORAGE_KEYS.STORIES, []);
@@ -280,8 +282,12 @@ function MainApp() {
           }
         } catch (e) {}
 
-        // Handle Welcome Onboarding & Welcome Chat for New Registrations
-        if (currentUser.isNewRegistration) {
+        // Handle One-Time Welcome Onboarding & Welcome Chat for New Registrations
+        const alreadyShown = localStorage.getItem(welcomeSeenKey);
+        if (currentUser.isNewRegistration && !alreadyShown) {
+          localStorage.setItem(welcomeSeenKey, 'true');
+          updateUserProfile({ isNewRegistration: false });
+
           const welcomeChatId = 'chat_stagelink_official';
           const hasWelcomeChat = loadedChats.some(c => c.id === welcomeChatId || (c.participant && c.participant.name && c.participant.name.includes('StageLink')));
 
@@ -319,15 +325,63 @@ function MainApp() {
 
           setIsOnboardingOpen(true);
           setIsWelcomeEmailOpen(true);
-          updateUserProfile({ isNewRegistration: false });
         }
       };
 
       loadInitialData();
 
-      // Live multi-user background synchronization every 8 seconds
-      const pollInterval = setInterval(() => {
-        loadInitialData();
+      // Background Live Posts and Stories Polling Sync (Pure data update, no modals)
+      const pollInterval = setInterval(async () => {
+        if (!isSupabaseConfigured()) return;
+        try {
+          const { data: supaPosts } = await supabase
+            .from('posts')
+            .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge)')
+            .order('created_at', { ascending: false });
+
+          if (supaPosts && supaPosts.length > 0) {
+            const freshPosts = supaPosts.map(p => ({
+              id: p.id,
+              userId: p.user_id,
+              userName: p.profiles?.full_name || 'Artiste StageLink',
+              userRole: p.profiles?.role || 'Membre StageLink',
+              userAvatar: p.profiles?.avatar_url || '',
+              isVerified: p.profiles?.verified_badge === 'gold' || p.profiles?.verified_badge === 'blue',
+              badgeType: p.profiles?.verified_badge || 'none',
+              text: p.content || '',
+              image: p.media_url || null,
+              hasAudio: Boolean(p.audio_url),
+              audioTitle: p.audio_title || 'Extrait Audio',
+              audioUrl: p.audio_url || null,
+              likesCount: p.likes_count || 0,
+              isLiked: false,
+              commentsCount: p.comments_count || 0,
+              comments: [],
+              timeAgo: 'Récemment'
+            }));
+            setPosts(freshPosts);
+          }
+
+          const { data: supaStories } = await supabase
+            .from('stories')
+            .select('*, profiles:user_id(full_name, avatar_url)')
+            .gte('expires_at', new Date().toISOString())
+            .order('created_at', { ascending: false });
+
+          if (supaStories && supaStories.length > 0) {
+            const freshStories = supaStories.map(s => ({
+              id: s.id,
+              userId: s.user_id,
+              userName: s.profiles?.full_name || 'Artiste StageLink',
+              avatar: s.profiles?.avatar_url || '',
+              hasUnread: true,
+              storyMedia: s.media_url,
+              caption: s.caption || '',
+              time: 'Récemment'
+            }));
+            setStories(freshStories);
+          }
+        } catch (e) {}
       }, 8000);
 
       return () => clearInterval(pollInterval);
