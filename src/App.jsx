@@ -496,6 +496,7 @@ function MainApp() {
   };
 
   const handleCreateStory = (storyData) => {
+    const rawMedia = storyData.storyMedia || storyData.mediaUrl || storyData.media || null;
     const newStory = {
       id: `story_${Date.now()}`,
       userId: currentUser.id,
@@ -505,12 +506,14 @@ function MainApp() {
       badgeType: currentUser.badgeType,
       hasUnread: false,
       isTextStory: storyData.isTextStory || false,
-      mediaUrl: storyData.mediaUrl || storyData.media || null,
-      mediaType: storyData.type || (storyData.mediaUrl ? 'image' : null),
+      mediaUrl: rawMedia,
+      storyMedia: rawMedia,
+      mediaType: storyData.mediaType || storyData.type || (rawMedia ? 'image' : null),
       caption: storyData.caption || '',
       bgGradient: storyData.bgGradient || 'linear-gradient(135deg, #0066FF, #0047FF)',
       filter: storyData.filter || 'none',
       stickers: storyData.stickers || [],
+      allowReshare: storyData.allowReshare !== false,
       isReshared: storyData.isReshared || false,
       resharedFrom: storyData.resharedFrom || null,
       time: 'À l\'instant'
