@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { X, Search, MessageSquare, Check, MapPin, Music } from 'lucide-react';
 import Logo from '../common/Logo';
+import { useAuth } from '../../context/AuthContext';
 
 export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onSelectUser, existingUsers, users }) {
+  const { currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('All');
 
@@ -20,6 +22,13 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
   // Search & Role filtering logic
   const filteredUsers = safeUsers.filter((user) => {
     if (!user) return false;
+
+    // Exclude current logged-in user from new chat contact list
+    if (currentUser) {
+      if (user.id && currentUser.id && user.id === currentUser.id) return false;
+      if (user.email && currentUser.email && user.email.toLowerCase() === currentUser.email.toLowerCase()) return false;
+    }
+
     const name = user.name || user.userName || '';
     const role = user.role || user.userRole || '';
     const location = user.location || '';

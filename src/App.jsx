@@ -177,7 +177,7 @@ function MainApp() {
             if (supaProfiles && supaProfiles.length > 0) {
               const mappedUsers = supaProfiles.map(p => ({
                 id: p.id,
-                name: p.full_name,
+                name: p.full_name || 'Artiste StageLink',
                 email: p.email || '',
                 role: p.role || 'Artiste',
                 company: p.company || '',
@@ -190,7 +190,18 @@ function MainApp() {
                 genres: p.genres || [],
                 gear: p.gear || []
               }));
-              loadedUsers = mappedUsers;
+
+              // Merge Supabase profiles with standard community profiles ensuring no duplicates
+              const fallbackMockUsers = getStoredItem(STORAGE_KEYS.USERS, []);
+              const mergedMap = new Map();
+              mappedUsers.forEach(u => mergedMap.set(u.id, u));
+              fallbackMockUsers.forEach(u => {
+                if (!mergedMap.has(u.id) && !Array.from(mergedMap.values()).some(m => m.name === u.name)) {
+                  mergedMap.set(u.id, u);
+                }
+              });
+
+              loadedUsers = Array.from(mergedMap.values());
             }
 
             // Fetch live posts

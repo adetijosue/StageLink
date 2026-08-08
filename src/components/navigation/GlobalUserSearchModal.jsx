@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { X, Search, User, MessageSquare, MapPin, Music, Check, Sparkles, ChevronRight } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
+import { useAuth } from '../../context/AuthContext';
 
 export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPublicProfile, onStartChat, isDarkMode }) {
+  const { currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('All');
 
@@ -12,6 +14,13 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
 
   const filteredUsers = safeUsers.filter((u) => {
     if (!u) return false;
+
+    // Exclude current logged-in user from member search results
+    if (currentUser) {
+      if (u.id && currentUser.id && u.id === currentUser.id) return false;
+      if (u.email && currentUser.email && u.email.toLowerCase() === currentUser.email.toLowerCase()) return false;
+    }
+
     const name = u.name || u.userName || '';
     const role = u.role || u.userRole || '';
     const location = u.location || '';
