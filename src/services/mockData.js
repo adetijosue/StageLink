@@ -56,42 +56,8 @@ export const setStoredItem = (key, value) => {
   }
 };
 
-// ═══════════════════════════════════════════════════════════
-// DATA VERSION — Increment this number to force a full 
-// localStorage reset on all users' browsers on next visit.
-// This ensures stale phantom data from previous sessions
-// is cleared for the Supabase production launch.
-// ═══════════════════════════════════════════════════════════
-const STAGELINK_DATA_VERSION = 2;
-const DATA_VERSION_KEY = 'stagelink_data_version';
-
+// Initialize seed storage ONLY IF NOT ALREADY INITIALIZED (preserves user profile edits & custom avatar photos)
 export const initializeStorage = () => {
-  // Check if a full reset is needed (version bump or first launch)
-  const currentVersion = parseInt(localStorage.getItem(DATA_VERSION_KEY) || '0', 10);
-  
-  if (currentVersion < STAGELINK_DATA_VERSION) {
-    // Full purge of all StageLink localStorage data
-    console.log(`[StageLink] 🔄 Data reset: v${currentVersion} → v${STAGELINK_DATA_VERSION}`);
-    
-    Object.values(STORAGE_KEYS).forEach(key => {
-      localStorage.removeItem(key);
-    });
-    
-    // Also clear any stale welcome/onboarding flags
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.startsWith('stagelink_') || key.startsWith('sl_'))) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach(key => localStorage.removeItem(key));
-    
-    // Set new version marker
-    localStorage.setItem(DATA_VERSION_KEY, String(STAGELINK_DATA_VERSION));
-  }
-
-  // Initialize empty seed data if not present
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
     setStoredItem(STORAGE_KEYS.USERS, INITIAL_USERS);
   }

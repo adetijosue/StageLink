@@ -61,10 +61,6 @@ export default function AuthScreen() {
     }
   };
 
-  const handleDemoLogin = (demoEmail) => {
-    login(demoEmail, 'password123');
-  };
-
   return (
     <div style={{
       position: 'fixed',
@@ -186,15 +182,12 @@ export default function AuthScreen() {
                     Nom d'artiste / Pseudonyme
                   </label>
                   <div style={{ position: 'relative' }}>
-                    <User size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94A3B8' }} />
+                    <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
                     <input
                       type="text"
-                      placeholder="ex: StageLink Production"
+                      placeholder="ex: StageLink ou Jean Dupont"
                       value={name}
-                      onChange={(e) => {
-                        setName(e.target.value);
-                        if (error) setError('');
-                      }}
+                      onChange={(e) => setName(e.target.value)}
                       style={{
                         width: '100%',
                         padding: '8px 12px 8px 36px',
@@ -207,7 +200,7 @@ export default function AuthScreen() {
                     />
                   </div>
                   <span style={{ fontSize: '0.7rem', color: '#64748B', marginTop: '3px', display: 'block' }}>
-                    💡 Entrez votre prénom, nom ou pseudonyme d'artiste.
+                    💡 Entrez votre prénom, nom ou nom de scène d'artiste.
                   </span>
                 </div>
 

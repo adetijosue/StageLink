@@ -15,50 +15,16 @@ export function isSupabaseConfigured() {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
- * Get the current Supabase session (for restoring auth state on app startup)
- */
-export async function getSupabaseSession() {
-  try {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) {
-      console.warn('Supabase getSession error:', error.message);
-      return null;
-    }
-    return session;
-  } catch (err) {
-    console.warn('Supabase getSession exception:', err.message);
-    return null;
-  }
-}
-
-/**
- * Subscribe to Supabase auth state changes
- */
-export function onAuthStateChange(callback) {
-  return supabase.auth.onAuthStateChange((event, session) => {
-    callback(event, session);
-  });
-}
-
-/**
  * Sign up a new user with Supabase Auth & insert into public.profiles
- * 
- * IMPORTANT: Only uses columns that EXIST in the production schema:
- * id, username, full_name, email, avatar_url, bio, role, gender, verified_badge,
- * location, company, instruments, genres, gear
  */
 export async function signUpUser({ email, password, name, role, gender = 'male' }) {
-  const cleanEmail = email.trim().toLowerCase();
-  const cleanPassword = password.trim();
-  const cleanName = name.trim();
-
   try {
     const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: cleanEmail,
-      password: cleanPassword,
+      email,
+      password,
       options: {
         data: {
-          full_name: cleanName,
+          full_name: name,
           role: role,
           gender: gender
         }
@@ -67,144 +33,50 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
 
     if (authError) {
       let rawMsg = authError.message || (typeof authError === 'string' ? authError : '');
-      console.warn('[StageLink] Supabase Auth signUp note:', rawMsg, authError);
-
-      // If user already exists, seamlessly attempt login
-      if (rawMsg.includes('already registered') || rawMsg.includes('User already exists') || authError.status === 422) {
-        console.log('[StageLink] Account exists, attempting auto-login...');
-        const loginRes = await signInUser({ email: cleanEmail, password: cleanPassword });
-        if (loginRes.success) {
-          return loginRes;
-        }
-        return { success: false, error: 'Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter.' };
-      }
-
-      // If SDK fetch failed (e.g. AuthRetryableFetchError), fallback to direct REST fetch
-      if (authError.name === 'AuthRetryableFetchError' || !rawMsg || rawMsg === '{}') {
-        try {
-          console.log('[StageLink] Retrying signup via direct REST fetch fallback...');
-          const restRes = await fetch(`${supabaseUrl}/auth/v1/signup`, {
-            method: 'POST',
-            headers: {
-              'apikey': supabaseAnonKey,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              email: cleanEmail,
-              password: cleanPassword,
-              data: { full_name: cleanName, role, gender }
-            })
-          });
-
-          if (restRes.ok) {
-            const restData = await restRes.json();
-            if (restData?.user) {
-              const userId = restData.user.id;
-              // Save session token if returned
-              if (restData.access_token) {
-                try {
-                  await supabase.auth.setSession({
-                    access_token: restData.access_token,
-                    refresh_token: restData.refresh_token
-                  });
-                } catch (se) {}
-              }
-
-              // Upsert profile
-              try {
-                await supabase.from('profiles').upsert({
-                  id: userId,
-                  username: cleanEmail.split('@')[0] + '_' + Math.floor(Math.random() * 1000),
-                  full_name: cleanName,
-                  email: cleanEmail,
-                  avatar_url: '',
-                  bio: `Membre ${role} sur StageLink`,
-                  role: role,
-                  gender: gender,
-                  verified_badge: 'none'
-                }, { onConflict: 'id' });
-              } catch (pe) {}
-
-              return {
-                success: true,
-                user: {
-                  id: userId,
-                  email: cleanEmail,
-                  name: cleanName,
-                  role: role,
-                  gender: gender,
-                  avatar: '',
-                  verified: false,
-                  badgeType: 'none',
-                  company: '',
-                  instruments: [],
-                  genres: [],
-                  gear: []
-                }
-              };
-            }
-          }
-        } catch (fetchErr) {
-          console.error('[StageLink] Direct REST signup fetch error:', fetchErr);
-        }
-
-        // Try login fallback as last resort
-        const fallbackLogin = await signInUser({ email: cleanEmail, password: cleanPassword });
-        if (fallbackLogin.success) return fallbackLogin;
-
-        return { success: false, error: 'Erreur de connexion au serveur. Veuillez vérifier votre connexion internet et réessayer.' };
-      }
-
-      // Translate known validation error messages
-      if (rawMsg.includes('at least 6 characters') || rawMsg.includes('Password should be')) {
+      if (rawMsg.includes('already registered') || rawMsg.includes('User already exists')) {
+        rawMsg = 'Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter.';
+      } else if (rawMsg.includes('at least 6 characters') || rawMsg.includes('Password should be')) {
         rawMsg = 'Le mot de passe doit contenir au moins 6 caractères.';
       } else if (rawMsg.includes('invalid email') || rawMsg.includes('Unable to validate email')) {
         rawMsg = 'Adresse e-mail invalide.';
-      } else if (rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError') || rawMsg.includes('fetch failed')) {
-        rawMsg = 'Impossible de se connecter au serveur Supabase (Échec du réseau). Si vous utilisez un bloqueur de publicités ou d\'anti-trackers (uBlock, Brave, etc.), veuillez autoriser ce site ou vérifier votre connexion internet.';
+      } else if (!rawMsg || rawMsg === '{}' || rawMsg.includes('{')) {
+        rawMsg = 'Erreur lors de la création du compte dans Supabase. Veuillez réessayer.';
       }
-
       return { success: false, error: rawMsg };
     }
 
     if (authData?.user) {
-      const username = cleanEmail.split('@')[0] + '_' + Math.floor(Math.random() * 1000);
-      const userId = authData.user.id;
+      const username = email.split('@')[0] + '_' + Math.floor(Math.random() * 1000);
       
-      // Upsert profile
+      // Upsert profile safely using exact matching DB columns (id, username, full_name, email, role, gender, bio, verified_badge)
       try {
-        const { error: pErr } = await supabase.from('profiles').upsert({
-          id: userId,
+        await supabase.from('profiles').upsert({
+          id: authData.user.id,
           username: username,
-          full_name: cleanName,
-          email: cleanEmail,
-          avatar_url: '',
-          bio: `Membre ${role} sur StageLink`,
+          full_name: name,
+          email: email,
           role: role,
           gender: gender,
-          verified_badge: 'none'
+          avatar_url: '',
+          bio: `Membre ${role} sur StageLink`,
+          verified_badge: 'none',
+          instruments: [],
+          genres: [],
+          gear: []
         }, { onConflict: 'id' });
-
-        if (pErr) {
-          console.warn('[StageLink] Profile upsert warning:', pErr.message);
-        }
       } catch (profileErr) {
-        console.warn('[StageLink] Profile upsert exception:', profileErr?.message || profileErr);
+        console.warn('Profile upsert note:', profileErr?.message || profileErr);
       }
 
-      // Guarantee session acquisition
+      // If email confirmation is disabled or session acquired, acquire session user
       let sessionUser = authData.user;
       if (!authData.session) {
-        try {
-          const { data: loginData } = await supabase.auth.signInWithPassword({
-            email: cleanEmail,
-            password: cleanPassword
-          });
-          if (loginData?.user) {
-            sessionUser = loginData.user;
-          }
-        } catch (loginErr) {
-          console.warn('[StageLink] Auto-login notice:', loginErr?.message);
+        const { data: loginData } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        if (loginData?.user) {
+          sessionUser = loginData.user;
         }
       }
 
@@ -212,8 +84,8 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
         success: true,
         user: {
           id: sessionUser.id,
-          email: sessionUser.email || cleanEmail,
-          name: cleanName,
+          email: sessionUser.email || email,
+          name: name,
           role: role,
           gender: gender,
           avatar: '',
@@ -229,22 +101,14 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
 
     return {
       success: false,
-      error: 'Erreur inattendue lors de la création du compte. Veuillez réessayer.'
+      error: 'Impossible d\'inscrire l\'utilisateur. Veuillez réessayer.'
     };
   } catch (err) {
-    console.error('[StageLink] Supabase Auth Signup Exception:', err);
-    try {
-      const fallbackLogin = await signInUser({ email: cleanEmail, password: cleanPassword });
-      if (fallbackLogin.success) return fallbackLogin;
-    } catch (e) {}
-
+    console.error('Supabase Auth Signup Error:', err);
     let errMsg = err?.message || (typeof err === 'string' ? err : '');
-    if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError') || errMsg.includes('fetch failed')) {
-      errMsg = 'Impossible de se connecter au serveur Supabase (Échec du réseau). Si vous utilisez un bloqueur de publicités ou d\'anti-trackers, veuillez autoriser ce site ou vérifier votre connexion internet.';
-    } else if (!errMsg || errMsg === '{}') {
+    if (!errMsg || errMsg === '{}' || errMsg.includes('{')) {
       errMsg = 'Erreur lors de la création du compte. Veuillez réessayer.';
     }
-
     return {
       success: false,
       error: errMsg
@@ -264,8 +128,6 @@ export async function signInUser({ email, password }) {
 
     if (authError) {
       let rawMsg = authError.message || (typeof authError === 'string' ? authError : '');
-      console.error('[StageLink] Supabase Auth signIn error:', rawMsg);
-
       if (!rawMsg || rawMsg === '{}' || rawMsg.includes('{')) {
         rawMsg = 'Adresse e-mail ou mot de passe incorrect.';
       }
@@ -273,8 +135,6 @@ export async function signInUser({ email, password }) {
         rawMsg = 'Adresse e-mail ou mot de passe incorrect.';
       } else if (rawMsg.includes('Email not confirmed')) {
         rawMsg = 'Veuillez confirmer votre adresse e-mail pour vous connecter.';
-      } else if (rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError') || rawMsg.includes('fetch failed')) {
-        rawMsg = 'Impossible de se connecter au serveur Supabase (Échec du réseau). Si vous utilisez un bloqueur de publicités ou d\'anti-trackers, veuillez autoriser ce site ou vérifier votre connexion internet.';
       }
       return { success: false, error: rawMsg };
     }
@@ -289,7 +149,7 @@ export async function signInUser({ email, password }) {
         .maybeSingle();
       profile = data;
     } catch (pe) {
-      console.warn('[StageLink] Profile fetch notice:', pe?.message || pe);
+      console.warn('Profile fetch notice:', pe?.message || pe);
     }
 
     return {
@@ -298,25 +158,20 @@ export async function signInUser({ email, password }) {
         id: authData.user.id,
         email: authData.user.email,
         name: profile?.full_name || authData.user.user_metadata?.full_name || email.split('@')[0],
-        role: profile?.role || authData.user.user_metadata?.role || 'Artiste / Compositeur',
-        gender: profile?.gender || authData.user.user_metadata?.gender || 'male',
+        role: profile?.role || profile?.skills?.[0] || authData.user.user_metadata?.role || 'Artiste / Compositeur',
         avatar: profile?.avatar_url || '',
         verified: profile?.verified_badge === 'gold' || profile?.verified_badge === 'blue',
         badgeType: profile?.verified_badge || 'none',
         company: profile?.company || '',
         instruments: profile?.instruments || [],
         genres: profile?.genres || [],
-        gear: profile?.gear || [],
-        bio: profile?.bio || '',
-        location: profile?.location || ''
+        gear: profile?.gear || []
       }
     };
   } catch (err) {
-    console.error('[StageLink] Supabase Auth Signin Exception:', err);
+    console.error('Supabase Auth Signin Error:', err);
     let errMsg = err?.message || (typeof err === 'string' ? err : '');
-    if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError') || errMsg.includes('fetch failed')) {
-      errMsg = 'Impossible de se connecter au serveur Supabase (Échec du réseau). Si vous utilisez un bloqueur de publicités ou d\'anti-trackers, veuillez autoriser ce site ou vérifier votre connexion internet.';
-    } else if (typeof errMsg !== 'string' || !errMsg.trim() || errMsg === '{}') {
+    if (typeof errMsg !== 'string' || !errMsg.trim()) {
       errMsg = 'Erreur lors de la connexion. Veuillez réessayer.';
     }
     return {
@@ -335,27 +190,6 @@ export async function signOutUser() {
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
-  }
-}
-
-/**
- * Fetch a user profile from Supabase by ID
- */
-export async function fetchProfile(userId) {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-    if (error) {
-      console.warn('[StageLink] fetchProfile error:', error.message);
-      return null;
-    }
-    return data;
-  } catch (err) {
-    console.warn('[StageLink] fetchProfile exception:', err.message);
-    return null;
   }
 }
 

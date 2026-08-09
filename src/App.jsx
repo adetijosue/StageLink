@@ -3,8 +3,6 @@ import { Plus, Volume2 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import AuthScreen from './components/auth/AuthScreen';
-import OnboardingWizard from './components/auth/OnboardingWizard';
-import WelcomeEmailModal from './components/auth/WelcomeEmailModal';
 import TopBar from './components/navigation/TopBar';
 import GlobalUserSearchModal from './components/navigation/GlobalUserSearchModal';
 import BottomNav from './components/navigation/BottomNav';
@@ -76,8 +74,6 @@ function MainApp() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(2);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
-  const [isWelcomeEmailOpen, setIsWelcomeEmailOpen] = useState(false);
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
 
   // Social Share, Report, and Public Profile Modals
@@ -176,52 +172,193 @@ function MainApp() {
 
         if (isSupabaseConfigured()) {
           try {
+            // Fetch live profiles from Supabase
             const { data: supaProfiles } = await supabase.from('profiles').select('*');
-            if (supaProfiles) {
-              loadedUsers = supaProfiles.map(mapSupabaseProfileToUser).filter(Boolean);
+            let mappedSupaUsers = [];
+            if (supaProfiles && supaProfiles.length > 0) {
+              mappedSupaUsers = supaProfiles.map(p => ({
+                id: p.id,
+                name: p.full_name || 'Artiste StageLink',
+                email: p.email || '',
+                role: p.role || 'Artiste',
+                company: p.company || '',
+                avatar: p.avatar_url || '',
+                verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+                badgeType: p.verified_badge || 'none',
+                bio: p.bio || '',
+                location: p.location || '',
+                instruments: p.instruments || [],
+                genres: p.genres || [],
+                gear: p.gear || []
+              }));
             }
+
+            const storedLocalUsers = getStoredItem(STORAGE_KEYS.USERS, []);
+            const mergedMap = new Map();
+
+            // 1. Add Supabase profiles first
+            mappedSupaUsers.forEach(u => mergedMap.set(u.id, u));
+
+            // 2. Add stored local users if not already in Supabase list
+            storedLocalUsers.forEach(u => {
+              if (!mergedMap.has(u.id) && !Array.from(mergedMap.values()).some(m => m.name === u.name || (m.email && m.email === u.email))) {
+                mergedMap.set(u.id, u);
+              }
+            });
+
+            loadedUsers = Array.from(mergedMap.values());
             setStoredItem(STORAGE_KEYS.USERS, loadedUsers);
           } catch (err) {
             console.warn('Supabase live profiles fetch note:', err.message);
           }
 
           try {
+            // Fetch live posts
             const { data: supaPosts } = await supabase
               .from('posts')
               .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge)')
               .order('created_at', { ascending: false });
 
-            if (supaPosts) {
-              loadedPosts = supaPosts.map(mapSupabasePostToFeedCard).filter(Boolean);
+            if (supaPosts && supaPosts.length > 0) {
+              loadedPosts = supaPosts.map(p => ({
+                id: p.id,
+                userId: p.user_id,
+                userName: p.profiles?.full_name || 'Artiste StageLink',
+                userRole: p.profiles?.role || 'Membre StageLink',
+                userAvatar: p.profiles?.avatar_url || '',
+                isVerified: p.profiles?.verified_badge === 'gold' || p.profiles?.verified_badge === 'blue',
+                badgeType: p.profiles?.verified_badge || 'none',
+                text: p.content || '',
+                image: p.media_url || null,
+                hasAudio: Boolean(p.audio_url),
+                audioTitle: p.audio_title || 'Extrait Audio',
+                audioUrl: p.audio_url || null,
+                likesCount: p.likes_count || 0,
+                isLiked: false,
+                commentsCount: p.comments_count || 0,
+                comments: [],
+                timeAgo: 'Récemment'
+              }));
             }
 
+            // Fetch live active stories (unexpired)
             const { data: supaStories } = await supabase
               .from('stories')
               .select('*, profiles:user_id(full_name, avatar_url)')
               .gte('expires_at', new Date().toISOString())
               .order('created_at', { ascending: false });
 
-            if (supaStories) {
-              loadedStories = supaStories.map(mapSupabaseStoryToStoryBar).filter(Boolean);
+            if (supaStories && supaStories.length > 0) {
+              loadedStories = supaStories.map(s => ({
+                id: s.id,
+                userId: s.user_id,
+                userName: s.profiles?.full_name || 'Artiste StageLink',
+                avatar: s.profiles?.avatar_url || '',
+                hasUnread: true,
+                storyMedia: s.media_url,
+                caption: s.caption || '',
+                time: 'Récemment'
+              }));
             }
 
+            // Fetch live matches or generate collaboration cards from real Supabase members
             const { data: supaMatches } = await supabase.from('matches').select('*');
-            if (supaMatches) {
+            if (supaMatches && supaMatches.length > 0) {
               loadedMatches = supaMatches;
+            } else if (loadedUsers && loadedUsers.length > 0) {
+              const otherUsers = loadedUsers.filter(u => u.id !== currentUser.id && u.email !== currentUser.email);
+              loadedMatches = otherUsers.map(u => ({
+                id: `match_${u.id}`,
+                userId: u.id,
+                title: `Session Studio & Collaboration avec ${u.name}`,
+                category: u.role || 'Artiste',
+                location: u.location || 'Studio & En ligne',
+                matchPercentage: 95,
+                image: u.avatar || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80',
+                description: u.bio || `Artiste ${u.role} à la recherche de collaborations sur StageLink.`,
+                creator: u.name,
+                creatorAvatar: u.avatar,
+                verified: u.verified,
+                badgeType: u.badgeType
+              }));
+            }
+
+            // Fetch live messages for currentUser from Supabase
+            try {
+              const { data: supaMessages } = await supabase
+                .from('messages')
+                .select('*, sender:sender_id(id, full_name, avatar_url, role), recipient:recipient_id(id, full_name, avatar_url, role)')
+                .or(`sender_id.eq.${currentUser.id},recipient_id.eq.${currentUser.id}`)
+                .order('created_at', { ascending: true });
+
+              if (supaMessages && supaMessages.length > 0) {
+                const chatMap = new Map();
+
+                supaMessages.forEach(msg => {
+                  const isMeSender = msg.sender_id === currentUser.id;
+                  const partnerId = isMeSender ? msg.recipient_id : msg.sender_id;
+                  const partnerProfile = isMeSender ? msg.recipient : msg.sender;
+                  const partnerUser = (loadedUsers || []).find(u => u.id === partnerId);
+
+                  const partnerName = partnerProfile?.full_name || partnerUser?.name || 'Artiste StageLink';
+                  const partnerAvatar = partnerProfile?.avatar_url || partnerUser?.avatar || '';
+                  const partnerRole = partnerProfile?.role || partnerUser?.role || 'Artiste';
+
+                  const chatId = `chat_${partnerId}`;
+
+                  const msgObj = {
+                    id: msg.id,
+                    sender: isMeSender ? 'current' : 'other',
+                    senderId: msg.sender_id,
+                    text: msg.content || '',
+                    mediaUrl: msg.media_url || null,
+                    audioUrl: msg.audio_url || null,
+                    isAudio: Boolean(msg.audio_url),
+                    timestamp: 'Récemment',
+                    createdAtTimestamp: new Date(msg.created_at || Date.now()).getTime(),
+                    isRead: msg.is_read !== false
+                  };
+
+                  if (!chatMap.has(chatId)) {
+                    chatMap.set(chatId, {
+                      id: chatId,
+                      participant: {
+                        id: partnerId,
+                        name: partnerName,
+                        avatar: partnerAvatar,
+                        online: true,
+                        role: partnerRole
+                      },
+                      unreadCount: (!isMeSender && !msg.is_read) ? 1 : 0,
+                      lastMessageTime: 'Récemment',
+                      messages: [msgObj]
+                    });
+                  } else {
+                    const existingChat = chatMap.get(chatId);
+                    existingChat.messages.push(msgObj);
+                    if (!isMeSender && !msg.is_read) {
+                      existingChat.unreadCount = (existingChat.unreadCount || 0) + 1;
+                    }
+                  }
+                });
+
+                const supaChats = Array.from(chatMap.values());
+                const mergedChatsMap = new Map();
+                supaChats.forEach(c => mergedChatsMap.set(c.id, c));
+                (loadedChats || []).forEach(c => {
+                  if (!mergedChatsMap.has(c.id)) {
+                    mergedChatsMap.set(c.id, c);
+                  }
+                });
+
+                loadedChats = Array.from(mergedChatsMap.values());
+              }
+            } catch (me) {
+              console.warn('Supabase live messages fetch note:', me.message);
             }
           } catch (err) {
             console.warn('Supabase live data fetch note:', err.message);
           }
-        } else {
-          // Fallback only if Supabase is NOT configured
-          const finalMergedMap = new Map();
-          (loadedUsers || []).forEach(u => u && u.id && finalMergedMap.set(u.id, u));
-          INITIAL_COMMUNITY_USERS.forEach(u => {
-            if (!finalMergedMap.has(u.id) && !Array.from(finalMergedMap.values()).some(m => m.name === u.name)) {
-              finalMergedMap.set(u.id, u);
-            }
-          });
-          loadedUsers = Array.from(finalMergedMap.values());
         }
 
         setAllUsers(loadedUsers);
@@ -230,6 +367,7 @@ function MainApp() {
         setMatches(loadedMatches);
         setChats(loadedChats);
 
+        // Open target profile if query params exist
         try {
           const params = new URLSearchParams(window.location.search);
           const targetProfileId = params.get('profile') || params.get('user');
@@ -241,6 +379,7 @@ function MainApp() {
           }
         } catch (e) {}
 
+        // Handle One-Time Welcome Onboarding & Welcome Chat for New Registrations
         const alreadyShown = localStorage.getItem(welcomeSeenKey);
         if (currentUser.isNewRegistration && !alreadyShown) {
           localStorage.setItem(welcomeSeenKey, 'true');
@@ -278,36 +417,77 @@ function MainApp() {
             };
             loadedChats = [welcomeChat, ...loadedChats];
             setChats(loadedChats);
-            setStoredItem(STORAGE_KEYS.CHATS, loadedChats);
           }
-
-          setIsOnboardingOpen(true);
-          setIsWelcomeEmailOpen(true);
         }
       };
 
       loadInitialData();
 
+      // Function to sync posts, stories & profiles from Supabase
       const syncPostsStoriesAndProfiles = async () => {
         if (!isSupabaseConfigured()) return;
         try {
+          // Sync Live Profiles
           const { data: supaProfiles } = await supabase.from('profiles').select('*');
-          if (supaProfiles) {
-            const mappedSupa = supaProfiles.map(mapSupabaseProfileToUser).filter(Boolean);
-            setAllUsers(mappedSupa);
-            setStoredItem(STORAGE_KEYS.USERS, mappedSupa);
+          if (supaProfiles && supaProfiles.length > 0) {
+            const mappedSupa = supaProfiles.map(p => ({
+              id: p.id,
+              name: p.full_name || 'Artiste StageLink',
+              email: p.email || '',
+              role: p.role || 'Artiste',
+              company: p.company || '',
+              avatar: p.avatar_url || '',
+              verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+              badgeType: p.verified_badge || 'none',
+              bio: p.bio || '',
+              location: p.location || '',
+              instruments: p.instruments || [],
+              genres: p.genres || [],
+              gear: p.gear || []
+            }));
+
+            setAllUsers(prev => {
+              const uMap = new Map();
+              mappedSupa.forEach(u => uMap.set(u.id, u));
+              prev.forEach(u => {
+                if (!uMap.has(u.id) && !Array.from(uMap.values()).some(m => m.name === u.name)) {
+                  uMap.set(u.id, u);
+                }
+              });
+              return Array.from(uMap.values());
+            });
           }
 
+          // Sync Live Posts
           const { data: supaPosts } = await supabase
             .from('posts')
             .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge)')
             .order('created_at', { ascending: false });
 
           if (supaPosts && supaPosts.length > 0) {
-            const freshPosts = supaPosts.map(mapSupabasePostToFeedCard).filter(Boolean);
+            const freshPosts = supaPosts.map(p => ({
+              id: p.id,
+              userId: p.user_id,
+              userName: p.profiles?.full_name || 'Artiste StageLink',
+              userRole: p.profiles?.role || 'Membre StageLink',
+              userAvatar: p.profiles?.avatar_url || '',
+              isVerified: p.profiles?.verified_badge === 'gold' || p.profiles?.verified_badge === 'blue',
+              badgeType: p.profiles?.verified_badge || 'none',
+              text: p.content || '',
+              image: p.media_url || null,
+              hasAudio: Boolean(p.audio_url),
+              audioTitle: p.audio_title || 'Extrait Audio',
+              audioUrl: p.audio_url || null,
+              likesCount: p.likes_count || 0,
+              isLiked: false,
+              commentsCount: p.comments_count || 0,
+              comments: [],
+              timeAgo: 'Récemment'
+            }));
             setPosts(freshPosts);
           }
 
+          // Sync Live Stories
           const { data: supaStories } = await supabase
             .from('stories')
             .select('*, profiles:user_id(full_name, avatar_url)')
@@ -315,12 +495,22 @@ function MainApp() {
             .order('created_at', { ascending: false });
 
           if (supaStories && supaStories.length > 0) {
-            const freshStories = supaStories.map(mapSupabaseStoryToStoryBar).filter(Boolean);
+            const freshStories = supaStories.map(s => ({
+              id: s.id,
+              userId: s.user_id,
+              userName: s.profiles?.full_name || 'Artiste StageLink',
+              avatar: s.profiles?.avatar_url || '',
+              hasUnread: true,
+              storyMedia: s.media_url,
+              caption: s.caption || '',
+              time: 'Récemment'
+            }));
             setStories(freshStories);
           }
         } catch (e) {}
       };
 
+      // 1. Instant Realtime Subscription Setup for Posts, Stories, Profiles & Messages (<100ms sync)
       let postsSub, storiesSub, profilesSub, messagesSub;
       if (isSupabaseConfigured()) {
         try {
@@ -341,10 +531,89 @@ function MainApp() {
 
           messagesSub = supabase
             .channel('realtime:messages')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
               const newMsg = payload.new;
-              if (newMsg && newMsg.recipient_id === currentUser.id) {
-                soundEngine.playMessagePopSound();
+              if (!newMsg) return;
+
+              if (newMsg.recipient_id === currentUser.id || newMsg.sender_id === currentUser.id) {
+                if (newMsg.recipient_id === currentUser.id) {
+                  soundEngine.playMessagePopSound();
+                }
+
+                const isMeSender = newMsg.sender_id === currentUser.id;
+                const partnerId = isMeSender ? newMsg.recipient_id : newMsg.sender_id;
+                const chatId = `chat_${partnerId}`;
+
+                let partner = (allUsers || []).find(u => u.id === partnerId);
+                if (!partner) {
+                  try {
+                    const { data: p } = await supabase.from('profiles').select('*').eq('id', partnerId).maybeSingle();
+                    if (p) {
+                      partner = { id: p.id, name: p.full_name, avatar: p.avatar_url, role: p.role };
+                    }
+                  } catch (e) {}
+                }
+
+                const formattedMsg = {
+                  id: newMsg.id,
+                  sender: isMeSender ? 'current' : 'other',
+                  senderId: newMsg.sender_id,
+                  text: newMsg.content || '',
+                  mediaUrl: newMsg.media_url || null,
+                  audioUrl: newMsg.audio_url || null,
+                  isAudio: Boolean(newMsg.audio_url),
+                  timestamp: 'À l\'instant',
+                  createdAtTimestamp: Date.now(),
+                  isRead: isMeSender
+                };
+
+                setChats(prevChats => {
+                  let chatFound = false;
+                  const updated = prevChats.map(c => {
+                    if (c.id === chatId || (c.participant && c.participant.id === partnerId)) {
+                      chatFound = true;
+                      return {
+                        ...c,
+                        unreadCount: isMeSender ? c.unreadCount : (c.unreadCount || 0) + 1,
+                        lastMessageTime: 'À l\'instant',
+                        messages: [...(c.messages || []), formattedMsg]
+                      };
+                    }
+                    return c;
+                  });
+
+                  if (!chatFound) {
+                    const newChatObj = {
+                      id: chatId,
+                      participant: {
+                        id: partnerId,
+                        name: partner?.name || 'Artiste StageLink',
+                        avatar: partner?.avatar || '',
+                        online: true,
+                        role: partner?.role || 'Artiste'
+                      },
+                      unreadCount: isMeSender ? 0 : 1,
+                      lastMessageTime: 'À l\'instant',
+                      messages: [formattedMsg]
+                    };
+                    const next = [newChatObj, ...prevChats];
+                    setStoredItem(STORAGE_KEYS.CHATS, next);
+                    return next;
+                  }
+
+                  setStoredItem(STORAGE_KEYS.CHATS, updated);
+                  return updated;
+                });
+
+                setSelectedChat(prevSelected => {
+                  if (prevSelected && (prevSelected.id === chatId || prevSelected.participant?.id === partnerId)) {
+                    return {
+                      ...prevSelected,
+                      messages: [...(prevSelected.messages || []), formattedMsg]
+                    };
+                  }
+                  return prevSelected;
+                });
               }
             })
             .subscribe();
@@ -549,25 +818,46 @@ function MainApp() {
     setActiveStory(reconstructedStory);
   };
 
-  const handleDeletePost = (postId) => {
+  const handleDeletePost = async (postId) => {
     const updated = posts.filter((p) => p.id !== postId);
     setPosts(updated);
     setStoredItem(STORAGE_KEYS.POSTS, updated);
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('posts').delete().eq('id', postId);
+      } catch (e) {
+        console.warn('Supabase post deletion note:', e.message);
+      }
+    }
   };
 
-  const handleLikePost = (postId) => {
+  const handleLikePost = async (postId) => {
+    let targetPost = null;
     const updated = posts.map((p) => {
       if (p.id === postId) {
-        return {
+        targetPost = {
           ...p,
           isLiked: !p.isLiked,
-          likesCount: p.isLiked ? p.likesCount - 1 : p.likesCount + 1
+          likesCount: p.isLiked ? Math.max(0, (p.likesCount || 1) - 1) : (p.likesCount || 0) + 1
         };
+        return targetPost;
       }
       return p;
     });
     setPosts(updated);
     setStoredItem(STORAGE_KEYS.POSTS, updated);
+
+    if (isSupabaseConfigured() && targetPost) {
+      try {
+        await supabase
+          .from('posts')
+          .update({ likes_count: targetPost.likesCount })
+          .eq('id', postId);
+      } catch (e) {
+        console.warn('Supabase post like update note:', e.message);
+      }
+    }
   };
 
   const handleAddComment = (postId, commentText) => {
@@ -1041,12 +1331,6 @@ function MainApp() {
         isDarkMode={isDarkMode}
       />
 
-      {/* Onboarding Wizard Modal */}
-      <OnboardingWizard
-        isOpen={isOnboardingOpen}
-        onClose={() => setIsOnboardingOpen(false)}
-      />
-
       {/* Post Social Share Modal */}
       <ShareModal
         isOpen={!!sharePost}
@@ -1122,26 +1406,6 @@ function MainApp() {
           setIsNotificationsOpen(false);
           setActiveTab(tab);
         }}
-      />
-
-      {/* Onboarding Wizard Modal */}
-      <OnboardingWizard
-        isOpen={isOnboardingOpen}
-        onClose={() => {
-          setIsOnboardingOpen(false);
-          updateUserProfile({ isNewRegistration: false });
-        }}
-      />
-
-      {/* Welcome Email Modal */}
-      <WelcomeEmailModal
-        isOpen={isWelcomeEmailOpen}
-        onClose={() => {
-          setIsWelcomeEmailOpen(false);
-          updateUserProfile({ isNewRegistration: false });
-        }}
-        userName={currentUser?.name}
-        userRole={currentUser?.role}
       />
 
       {/* Persistent Bottom Navigation Bar */}
