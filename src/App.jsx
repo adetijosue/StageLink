@@ -915,7 +915,7 @@ function MainApp() {
           id: postUuid,
           user_id: currentUser.id,
           content: newPostData.text || '',
-          media_url: newPostData.image || (newPostData.mediaList && newPostData.mediaList[0]) || null,
+          media_url: newPostData.image || (newPostData.mediaList && newPostData.mediaList[0]?.url) || (newPostData.mediaList && typeof newPostData.mediaList[0] === 'string' ? newPostData.mediaList[0] : null),
           audio_url: newPostData.audioUrl || null,
           audio_title: newPostData.audioTitle || null
         });

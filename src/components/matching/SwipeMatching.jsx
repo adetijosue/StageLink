@@ -116,47 +116,76 @@ export default function SwipeMatching({ matches, onApplyMatch }) {
               <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0F172A', marginBottom: '4px' }}>
                 {currentCard.title}
               </h3>
-              <p style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600, marginBottom: '12px' }}>
-                {currentCard.company}
-              </p>
+              {currentCard.company && (
+                <p style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 600, marginBottom: '12px' }}>
+                  {currentCard.company}
+                </p>
+              )}
 
               {/* Location & Deadline metadata */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '12px', fontSize: '0.8rem', color: '#475569' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <MapPin size={14} color="#0066FF" /> {currentCard.location}
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Calendar size={14} color="#0066FF" /> {currentCard.deadline}
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <DollarSign size={14} color="#10B981" /> {currentCard.rate}
-                </span>
+                {currentCard.location && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <MapPin size={14} color="#0066FF" /> {currentCard.location}
+                  </span>
+                )}
+                {currentCard.deadline && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Calendar size={14} color="#0066FF" /> {currentCard.deadline}
+                  </span>
+                )}
+                {currentCard.rate && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <DollarSign size={14} color="#10B981" /> {currentCard.rate}
+                  </span>
+                )}
               </div>
 
-              {/* Summary */}
-              <p style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.4, marginBottom: '14px' }}>
-                {currentCard.summary}
-              </p>
+              {/* Summary / Description */}
+              {(currentCard.summary || currentCard.description) && (
+                <p style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.4, marginBottom: '14px' }}>
+                  {currentCard.summary || currentCard.description}
+                </p>
+              )}
 
               {/* Skills Tags Pills */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
-                {currentCard.skills.map((skill, idx) => (
-                  <span
-                    key={idx}
-                    style={{
-                      background: '#EFF6FF',
-                      color: '#0066FF',
-                      borderRadius: '12px',
-                      padding: '4px 10px',
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      border: '1px solid #BFDBFE'
-                    }}
-                  >
-                    {skill}
+              {Array.isArray(currentCard.skills) && currentCard.skills.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
+                  {currentCard.skills.map((skill, idx) => (
+                    <span
+                      key={idx}
+                      style={{
+                        background: '#EFF6FF',
+                        color: '#0066FF',
+                        borderRadius: '12px',
+                        padding: '4px 10px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        border: '1px solid #BFDBFE'
+                      }}
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Category badge for dynamic cards without skills */}
+              {(!Array.isArray(currentCard.skills) || currentCard.skills.length === 0) && currentCard.category && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
+                  <span style={{
+                    background: '#EFF6FF',
+                    color: '#0066FF',
+                    borderRadius: '12px',
+                    padding: '4px 10px',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    border: '1px solid #BFDBFE'
+                  }}>
+                    {currentCard.category}
                   </span>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Action Bar matching mockups: Dislike (Red X), Super Like (Amber Star), Direct Apply (#0066FF) */}
