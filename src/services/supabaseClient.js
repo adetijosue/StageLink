@@ -1,25 +1,60 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://shklbnxxpcioavsplbem.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNoa2xibnh4cGNpb2F2c3BsYmVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxOTQzODcsImV4cCI6MjEwMTc3MDM4N30.xG1YWOQAX4jiD3M66OFRByK5R85-a2MaAIAxKPca4RM';
+const rawUrl = import.meta.env.VITE_SUPABASE_URL || 'https://shklbnxxpcioavsplbem.supabase.co';
+const rawKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNoa2xibnh4cGNpb2F2c3BsYmVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxOTQzODcsImV4cCI6MjEwMTc3MDM4N30.xG1YWOQAX4jiD3M66OFRByK5R85-a2MaAIAxKPca4RM';
+
+export const supabaseUrl = rawUrl.trim().replace(/\/+$/, '');
+export const supabaseAnonKey = rawKey.trim();
 
 export function isSupabaseConfigured() {
   return (
     Boolean(supabaseUrl) &&
     !supabaseUrl.includes('votre-projet') &&
     Boolean(supabaseAnonKey) &&
-    !supabaseAnonKey.includes('votre-cle')
+    !supabaseAnonKey.includes('votre-cle') &&
+    supabaseUrl.startsWith('http')
   );
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
+ * Helper to retry async Supabase calls on network errors (e.g. flaky connections)
+ */
+async function withRetry(operation, maxRetries = 3, delayMs = 1000) {
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    try {
+      const result = await operation();
+      // If there's an error from Supabase that looks like a network error, throw it to trigger retry
+      if (result?.error) {
+        const msg = result.error.message || '';
+        if (msg.includes('Load failed') || msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('network error')) {
+          throw new Error('Network error detected');
+        }
+      }
+      return result;
+    } catch (err) {
+      const msg = err?.message || '';
+      if (msg.includes('Load failed') || msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('network error') || msg.includes('Network error detected')) {
+        attempt++;
+        if (attempt >= maxRetries) {
+          return { error: new Error('La connexion au serveur a échoué après plusieurs tentatives.') };
+        }
+        await new Promise(res => setTimeout(res, delayMs * attempt));
+      } else {
+        return { error: err };
+      }
+    }
+  }
+}
+
+/**
  * Sign up a new user with Supabase Auth & insert into public.profiles
  */
 export async function signUpUser({ email, password, name, role, gender = 'male' }) {
   try {
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await withRetry(() => supabase.auth.signUp({
       email,
       password,
       options: {
@@ -29,12 +64,12 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
           gender: gender
         }
       }
-    });
+    }));
 
     if (authError) {
       let rawMsg = authError.message || (typeof authError === 'string' ? authError : '');
-      if (rawMsg.includes('Load failed') || rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError')) {
-        rawMsg = 'Erreur de connexion au serveur. Veuillez vérifier votre connexion Internet et réessayer.';
+      if (rawMsg.includes('La connexion au serveur a échoué') || rawMsg.includes('Load failed') || rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError')) {
+        rawMsg = 'Erreur de connexion au serveur. Le réseau est instable ou bloqué par un pare-feu.';
       } else if (rawMsg.includes('already registered') || rawMsg.includes('User already exists') || rawMsg.includes('user_already_exists')) {
         rawMsg = 'Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter.';
       } else if (rawMsg.includes('at least 6 characters') || rawMsg.includes('Password should be')) {
@@ -87,10 +122,10 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
       // If session not established, attempt auto-login
       let sessionUser = authData.user;
       if (!authData.session) {
-        const { data: loginData } = await supabase.auth.signInWithPassword({
+        const { data: loginData } = await withRetry(() => supabase.auth.signInWithPassword({
           email,
           password
-        });
+        }));
         if (loginData?.user) {
           sessionUser = loginData.user;
         }
@@ -137,15 +172,15 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
  */
 export async function signInUser({ email, password }) {
   try {
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    const { data: authData, error: authError } = await withRetry(() => supabase.auth.signInWithPassword({
       email,
       password
-    });
+    }));
 
     if (authError) {
       let rawMsg = authError.message || (typeof authError === 'string' ? authError : '');
-      if (rawMsg.includes('Load failed') || rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError')) {
-        rawMsg = 'Erreur de connexion au serveur. Veuillez vérifier votre connexion Internet et réessayer.';
+      if (rawMsg.includes('La connexion au serveur a échoué') || rawMsg.includes('Load failed') || rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError')) {
+        rawMsg = 'Erreur de connexion au serveur. Le réseau est instable ou bloqué par un pare-feu.';
       } else if (rawMsg.includes('Invalid login credentials')) {
         rawMsg = 'Adresse e-mail ou mot de passe incorrect.';
       } else if (rawMsg.includes('Email not confirmed')) {
