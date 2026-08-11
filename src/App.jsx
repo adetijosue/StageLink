@@ -192,9 +192,11 @@ function MainApp() {
       const welcomeSeenKey = `stagelink_welcome_shown_${currentUser.id}`;
 
       const loadInitialData = async () => {
-        const CACHE_VERSION = '1.1';
-        if (localStorage.getItem('stagelink_cache_version') !== CACHE_VERSION) {
-          localStorage.removeItem('stagelink_chats');
+        // Check cache version to force clean old formats
+        const CACHE_VERSION = 'v2'; // Bumped to force reset due to schema mismatches
+        const storedVersion = localStorage.getItem('stagelink_cache_version');
+        if (storedVersion !== CACHE_VERSION) {
+          localStorage.removeItem(STORAGE_KEYS.CHATS);
           localStorage.setItem('stagelink_cache_version', CACHE_VERSION);
         }
 
@@ -1076,13 +1078,24 @@ function MainApp() {
       // Save story reply directly to Supabase Database
       if (isSupabaseConfigured() && targetUserId) {
         try {
-          supabase.from('messages').insert({
+          const { error: storyMsgErr } = await supabase.from('messages').insert({
             id: msgUuid,
             sender_id: currentUser.id,
             receiver_id: targetUserId,
             content: replyText,
             media_url: rawMedia || null
           });
+          if (storyMsgErr) {
+             const { error: bareStoryErr } = await supabase.from('messages').insert({
+               id: msgUuid,
+               sender_id: currentUser.id,
+               receiver_id: targetUserId,
+               content: replyText
+             });
+             if (bareStoryErr) {
+                console.error('All story reply insert fallbacks failed:', bareStoryErr);
+             }
+          }
         } catch (se) {
           console.warn('Supabase story reply insert note:', se?.message || se);
         }
@@ -1432,7 +1445,7 @@ function MainApp() {
 
         if (insertErr) {
           console.warn('Supabase message send note with metadata:', insertErr.message || insertErr);
-          // Fallback if metadata column doesn't exist yet
+          // Fallback 1: try with audio_note_url
           const { error: fallbackErr } = await supabase.from('messages').insert({
             id: msgUuid,
             sender_id: currentUser.id,
@@ -1444,7 +1457,17 @@ function MainApp() {
           
           if (fallbackErr) {
             console.error('Supabase fallback insert failed:', fallbackErr);
-            return; // Stop if fallback also failed
+            // Fallback 2: Ultimate barebones insert
+            const { error: bareFallbackErr } = await supabase.from('messages').insert({
+              id: msgUuid,
+              sender_id: currentUser.id,
+              receiver_id: recipientId,
+              content: newMsg.text || ''
+            });
+            if (bareFallbackErr) {
+               console.error('All message insert fallbacks failed:', bareFallbackErr);
+               return; // Stop if everything failed
+            }
           }
         }
         
