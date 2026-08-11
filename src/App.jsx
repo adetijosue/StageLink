@@ -350,7 +350,29 @@ function MainApp() {
                   }
                 });
 
-                const supaChats = Array.from(chatMap.values());
+                let supaChats = Array.from(chatMap.values());
+                
+                // Fetch chat states for filtering (archived, deleted, unread overrides)
+                try {
+                  const { data: statesData } = await supabase.from('chat_states').select('*').eq('user_id', currentUser.id);
+                  if (statesData && statesData.length > 0) {
+                    supaChats = supaChats.map(c => {
+                      const state = statesData.find(s => s.partner_id === c.participant.id);
+                      if (state) {
+                        return {
+                          ...c,
+                          isArchived: state.is_archived,
+                          isDeleted: state.is_deleted,
+                          unreadCount: state.force_unread ? Math.max(1, c.unreadCount) : c.unreadCount
+                        };
+                      }
+                      return c;
+                    }).filter(c => !c.isDeleted && !c.isArchived);
+                  }
+                } catch (stateErr) {
+                  console.warn('Supabase chat_states fetch note:', stateErr.message);
+                }
+
                 loadedChats = supaChats;
               }
             } catch (me) {
@@ -1396,7 +1418,6 @@ function MainApp() {
             onApplyMatch={handleApplyMatch}
           />
         )}
-
         {activeTab === 'discussions' && (
           <ChatList
             chats={chats}
@@ -1404,6 +1425,38 @@ function MainApp() {
             onOpenNewChatModal={() => setIsNewChatModalOpen(true)}
             onOpenCallHistoryModal={() => setIsCallHistoryModalOpen(true)}
             isDarkMode={isDarkMode}
+            onArchiveChat={async (chat) => {
+              const partnerId = chat.participant.id;
+              const updatedChats = chats.filter(c => c.id !== chat.id);
+              setChats(updatedChats);
+              if (isSupabaseConfigured()) {
+                try {
+                  await supabase.from('chat_states').upsert({ user_id: currentUser.id, partner_id: partnerId, is_archived: true, updated_at: new Date().toISOString() });
+                } catch (e) { console.warn('Archive error:', e); }
+              }
+            }}
+            onDeleteChat={async (chat) => {
+              const partnerId = chat.participant.id;
+              const updatedChats = chats.filter(c => c.id !== chat.id);
+              setChats(updatedChats);
+              if (isSupabaseConfigured()) {
+                try {
+                  await supabase.from('chat_states').upsert({ user_id: currentUser.id, partner_id: partnerId, is_deleted: true, updated_at: new Date().toISOString() });
+                } catch (e) { console.warn('Delete error:', e); }
+              }
+            }}
+            onToggleUnread={async (chat) => {
+              const partnerId = chat.participant.id;
+              const isCurrentlyUnread = chat.unreadCount > 0;
+              const newUnread = !isCurrentlyUnread;
+              const updatedChats = chats.map(c => c.id === chat.id ? { ...c, unreadCount: newUnread ? 1 : 0 } : c);
+              setChats(updatedChats);
+              if (isSupabaseConfigured()) {
+                try {
+                  await supabase.from('chat_states').upsert({ user_id: currentUser.id, partner_id: partnerId, force_unread: newUnread, updated_at: new Date().toISOString() });
+                } catch (e) { console.warn('Toggle unread error:', e); }
+              }
+            }}
           />
         )}
 

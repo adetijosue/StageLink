@@ -1,7 +1,8 @@
 import React from 'react';
 import { Plus, Search, MessageSquare, PhoneCall } from 'lucide-react';
+import SwipeableChatItem from './SwipeableChatItem';
 
-export default function ChatList({ chats, onSelectChat, onOpenNewChatModal, onOpenCallHistoryModal, isDarkMode }) {
+export default function ChatList({ chats, onSelectChat, onOpenNewChatModal, onOpenCallHistoryModal, isDarkMode, onArchiveChat, onDeleteChat, onToggleUnread }) {
   // Check if there are any missed calls across chats
   let missedCallsCount = 0;
   (chats || []).forEach((c) => {
@@ -98,83 +99,16 @@ export default function ChatList({ chats, onSelectChat, onOpenNewChatModal, onOp
 
       {/* Chat Conversations List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {chats.map((chat) => {
-          const lastMsg = chat.messages[chat.messages.length - 1];
-          return (
-            <div
-              key={chat.id}
-              onClick={() => onSelectChat(chat)}
-              style={{
-                background: 'var(--card-bg)',
-                borderRadius: '16px',
-                padding: '12px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                border: '1px solid var(--border-light)',
-                cursor: 'pointer',
-                transition: 'transform 0.15s ease',
-                boxShadow: 'var(--shadow-sm)'
-              }}
-            >
-              {/* Avatar with Online indicator */}
-              <div style={{ position: 'relative' }}>
-                <img
-                  src={chat.participant.avatar}
-                  alt={chat.participant.name}
-                  style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }}
-                />
-                {chat.participant.online && (
-                  <span style={{
-                    position: 'absolute',
-                    bottom: '2px',
-                    right: '2px',
-                    width: '12px',
-                    height: '12px',
-                    background: '#10B981',
-                    borderRadius: '50%',
-                    border: '2px solid #FFFFFF'
-                  }} />
-                )}
-              </div>
-
-              {/* Chat Info */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <h4 style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-dark)' }}>
-                    {chat.participant.name}
-                  </h4>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    {chat.lastMessageTime}
-                  </span>
-                </div>
-                <p style={{
-                  fontSize: '0.82rem',
-                  color: 'var(--text-muted)',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}>
-                  {lastMsg ? lastMsg.text : 'Aucun message'}
-                </p>
-              </div>
-
-              {/* Unread Message Badge Counter */}
-              {chat.unreadCount > 0 && (
-                <span style={{
-                  background: '#EF4444',
-                  color: '#FFFFFF',
-                  borderRadius: '10px',
-                  padding: '2px 7px',
-                  fontSize: '0.72rem',
-                  fontWeight: 800
-                }}>
-                  {chat.unreadCount}
-                </span>
-              )}
-            </div>
-          );
-        })}
+        {chats.map((chat) => (
+          <SwipeableChatItem
+            key={chat.id}
+            chat={chat}
+            onSelectChat={onSelectChat}
+            onArchive={onArchiveChat}
+            onDelete={onDeleteChat}
+            onToggleUnread={onToggleUnread}
+          />
+        ))}
       </div>
     </div>
   );
