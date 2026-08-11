@@ -31,7 +31,7 @@ export default function StoryViewer({
     if (story?.id && onViewStory) {
       onViewStory(story.id, story.userId);
     }
-  }, [story?.id]);
+  }, [story?.id, story?.userId, onViewStory]);
   const [isMuted, setIsMuted] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [replySent, setReplySent] = useState(false);

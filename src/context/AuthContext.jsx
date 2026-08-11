@@ -180,12 +180,17 @@ export function AuthProvider({ children }) {
       try {
         const { error } = await supabase.rpc('delete_user_account');
         if (error) {
-           console.error('Erreur RPC delete_user_account:', error);
+           console.warn('Erreur RPC delete_user_account, utilisation de la suppression directe...', error);
            // Fallback in case RPC is not yet created by admin
-           await supabase.from('profiles').delete().eq('id', userId);
+           const { error: deleteErr } = await supabase.from('profiles').delete().eq('id', userId);
+           if (deleteErr) {
+             console.error('Erreur de suppression du profil:', deleteErr);
+             throw new Error('Échec de la suppression. Veuillez contacter le support.');
+           }
         }
       } catch (pe) {
-        console.warn('Supabase profile deletion note:', pe?.message || pe);
+        console.error('Erreur critique lors de la suppression de compte:', pe);
+        return { success: false, error: pe.message };
       }
     }
 

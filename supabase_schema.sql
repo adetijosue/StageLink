@@ -226,6 +226,9 @@ CREATE POLICY "Les utilisateurs peuvent creer leur propre profil"
 CREATE POLICY "Les utilisateurs peuvent modifier leur profil"
     ON public.profiles FOR UPDATE USING (auth.uid() = id);
 
+CREATE POLICY "Les utilisateurs peuvent supprimer leur profil"
+    ON public.profiles FOR DELETE USING (auth.uid() = id);
+
 -- ── POSTS ──
 CREATE POLICY "Les posts sont visibles par tous les authentifies"
     ON public.posts FOR SELECT USING (auth.role() = 'authenticated');
@@ -339,35 +342,15 @@ CREATE POLICY "Tout le monde peut inserer des notifications"
 -- ════════════════════════════════════════════════════════════════
 DO $$
 BEGIN
+    DROP PUBLICATION IF EXISTS supabase_realtime;
+    CREATE PUBLICATION supabase_realtime;
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
     ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
-EXCEPTION WHEN duplicate_object THEN
-    NULL;
-END $$;
-
-DO $$
-BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_states;
-EXCEPTION WHEN duplicate_object THEN
-    NULL;
-END $$;
-
-DO $$
-BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
-EXCEPTION WHEN duplicate_object THEN
-    NULL;
-END $$;
-
-DO $$
-BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.matches;
-EXCEPTION WHEN duplicate_object THEN
-    NULL;
-END $$;
-
-DO $$
-BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.posts;
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.stories;
 EXCEPTION WHEN duplicate_object THEN
     NULL;
 END $$;
