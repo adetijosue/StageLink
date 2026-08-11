@@ -224,7 +224,7 @@ function MainApp() {
               .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge)')
               .order('created_at', { ascending: false });
 
-            if (supaPosts && supaPosts.length > 0) {
+            if (supaPosts) {
               loadedPosts = supaPosts.map(p => ({
                 id: p.id,
                 userId: p.user_id,
@@ -253,7 +253,7 @@ function MainApp() {
               .gte('expires_at', new Date().toISOString())
               .order('created_at', { ascending: false });
 
-            if (supaStories && supaStories.length > 0) {
+            if (supaStories) {
               loadedStories = supaStories.map(s => ({
                 id: s.id,
                 userId: s.user_id,
@@ -469,7 +469,7 @@ function MainApp() {
             .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge)')
             .order('created_at', { ascending: false });
 
-          if (supaPosts && supaPosts.length > 0) {
+          if (supaPosts) {
             const freshPosts = supaPosts.map(p => ({
               id: p.id,
               userId: p.user_id,
@@ -499,7 +499,7 @@ function MainApp() {
             .gte('expires_at', new Date().toISOString())
             .order('created_at', { ascending: false });
 
-          if (supaStories && supaStories.length > 0) {
+          if (supaStories) {
             const freshStories = supaStories.map(s => ({
               id: s.id,
               userId: s.user_id,
