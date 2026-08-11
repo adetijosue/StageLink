@@ -1594,7 +1594,7 @@ function MainApp() {
         onMinimize={() => setIsCallMinimized(true)}
         onMaximize={() => setIsCallMinimized(false)}
         onClose={() => setIsVideoCallActive(false)}
-        callerName={selectedChat ? selectedChat.participant.name : 'Sarah Jenkins'}
+        callerName={selectedChat ? selectedChat.participant.name : 'Artiste StageLink'}
         callerAvatar={selectedChat ? selectedChat.participant.avatar : null}
         isAudioOnly={isAudioCallOnly}
         onCallEnded={handleCallEnded}
