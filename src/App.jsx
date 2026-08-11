@@ -99,6 +99,27 @@ function MainApp() {
   const [chats, setChats] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
 
+  // Native Notifications Setup
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  const sendNativeNotification = (title, body) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      if (document.hidden || !document.hasFocus()) {
+        try {
+          new Notification(title, {
+            body: body
+          });
+        } catch (e) {
+          console.warn('Native notification error:', e);
+        }
+      }
+    }
+  };
+
   const toggleDarkMode = () => {
     setIsDarkMode((prev) => {
       const next = !prev;
@@ -599,7 +620,25 @@ function MainApp() {
             
           notificationsSub = supabase
             .channel('realtime:notifications')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => syncNotifications())
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, async (payload) => {
+              if (payload.new && payload.new.user_id === currentUser.id) {
+                let body = 'Vous avez une nouvelle notification';
+                try {
+                  const { data: actor } = await supabase.from('profiles').select('full_name').eq('id', payload.new.actor_id).maybeSingle();
+                  const actorName = actor ? actor.full_name : 'Quelqu\'un';
+                  if (payload.new.type === 'like_post') body = `${actorName} a aimé votre publication.`;
+                  else if (payload.new.type === 'comment_post') body = `${actorName} a commenté votre publication.`;
+                  else if (payload.new.type === 'like_story') body = `${actorName} a aimé votre story.`;
+                  else if (payload.new.type === 'view_story') body = `${actorName} a vu votre story.`;
+                  else body = `Nouvelle notification de ${actorName}.`;
+                  
+                  sendNativeNotification('StageLink', body);
+                } catch(e) {}
+              }
+              syncNotifications();
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications' }, () => syncNotifications())
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'notifications' }, () => syncNotifications())
             .subscribe();
 
           messagesSub = supabase
@@ -625,6 +664,13 @@ function MainApp() {
                       partner = { id: p.id, name: p.full_name, avatar: p.avatar_url, role: p.role };
                     }
                   } catch (e) {}
+                }
+
+                if (newMsg.recipient_id === currentUser.id) {
+                  const isAudio = Boolean(newMsg.audio_url);
+                  const isMedia = Boolean(newMsg.media_url);
+                  const msgText = newMsg.content || (isAudio ? '🎤 Message vocal' : (isMedia ? '📷 Média' : 'Nouveau message'));
+                  sendNativeNotification(partner ? partner.name : 'Nouveau message', msgText);
                 }
 
                 const formattedMsg = {
