@@ -192,6 +192,12 @@ function MainApp() {
       const welcomeSeenKey = `stagelink_welcome_shown_${currentUser.id}`;
 
       const loadInitialData = async () => {
+        const CACHE_VERSION = '1.1';
+        if (localStorage.getItem('stagelink_cache_version') !== CACHE_VERSION) {
+          localStorage.removeItem('stagelink_chats');
+          localStorage.setItem('stagelink_cache_version', CACHE_VERSION);
+        }
+
         let loadedPosts = getStoredItem(STORAGE_KEYS.POSTS, []);
         let loadedStories = getStoredItem(STORAGE_KEYS.STORIES, []);
         let loadedMatches = getStoredItem(STORAGE_KEYS.MATCHES, []);
