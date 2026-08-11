@@ -175,10 +175,15 @@ export function AuthProvider({ children }) {
     const userId = currentUser.id;
     const userEmail = currentUser.email;
 
-    // 1. Delete profile from Supabase Database table
+    // 1. Delete user entirely from Supabase Auth (which cascades to profiles and all data)
     if (isSupabaseConfigured() && userId) {
       try {
-        await supabase.from('profiles').delete().eq('id', userId);
+        const { error } = await supabase.rpc('delete_user_account');
+        if (error) {
+           console.error('Erreur RPC delete_user_account:', error);
+           // Fallback in case RPC is not yet created by admin
+           await supabase.from('profiles').delete().eq('id', userId);
+        }
       } catch (pe) {
         console.warn('Supabase profile deletion note:', pe?.message || pe);
       }
