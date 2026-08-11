@@ -687,6 +687,13 @@ function MainApp() {
                 
                 setChats(reconstructedChats);
                 setStoredItem(STORAGE_KEYS.CHATS, reconstructedChats);
+                setSelectedChat(prev => {
+                  if (prev) {
+                    const updatedActive = reconstructedChats.find(c => c.id === prev.id);
+                    if (updatedActive) return updatedActive;
+                  }
+                  return prev;
+                });
               }
             } catch(e) {}
           };
@@ -759,6 +766,9 @@ function MainApp() {
                     }
                   } catch (e) {}
                 }
+                if (!partner) {
+                  partner = { id: partnerId, name: 'Utilisateur', avatar: null, role: 'Artiste' };
+                }
 
                 if (newMsg.recipient_id === currentUser.id) {
                   const isAudio = Boolean(newMsg.audio_url);
@@ -830,6 +840,9 @@ function MainApp() {
                   }
                   return prevSelected;
                 });
+                
+                // Fallback: Re-sync entire message history to guarantee identical state
+                syncMessages();
               }
             })
             .subscribe();
