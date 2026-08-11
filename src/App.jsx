@@ -599,6 +599,100 @@ function MainApp() {
       let profilesSub, postsSub, storiesSub, messagesSub, notificationsSub;
       if (isSupabaseConfigured()) {
         try {
+          const syncMessages = async () => {
+            if (!currentUser?.id) return;
+            try {
+              const { data: supaMsgs } = await supabase
+                .from('messages')
+                .select('*')
+                .or(`sender_id.eq.${currentUser.id},recipient_id.eq.${currentUser.id}`)
+                .order('created_at', { ascending: true });
+              
+              if (supaMsgs && supaMsgs.length > 0) {
+                const partnerIds = new Set();
+                supaMsgs.forEach(m => {
+                  if (m.sender_id !== currentUser.id) partnerIds.add(m.sender_id);
+                  if (m.recipient_id !== currentUser.id) partnerIds.add(m.recipient_id);
+                });
+
+                const { data: profiles } = await supabase.from('profiles').select('*').in('id', Array.from(partnerIds));
+                const profilesMap = {};
+                if (profiles) {
+                  profiles.forEach(p => {
+                    profilesMap[p.id] = {
+                      id: p.id,
+                      name: p.full_name || 'Artiste',
+                      avatar: p.avatar_url,
+                      role: p.role,
+                      online: true
+                    };
+                  });
+                }
+
+                const chatGroups = {};
+                supaMsgs.forEach(msg => {
+                  const isMeSender = msg.sender_id === currentUser.id;
+                  const partnerId = isMeSender ? msg.recipient_id : msg.sender_id;
+                  
+                  if (!chatGroups[partnerId]) {
+                    chatGroups[partnerId] = {
+                      id: `chat_${partnerId}`,
+                      participant: profilesMap[partnerId] || { id: partnerId, name: 'Utilisateur', avatar: null, role: 'Artiste' },
+                      messages: [],
+                      unreadCount: 0
+                    };
+                  }
+                  
+                  const formattedMsg = {
+                    id: msg.id,
+                    sender: isMeSender ? 'current' : 'other',
+                    senderId: msg.sender_id,
+                    text: msg.content || '',
+                    mediaUrl: msg.media_url || null,
+                    audioUrl: msg.audio_url || null,
+                    isAudio: Boolean(msg.audio_url),
+                    timestamp: new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                    createdAtTimestamp: new Date(msg.created_at).getTime(),
+                    isRead: true
+                  };
+
+                  if (!isMeSender && msg.is_read === false) {
+                     chatGroups[partnerId].unreadCount += 1;
+                  }
+
+                  chatGroups[partnerId].messages.push(formattedMsg);
+                  chatGroups[partnerId].lastMessageTime = formattedMsg.timestamp;
+                  chatGroups[partnerId].lastMessageText = formattedMsg.text || (formattedMsg.isAudio ? '🎤 Audio' : (formattedMsg.mediaUrl ? '📷 Média' : ''));
+                });
+
+                let reconstructedChats = Object.values(chatGroups).sort((a,b) => {
+                   const lastA = a.messages[a.messages.length - 1]?.createdAtTimestamp || 0;
+                   const lastB = b.messages[b.messages.length - 1]?.createdAtTimestamp || 0;
+                   return lastB - lastA;
+                });
+
+                const { data: statesData } = await supabase.from('chat_states').select('*').eq('user_id', currentUser.id);
+                if (statesData && statesData.length > 0) {
+                  const statesMap = {};
+                  statesData.forEach(s => statesMap[s.partner_id] = s);
+                  reconstructedChats = reconstructedChats.filter(chat => {
+                    const partnerId = chat.participant?.id;
+                    const state = statesMap[partnerId];
+                    if (state?.is_deleted) return false;
+                    if (state?.is_archived) return false;
+                    if (state?.force_unread) chat.unreadCount = (chat.unreadCount || 0) + 1;
+                    return true;
+                  });
+                }
+                
+                setChats(reconstructedChats);
+                setStoredItem(STORAGE_KEYS.CHATS, reconstructedChats);
+              }
+            } catch(e) {}
+          };
+          
+          syncMessages();
+
           profilesSub = supabase
             .channel('realtime:profiles')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => syncPostsStoriesAndProfiles())
@@ -698,33 +792,30 @@ function MainApp() {
                         ...c,
                         unreadCount: isMeSender ? c.unreadCount : (c.unreadCount || 0) + 1,
                         lastMessageTime: 'À l\'instant',
+                        lastMessageText: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Audio' : (formattedMsg.mediaUrl ? '📷 Média' : '')),
                         messages: [...(c.messages || []), formattedMsg]
                       };
                     }
                     return c;
                   });
 
-                  if (!chatFound) {
-                    const newChatObj = {
-                      id: chatId,
-                      participant: {
-                        id: partnerId,
-                        name: partner?.name || 'Artiste StageLink',
-                        avatar: partner?.avatar || '',
-                        online: true,
-                        role: partner?.role || 'Artiste'
-                      },
-                      unreadCount: isMeSender ? 0 : 1,
-                      lastMessageTime: 'À l\'instant',
-                      messages: [formattedMsg]
-                    };
-                    const next = [newChatObj, ...prevChats];
-                    setStoredItem(STORAGE_KEYS.CHATS, next);
-                    return next;
+                  let finalChats = updated;
+                  if (!chatFound && partner) {
+                      finalChats = [{
+                        id: chatId,
+                        participant: partner,
+                        unreadCount: isMeSender ? 0 : 1,
+                        lastMessageTime: 'À l\'instant',
+                        lastMessageText: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Audio' : (formattedMsg.mediaUrl ? '📷 Média' : '')),
+                        messages: [formattedMsg]
+                      }, ...updated];
                   }
-
-                  setStoredItem(STORAGE_KEYS.CHATS, updated);
-                  return updated;
+                  
+                  try {
+                    localStorage.setItem('stagelink_chats', JSON.stringify(finalChats));
+                  } catch(e) {}
+                  
+                  return finalChats;
                 });
 
                 setSelectedChat(prevSelected => {
@@ -1225,11 +1316,13 @@ function MainApp() {
       isRead: true
     };
 
-    const targetChat = chats.find(c => c.id === chatId);
+    const targetChat = chats.find(c => c.id === chatId) || (selectedChat?.id === chatId ? selectedChat : null);
     const recipientId = targetChat?.participant?.id;
 
+    let chatFound = false;
     const updatedChats = chats.map((c) => {
       if (c.id === chatId) {
+        chatFound = true;
         return {
           ...c,
           unreadCount: 0,
@@ -1239,6 +1332,16 @@ function MainApp() {
       }
       return c;
     });
+
+    if (!chatFound && targetChat) {
+      updatedChats.unshift({
+        id: chatId,
+        participant: targetChat.participant,
+        unreadCount: 0,
+        lastMessageTime: 'À l\'instant',
+        messages: [newMsg]
+      });
+    }
 
     setChats(updatedChats);
     setStoredItem(STORAGE_KEYS.CHATS, updatedChats);
