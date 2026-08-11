@@ -6,6 +6,28 @@ import UserAvatar from '../common/UserAvatar';
 export default function StoryBar({ stories, onSelectStory, onAddStory }) {
   const { currentUser } = useAuth();
 
+  // Separate current user's stories from other users
+  const myStories = stories.filter(s => s.userId === currentUser?.id);
+  const otherStories = stories.filter(s => s.userId !== currentUser?.id);
+  const myLatestStory = myStories.length > 0 ? myStories[0] : null;
+
+  const handleMyStatusClick = () => {
+    if (myLatestStory) {
+      onSelectStory(myLatestStory);
+    } else {
+      onAddStory();
+    }
+  };
+
+  const renderThumbnail = (s) => {
+    if (!s?.storyMedia) return null;
+    const isVideo = s.mediaType === 'video' || s.isVideo || (typeof s.storyMedia === 'string' && (s.storyMedia.includes('.mp4') || s.storyMedia.startsWith('data:video')));
+    if (isVideo) {
+      return <video src={s.storyMedia} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--card-bg)' }} muted playsInline />;
+    }
+    return <img src={s.storyMedia} alt={s.userName || 'Story'} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--card-bg)' }} />;
+  };
+
   return (
     <div style={{
       padding: '16px 16px 14px 16px',
@@ -21,7 +43,7 @@ export default function StoryBar({ stories, onSelectStory, onAddStory }) {
     }}>
       {/* WhatsApp-Style 'Mon Statut' / Add My Story Circle */}
       <div
-        onClick={onAddStory}
+        onClick={handleMyStatusClick}
         style={{
           display: 'inline-flex',
           flexDirection: 'column',
@@ -37,29 +59,41 @@ export default function StoryBar({ stories, onSelectStory, onAddStory }) {
           height: '72px',
           borderRadius: '50%',
           padding: '2px',
-          background: 'linear-gradient(135deg, rgba(0, 102, 255, 0.2), rgba(0, 71, 255, 0.1))'
+          background: myLatestStory ? 'linear-gradient(135deg, #0066FF 0%, #00C6FF 100%)' : 'linear-gradient(135deg, rgba(0, 102, 255, 0.2), rgba(0, 71, 255, 0.1))',
+          boxShadow: myLatestStory ? '0 4px 14px rgba(0, 102, 255, 0.3)' : 'none'
         }}>
-          <UserAvatar
-            user={currentUser}
-            size={68}
-            border="2px solid var(--card-bg)"
-          />
+          {myLatestStory?.storyMedia ? renderThumbnail(myLatestStory) : (
+            <UserAvatar
+              user={currentUser}
+              size={68}
+              border="2px solid var(--card-bg)"
+            />
+          )}
+          
           {/* Plus Badge Icon on Bottom Right */}
-          <div style={{
-            position: 'absolute',
-            bottom: '0',
-            right: '0',
-            width: '24px',
-            height: '24px',
-            borderRadius: '50%',
-            background: '#0066FF',
-            color: '#FFFFFF',
-            border: '2.5px solid var(--card-bg)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(0, 102, 255, 0.4)'
-          }}>
+          <div 
+            onClick={(e) => {
+              if (myLatestStory) {
+                e.stopPropagation();
+                onAddStory();
+              }
+            }}
+            style={{
+              position: 'absolute',
+              bottom: '0',
+              right: '0',
+              width: '24px',
+              height: '24px',
+              borderRadius: '50%',
+              background: '#0066FF',
+              color: '#FFFFFF',
+              border: '2.5px solid var(--card-bg)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(0, 102, 255, 0.4)'
+            }}
+          >
             <Plus size={14} strokeWidth={3} />
           </div>
         </div>
@@ -74,7 +108,7 @@ export default function StoryBar({ stories, onSelectStory, onAddStory }) {
       </div>
 
       {/* WhatsApp-Style Enlarged Stories List */}
-      {stories.map((story) => {
+      {otherStories.map((story) => {
         const isUnread = story.hasUnread !== false;
 
         return (
@@ -105,11 +139,13 @@ export default function StoryBar({ stories, onSelectStory, onAddStory }) {
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <UserAvatar
-                user={{ name: story.userName, avatar: story.userAvatar, gender: story.gender }}
-                size={66}
-                border="2px solid var(--card-bg)"
-              />
+              {story.storyMedia ? renderThumbnail(story) : (
+                <UserAvatar
+                  user={{ name: story.userName, avatar: story.userAvatar || story.avatar, gender: story.gender }}
+                  size={66}
+                  border="2px solid var(--card-bg)"
+                />
+              )}
             </div>
 
             {/* Story User First Name */}
@@ -123,7 +159,7 @@ export default function StoryBar({ stories, onSelectStory, onAddStory }) {
               whiteSpace: 'nowrap',
               textAlign: 'center'
             }}>
-              {story.userName.split(' ')[0]}
+              {story.userName ? story.userName.split(' ')[0] : 'Artiste'}
             </span>
           </div>
         );
