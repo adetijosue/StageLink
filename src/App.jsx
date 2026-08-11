@@ -652,8 +652,8 @@ function MainApp() {
                     senderId: msg.sender_id,
                     text: msg.content || '',
                     mediaUrl: msg.media_url || null,
-                    audioUrl: msg.audio_url || null,
-                    isAudio: msg.metadata?.isAudio || Boolean(msg.audio_url),
+                    audioUrl: msg.audio_url || msg.audio_note_url || null,
+                    isAudio: msg.metadata?.isAudio || Boolean(msg.audio_url || msg.audio_note_url),
                     audioDuration: msg.metadata?.audioDuration || null,
                     quotedMessage: msg.metadata?.quotedMessage || null,
                     documentName: msg.metadata?.documentName || null,
@@ -786,7 +786,7 @@ function MainApp() {
                 }
 
                 if (newMsg.receiver_id === currentUser.id) {
-                  const isAudio = Boolean(newMsg.audio_url);
+                  const isAudio = Boolean(newMsg.audio_url || newMsg.audio_note_url);
                   const isMedia = Boolean(newMsg.media_url);
                   const msgText = newMsg.content || (isAudio ? '🎤 Message vocal' : (isMedia ? '📷 Média' : 'Nouveau message'));
                   sendNativeNotification(partner ? partner.name : 'Nouveau message', msgText);
@@ -798,8 +798,8 @@ function MainApp() {
                   senderId: newMsg.sender_id,
                   text: newMsg.content || '',
                   mediaUrl: newMsg.media_url || null,
-                  audioUrl: newMsg.audio_url || null,
-                  isAudio: newMsg.metadata?.isAudio || Boolean(newMsg.audio_url),
+                  audioUrl: newMsg.audio_url || newMsg.audio_note_url || null,
+                  isAudio: newMsg.metadata?.isAudio || Boolean(newMsg.audio_url || newMsg.audio_note_url),
                   audioDuration: newMsg.metadata?.audioDuration || null,
                   quotedMessage: newMsg.metadata?.quotedMessage || null,
                   documentName: newMsg.metadata?.documentName || null,
@@ -1429,7 +1429,7 @@ function MainApp() {
             receiver_id: recipientId,
             content: newMsg.text || '',
             media_url: newMsg.mediaUrl || null,
-            audio_url: newMsg.audioUrl || null
+            audio_note_url: newMsg.audioUrl || null
           });
           
           if (fallbackErr) {
