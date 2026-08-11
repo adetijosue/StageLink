@@ -213,16 +213,19 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
       mediaRecorderRef.current.onstop = () => {
         const mimeType = mediaRecorderRef.current.mimeType || 'audio/webm';
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        const audioUrl = URL.createObjectURL(audioBlob);
-
+        
         if (mediaRecorderRef.current.stream) {
           mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
         }
 
-        setAudioPreviewData({
-          audioUrl,
-          audioDuration: durationFormatted
-        });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setAudioPreviewData({
+            audioUrl: reader.result,
+            audioDuration: durationFormatted
+          });
+        };
+        reader.readAsDataURL(audioBlob);
       };
       mediaRecorderRef.current.stop();
     } else {
