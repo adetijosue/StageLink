@@ -33,12 +33,14 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
 
     if (authError) {
       let rawMsg = authError.message || (typeof authError === 'string' ? authError : '');
-      if (rawMsg.includes('already registered') || rawMsg.includes('User already exists')) {
+      if (rawMsg.includes('already registered') || rawMsg.includes('User already exists') || rawMsg.includes('user_already_exists')) {
         rawMsg = 'Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter.';
       } else if (rawMsg.includes('at least 6 characters') || rawMsg.includes('Password should be')) {
         rawMsg = 'Le mot de passe doit contenir au moins 6 caractères.';
       } else if (rawMsg.includes('invalid email') || rawMsg.includes('Unable to validate email')) {
         rawMsg = 'Adresse e-mail invalide.';
+      } else if (rawMsg.includes('rate limit') || rawMsg.includes('rate_limit')) {
+        rawMsg = 'Trop de tentatives en peu de temps. Veuillez patienter une minute avant de réessayer.';
       } else if (!rawMsg || rawMsg === '{}' || rawMsg.includes('{')) {
         rawMsg = 'Erreur lors de la création du compte dans Supabase. Veuillez réessayer.';
       }
@@ -46,11 +48,19 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
     }
 
     if (authData?.user) {
-      const username = email.split('@')[0] + '_' + Math.floor(Math.random() * 1000);
+      // Check if user already exists (Supabase returns empty identities array for existing users when email confirmation is enabled)
+      if (Array.isArray(authData.user.identities) && authData.user.identities.length === 0) {
+        return {
+          success: false,
+          error: 'Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter.'
+        };
+      }
+
+      const username = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_') + '_' + Math.floor(Date.now() % 10000);
       
-      // Upsert profile safely using exact matching DB columns (id, username, full_name, email, role, gender, bio, verified_badge)
+      // Upsert profile safely using exact matching DB columns
       try {
-        await supabase.from('profiles').upsert({
+        const { error: profileErr } = await supabase.from('profiles').upsert({
           id: authData.user.id,
           username: username,
           full_name: name,
@@ -64,11 +74,15 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
           genres: [],
           gear: []
         }, { onConflict: 'id' });
-      } catch (profileErr) {
-        console.warn('Profile upsert note:', profileErr?.message || profileErr);
+
+        if (profileErr) {
+          console.warn('Profile upsert note:', profileErr.message);
+        }
+      } catch (pe) {
+        console.warn('Profile upsert exception:', pe?.message || pe);
       }
 
-      // If email confirmation is disabled or session acquired, acquire session user
+      // If session not established, attempt auto-login
       let sessionUser = authData.user;
       if (!authData.session) {
         const { data: loginData } = await supabase.auth.signInWithPassword({

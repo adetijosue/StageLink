@@ -57,32 +57,37 @@ export default function AuthScreen() {
 
     setIsSubmitting(true);
 
-    if (isLogin) {
-      const res = await login(email.trim(), password.trim());
-      setIsSubmitting(false);
-      if (!res.success) {
-        let errText = typeof res.error === 'string' ? res.error : res.error?.message;
-        if (!errText || errText === '{}' || errText.includes('{')) {
-          errText = 'Identifiants ou mot de passe incorrect.';
+    try {
+      if (isLogin) {
+        const res = await login(email.trim(), password.trim());
+        if (!res.success) {
+          let errText = typeof res.error === 'string' ? res.error : res.error?.message;
+          if (!errText || errText === '{}' || errText.includes('{')) {
+            errText = 'Identifiants ou mot de passe incorrect.';
+          }
+          setError(errText);
         }
-        setError(errText);
-      }
-    } else {
-      if (!name.trim()) {
-        setError('Veuillez entrer votre nom ou pseudonyme d\'artiste.');
-        setIsSubmitting(false);
-        return;
-      }
+      } else {
+        if (!name.trim()) {
+          setError('Veuillez entrer votre nom ou pseudonyme d\'artiste.');
+          setIsSubmitting(false);
+          return;
+        }
 
-      const res = await signup({ email: email.trim(), password: password.trim(), name: name.trim(), role, gender });
-      setIsSubmitting(false);
-      if (!res.success) {
-        let errText = typeof res.error === 'string' ? res.error : res.error?.message;
-        if (!errText || errText === '{}' || errText.includes('{')) {
-          errText = 'Erreur lors de l’inscription. Veuillez réessayer.';
+        const res = await signup({ email: email.trim(), password: password.trim(), name: name.trim(), role, gender });
+        if (!res.success) {
+          let errText = typeof res.error === 'string' ? res.error : res.error?.message;
+          if (!errText || errText === '{}' || errText.includes('{')) {
+            errText = 'Erreur lors de l’inscription. Veuillez réessayer.';
+          }
+          setError(errText);
         }
-        setError(errText);
       }
+    } catch (err) {
+      console.error('Auth submit error:', err);
+      setError(err?.message || 'Erreur lors du traitement. Veuillez réessayer.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
