@@ -1013,7 +1013,7 @@ function MainApp() {
     });
   };
 
-  const handleStoryReplyToInbox = (storyUser, replyText, isFromViewersList = false) => {
+  const handleStoryReplyToInbox = async (storyUser, replyText, isFromViewersList = false) => {
     const targetUserId = storyUser.userId || storyUser.id || `usr_story_${Date.now()}`;
     const targetUserName = storyUser.userName || storyUser.name;
     const targetAvatar = storyUser.userAvatar || storyUser.avatar;
