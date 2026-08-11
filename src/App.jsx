@@ -147,16 +147,21 @@ function MainApp() {
     return () => window.removeEventListener('profileUpdated', handleProfileUpdated);
   }, []);
 
-  const handleRefreshData = () => {
-    const freshPosts = getStoredItem(STORAGE_KEYS.POSTS, []);
-    const freshStories = getStoredItem(STORAGE_KEYS.STORIES, []);
-    const freshChats = getStoredItem(STORAGE_KEYS.CHATS, []);
-    const freshUsers = getStoredItem(STORAGE_KEYS.USERS, []);
+  const handleRefreshData = async () => {
+    soundEngine.playPopSound();
+    if (isSupabaseConfigured()) {
+      await syncPostsStoriesAndProfiles();
+    } else {
+      const freshPosts = getStoredItem(STORAGE_KEYS.POSTS, []);
+      const freshStories = getStoredItem(STORAGE_KEYS.STORIES, []);
+      const freshChats = getStoredItem(STORAGE_KEYS.CHATS, []);
+      const freshUsers = getStoredItem(STORAGE_KEYS.USERS, []);
 
-    setPosts(freshPosts);
-    setStories(freshStories);
-    setChats(freshChats);
-    setAllUsers(freshUsers);
+      setPosts(freshPosts);
+      setStories(freshStories);
+      setChats(freshChats);
+      setAllUsers(freshUsers);
+    }
   };
 
   useEffect(() => {
@@ -572,6 +577,9 @@ function MainApp() {
                   const updated = prevChats.map(c => {
                     if (c.id === chatId || (c.participant && c.participant.id === partnerId)) {
                       chatFound = true;
+                      const msgExists = (c.messages || []).some(m => m.id === formattedMsg.id);
+                      if (msgExists) return c;
+
                       return {
                         ...c,
                         unreadCount: isMeSender ? c.unreadCount : (c.unreadCount || 0) + 1,
@@ -607,6 +615,9 @@ function MainApp() {
 
                 setSelectedChat(prevSelected => {
                   if (prevSelected && (prevSelected.id === chatId || prevSelected.participant?.id === partnerId)) {
+                    const msgExists = (prevSelected.messages || []).some(m => m.id === formattedMsg.id);
+                    if (msgExists) return prevSelected;
+
                     return {
                       ...prevSelected,
                       messages: [...(prevSelected.messages || []), formattedMsg]
@@ -646,7 +657,7 @@ function MainApp() {
     setUnreadNotificationsCount(0);
   };
 
-  const handleSelectChat = (chat) => {
+  const handleSelectChat = async (chat) => {
     window.history.pushState({ page: 'chat' }, '');
     const updatedChats = chats.map((c) => {
       if (c.id === chat.id) {
@@ -660,6 +671,19 @@ function MainApp() {
 
     const active = updatedChats.find((c) => c.id === chat.id);
     setSelectedChat(active || { ...chat, unreadCount: 0 });
+
+    const partnerId = chat.participant?.id;
+    if (isSupabaseConfigured() && currentUser?.id && partnerId) {
+      try {
+        await supabase
+          .from('messages')
+          .update({ is_read: true })
+          .eq('recipient_id', currentUser.id)
+          .eq('sender_id', partnerId);
+      } catch (me) {
+        console.warn('Supabase mark read note:', me?.message || me);
+      }
+    }
   };
 
   const handleStartChatWithUser = (targetUser) => {
@@ -744,8 +768,9 @@ function MainApp() {
 
     if (replyText) {
       const rawMedia = storyUser.storyMedia || storyUser.image || storyUser.mediaUrl || null;
+      const msgUuid = generateUUID();
       const newMsg = {
-        id: `msg_story_${Date.now()}`,
+        id: msgUuid,
         sender: 'current',
         text: replyText,
         isStoryComment: true,
@@ -773,6 +798,21 @@ function MainApp() {
       };
 
       updatedChatsList = updatedChatsList.map((c) => (c.id === targetChat.id ? targetChat : c));
+
+      // Save story reply directly to Supabase Database
+      if (isSupabaseConfigured() && targetUserId) {
+        try {
+          supabase.from('messages').insert({
+            id: msgUuid,
+            sender_id: currentUser.id,
+            recipient_id: targetUserId,
+            content: replyText,
+            media_url: rawMedia || null
+          });
+        } catch (se) {
+          console.warn('Supabase story reply insert note:', se?.message || se);
+        }
+      }
     }
 
     setChats(updatedChatsList);
@@ -1050,7 +1090,7 @@ function MainApp() {
     if (active) setSelectedChat(active);
   };
 
-  const handleDeleteMessageForEveryone = (chatId, messageId) => {
+  const handleDeleteMessageForEveryone = async (chatId, messageId) => {
     const updatedChats = chats.map((c) => {
       if (c.id === chatId) {
         return {
@@ -1065,6 +1105,14 @@ function MainApp() {
 
     const active = updatedChats.find((c) => c.id === chatId);
     if (active) setSelectedChat(active);
+
+    if (isSupabaseConfigured() && messageId) {
+      try {
+        await supabase.from('messages').delete().eq('id', messageId);
+      } catch (me) {
+        console.warn('Supabase message deletion note:', me?.message || me);
+      }
+    }
   };
 
   const handleCallEnded = (callResult) => {
@@ -1116,6 +1164,40 @@ function MainApp() {
 
     setChats(updatedChats);
     setStoredItem(STORAGE_KEYS.CHATS, updatedChats);
+  };
+
+  const handleApplyMatch = async (matchCard) => {
+    if (!currentUser || !matchCard) return;
+
+    const targetUserId = matchCard.userId || matchCard.id?.replace('match_', '');
+    const targetUserName = matchCard.creator || matchCard.title || 'Artiste StageLink';
+    const targetAvatar = matchCard.creatorAvatar || matchCard.image || '';
+    const targetRole = matchCard.category || 'Artiste';
+
+    // 1. Insert match record into Supabase matches table
+    if (isSupabaseConfigured() && targetUserId) {
+      try {
+        await supabase.from('matches').insert({
+          user_id: currentUser.id,
+          target_user_id: targetUserId,
+          status: 'applied'
+        });
+      } catch (me) {
+        console.warn('Supabase match insert note:', me?.message || me);
+      }
+    }
+
+    // 2. Start a direct chat session with the target artist
+    handleStartChatWithUser({
+      id: targetUserId,
+      name: targetUserName,
+      avatar: targetAvatar,
+      role: targetRole
+    });
+
+    // 3. Send initial intro message in chat
+    const chatId = `chat_${targetUserId}`;
+    handleSendMessage(chatId, `Bonjour ${targetUserName} ! Je suis intéressé(e) par votre opportunité "${matchCard.title}" sur StageLink.`);
   };
 
   const handleUpgradeSuccess = () => {
@@ -1189,7 +1271,7 @@ function MainApp() {
         {activeTab === 'match' && (
           <SwipeMatching
             matches={matches}
-            onApplyMatch={(match) => {}}
+            onApplyMatch={handleApplyMatch}
           />
         )}
 
@@ -1248,11 +1330,19 @@ function MainApp() {
             setActiveStory(null);
             setSavedStoryContext(null);
           }}
-          onDeleteStory={(storyId) => {
+          onDeleteStory={async (storyId) => {
             const updated = stories.filter((s) => s.id !== storyId);
             setStories(updated);
             setStoredItem(STORAGE_KEYS.STORIES, updated);
             setActiveStory(null);
+
+            if (isSupabaseConfigured() && storyId) {
+              try {
+                await supabase.from('stories').delete().eq('id', storyId);
+              } catch (se) {
+                console.warn('Supabase story deletion note:', se?.message || se);
+              }
+            }
           }}
           onReshareStory={(st) => {
             setActiveStory(null);

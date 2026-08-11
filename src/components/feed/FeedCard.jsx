@@ -21,12 +21,29 @@ export default function FeedCard({ post, onLike, onFollowUser, onAddComment, onD
 
   const isAuthor = currentUser && (currentUser.id === post.userId || currentUser.name === post.userName);
 
+  const audioInstanceRef = useRef(null);
+
   const toggleAudio = () => {
     if (isPlayingAudio) {
+      if (audioInstanceRef.current) {
+        audioInstanceRef.current.pause();
+      }
       soundEngine.stop();
       setIsPlayingAudio(false);
     } else {
-      soundEngine.generateAndPlay(120, 'Afro-Gospel');
+      if (post.audioUrl) {
+        const audio = new Audio(post.audioUrl);
+        audioInstanceRef.current = audio;
+        audio.onended = () => setIsPlayingAudio(false);
+        audio.onerror = () => {
+          soundEngine.generateAndPlay(120, 'Afro-Gospel');
+        };
+        audio.play().catch(() => {
+          soundEngine.generateAndPlay(120, 'Afro-Gospel');
+        });
+      } else {
+        soundEngine.generateAndPlay(120, 'Afro-Gospel');
+      }
       setIsPlayingAudio(true);
     }
   };
