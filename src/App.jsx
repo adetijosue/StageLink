@@ -721,7 +721,7 @@ function MainApp() {
       setActiveStory(savedStoryContext.story);
       setSavedStoryContext(null);
     } else {
-      setActiveTab('feed');
+      setActiveTab('discussions');
     }
   };
 
