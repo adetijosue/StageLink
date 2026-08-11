@@ -217,95 +217,123 @@ ALTER TABLE public.followers     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_states   ENABLE ROW LEVEL SECURITY;
 
 -- ── PROFILES ──
+DROP POLICY IF EXISTS "Tout le monde peut voir les profils" ON public.profiles;
 CREATE POLICY "Tout le monde peut voir les profils"
     ON public.profiles FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent creer leur propre profil" ON public.profiles;
 CREATE POLICY "Les utilisateurs peuvent creer leur propre profil"
     ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent modifier leur profil" ON public.profiles;
 CREATE POLICY "Les utilisateurs peuvent modifier leur profil"
     ON public.profiles FOR UPDATE USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent supprimer leur profil" ON public.profiles;
 CREATE POLICY "Les utilisateurs peuvent supprimer leur profil"
     ON public.profiles FOR DELETE USING (auth.uid() = id);
 
 -- ── POSTS ──
+DROP POLICY IF EXISTS "Les posts sont visibles par tous les authentifies" ON public.posts;
 CREATE POLICY "Les posts sont visibles par tous les authentifies"
     ON public.posts FOR SELECT USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent publier" ON public.posts;
 CREATE POLICY "Les utilisateurs peuvent publier"
     ON public.posts FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent modifier leurs posts" ON public.posts;
 CREATE POLICY "Les utilisateurs peuvent modifier leurs posts"
     ON public.posts FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent supprimer leurs posts" ON public.posts;
 CREATE POLICY "Les utilisateurs peuvent supprimer leurs posts"
     ON public.posts FOR DELETE USING (auth.uid() = user_id);
 
 -- ── POST LIKES ──
+DROP POLICY IF EXISTS "Les likes sont visibles par tous les authentifies" ON public.post_likes;
 CREATE POLICY "Les likes sont visibles par tous les authentifies"
     ON public.post_likes FOR SELECT USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent liker" ON public.post_likes;
 CREATE POLICY "Les utilisateurs peuvent liker"
     ON public.post_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent retirer leur like" ON public.post_likes;
 CREATE POLICY "Les utilisateurs peuvent retirer leur like"
     ON public.post_likes FOR DELETE USING (auth.uid() = user_id);
 
 -- ── POST COMMENTS ──
+DROP POLICY IF EXISTS "Les commentaires sont visibles par tous les authentifies" ON public.post_comments;
 CREATE POLICY "Les commentaires sont visibles par tous les authentifies"
     ON public.post_comments FOR SELECT USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent commenter" ON public.post_comments;
 CREATE POLICY "Les utilisateurs peuvent commenter"
     ON public.post_comments FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent supprimer leurs commentaires" ON public.post_comments;
 CREATE POLICY "Les utilisateurs peuvent supprimer leurs commentaires"
     ON public.post_comments FOR DELETE USING (auth.uid() = user_id);
 
 -- ── STORIES ──
+DROP POLICY IF EXISTS "Les stories non expirees sont visibles" ON public.stories;
 CREATE POLICY "Les stories non expirees sont visibles"
     ON public.stories FOR SELECT USING (expires_at > NOW());
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent publier des stories" ON public.stories;
 CREATE POLICY "Les utilisateurs peuvent publier des stories"
     ON public.stories FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent supprimer leurs stories" ON public.stories;
 CREATE POLICY "Les utilisateurs peuvent supprimer leurs stories"
     ON public.stories FOR DELETE USING (auth.uid() = user_id);
 
 -- ── MATCHES ──
+DROP POLICY IF EXISTS "Les utilisateurs voient leurs propres matches" ON public.matches;
 CREATE POLICY "Les utilisateurs voient leurs propres matches"
     ON public.matches FOR SELECT USING (auth.uid() = candidate_id OR auth.uid() = target_id);
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent creer des matches" ON public.matches;
 CREATE POLICY "Les utilisateurs peuvent creer des matches"
     ON public.matches FOR INSERT WITH CHECK (auth.uid() = candidate_id);
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent repondre aux matches" ON public.matches;
 CREATE POLICY "Les utilisateurs peuvent repondre aux matches"
     ON public.matches FOR UPDATE USING (auth.uid() = candidate_id OR auth.uid() = target_id);
 
 -- ── MESSAGES ──
+DROP POLICY IF EXISTS "Les utilisateurs voient leurs conversations" ON public.messages;
 CREATE POLICY "Les utilisateurs voient leurs conversations"
     ON public.messages FOR SELECT USING (auth.uid() = sender_id OR auth.uid() = receiver_id);
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent envoyer des messages" ON public.messages;
 CREATE POLICY "Les utilisateurs peuvent envoyer des messages"
     ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
 
 -- ── CHAT_STATES ──
+DROP POLICY IF EXISTS "Les utilisateurs gèrent leurs états" ON public.chat_states;
 CREATE POLICY "Les utilisateurs gèrent leurs états"
     ON public.chat_states FOR ALL USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent supprimer leurs messages" ON public.messages;
 CREATE POLICY "Les utilisateurs peuvent supprimer leurs messages"
     ON public.messages FOR DELETE USING (auth.uid() = sender_id);
 
+DROP POLICY IF EXISTS "Les destinataires peuvent marquer comme lu" ON public.messages;
 CREATE POLICY "Les destinataires peuvent marquer comme lu"
     ON public.messages FOR UPDATE USING (auth.uid() = receiver_id);
 
 -- ── FOLLOWERS ──
+DROP POLICY IF EXISTS "Les abonnements sont visibles par tous les authentifies" ON public.followers;
 CREATE POLICY "Les abonnements sont visibles par tous les authentifies"
     ON public.followers FOR SELECT USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent suivre" ON public.followers;
 CREATE POLICY "Les utilisateurs peuvent suivre"
     ON public.followers FOR INSERT WITH CHECK (auth.uid() = follower_id);
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent se desabonner" ON public.followers;
 CREATE POLICY "Les utilisateurs peuvent se desabonner"
     ON public.followers FOR DELETE USING (auth.uid() = follower_id);
 
@@ -328,12 +356,15 @@ CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON public.notifications(
 
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Les utilisateurs voient leurs propres notifications" 
+DROP POLICY IF EXISTS "Les utilisateurs voient leurs propres notifications" ON public.notifications;
+CREATE POLICY "Les utilisateurs voient leurs propres notifications"
     ON public.notifications FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Les utilisateurs peuvent marquer comme lu" ON public.notifications;
 CREATE POLICY "Les utilisateurs peuvent marquer comme lu"
     ON public.notifications FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Tout le monde peut inserer des notifications" ON public.notifications;
 CREATE POLICY "Tout le monde peut inserer des notifications"
     ON public.notifications FOR INSERT WITH CHECK (true);
 
