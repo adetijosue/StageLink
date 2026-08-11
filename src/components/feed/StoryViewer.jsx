@@ -13,12 +13,25 @@ export default function StoryViewer({
   onSendReply,
   onReshareStory,
   onDeleteStory,
-  initialShowViewers
+  initialShowViewers,
+  onLikeStory,
+  onViewStory
 }) {
   const { currentUser } = useAuth();
   const [progress, setProgress] = useState(0);
-  const [isLiked, setIsLiked] = useState(false);
-  const [likesCount, setLikesCount] = useState(story?.likesCount || 8);
+  const [isLiked, setIsLiked] = useState(story?.isLiked || false);
+  const [likesCount, setLikesCount] = useState(story?.likesCount || 0);
+
+  useEffect(() => {
+    setIsLiked(story?.isLiked || false);
+    setLikesCount(story?.likesCount || 0);
+  }, [story?.isLiked, story?.likesCount]);
+
+  useEffect(() => {
+    if (story?.id && onViewStory) {
+      onViewStory(story.id, story.userId);
+    }
+  }, [story?.id]);
   const [isMuted, setIsMuted] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [replySent, setReplySent] = useState(false);
@@ -77,13 +90,17 @@ export default function StoryViewer({
 
   const handleToggleLike = () => {
     soundEngine.playLikePopSound();
-    if (!isLiked) {
+    let newIsLiked = !isLiked;
+    if (newIsLiked) {
       confetti({ particleCount: 35, spread: 60, origin: { y: 0.85 } });
       setLikesCount(prev => prev + 1);
     } else {
       setLikesCount(prev => Math.max(0, prev - 1));
     }
-    setIsLiked(!isLiked);
+    setIsLiked(newIsLiked);
+    if (onLikeStory) {
+      onLikeStory(story.id, story.userId, newIsLiked);
+    }
   };
 
   const handleSendReplyToInbox = (e) => {

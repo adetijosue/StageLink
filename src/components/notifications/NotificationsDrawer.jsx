@@ -4,58 +4,91 @@ import { X, Heart, Sparkles, MessageCircle, Crown } from 'lucide-react';
 export default function NotificationsDrawer({ isOpen, onClose, onSelectChat, onNavigateTab }) {
   if (!isOpen) return null;
 
-  const notifications = [
-    {
-      id: 'n1',
-      type: 'like',
-      title: 'Sarah Jenkins a aimé votre maquette audio.',
-      subtitle: 'En plein enregistrement des prises vocales pour notre nouvel EP...',
-      time: '15m ago',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-      icon: Heart,
-      iconBg: '#FEF2F2',
-      iconColor: '#EF4444',
-      targetTab: 'feed'
-    },
-    {
-      id: 'n2',
-      type: 'match',
-      title: 'Nouveau match pour votre offre musicale',
-      subtitle: 'Harmonix Records - Guitariste Lead Solo (Tournée 2026)',
-      time: '1h ago',
-      avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&auto=format&fit=crop&q=80',
-      icon: Sparkles,
-      iconBg: '#EFF6FF',
-      iconColor: '#0066FF',
-      targetTab: 'match'
-    },
-    {
-      id: 'n3',
-      type: 'message',
-      title: 'Daniad Stansom vous a envoyé un message',
-      subtitle: 'Salut ! J\'ai écouté ton mix sur StageLink...',
-      time: '2h ago',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-      icon: MessageCircle,
-      iconBg: '#ECFDF5',
-      iconColor: '#10B981',
-      targetTab: 'discussions',
-      chatObj: {
-        id: 'chat_daniad',
-        participant: {
-          id: 'usr_daniad',
-          name: 'Daniad Stansom',
-          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-          role: 'Ingénieur Mixage & Mastering',
-          online: true
-        },
-        unreadCount: 0,
-        messages: [
-          { id: 'm1', sender: 'other', text: 'Salut ! J\'ai écouté ton mix sur StageLink...', timestamp: '2h ago' }
-        ]
-      }
+  const mapNotificationToUI = (n) => {
+    let title, subtitle, icon, iconBg, iconColor, targetTab;
+    switch (n.type) {
+      case 'like_post':
+        title = `${n.actorName} a aimé votre publication.`;
+        subtitle = 'Ouvrez le fil d\'actualité pour voir.';
+        icon = Heart;
+        iconBg = '#FEF2F2';
+        iconColor = '#EF4444';
+        targetTab = 'feed';
+        break;
+      case 'like_story':
+        title = `${n.actorName} a aimé votre story.`;
+        subtitle = 'Appuyez pour revoir votre story.';
+        icon = Heart;
+        iconBg = '#FEF2F2';
+        iconColor = '#EF4444';
+        targetTab = 'feed';
+        break;
+      case 'comment_post':
+        title = `${n.actorName} a commenté votre publication.`;
+        subtitle = 'Appuyez pour lire le commentaire.';
+        icon = MessageCircle;
+        iconBg = '#ECFDF5';
+        iconColor = '#10B981';
+        targetTab = 'feed';
+        break;
+      case 'view_story':
+        title = `${n.actorName} a vu votre story.`;
+        subtitle = 'Regardez qui interagit avec vous.';
+        icon = Eye;
+        iconBg = '#EFF6FF';
+        iconColor = '#0066FF';
+        targetTab = 'feed';
+        break;
+      case 'reshare_story':
+      case 'reshare_post':
+        title = `${n.actorName} a partagé votre contenu.`;
+        subtitle = 'Votre portée s\'étend !';
+        icon = Sparkles;
+        iconBg = '#FEF3C7';
+        iconColor = '#D97706';
+        targetTab = 'feed';
+        break;
+      default:
+        title = `${n.actorName} a interagi avec vous.`;
+        subtitle = '';
+        icon = Sparkles;
+        iconBg = '#EFF6FF';
+        iconColor = '#0066FF';
+        targetTab = 'feed';
     }
-  ];
+    
+    return {
+      id: n.id,
+      type: n.type,
+      title,
+      subtitle,
+      time: n.time,
+      avatar: n.actorAvatar,
+      icon,
+      iconBg,
+      iconColor,
+      targetTab,
+      isRead: n.isRead,
+      chatObj: n.chatObj
+    };
+  };
+
+  const displayNotifications = notifications && notifications.length > 0 
+    ? notifications.map(mapNotificationToUI) 
+    : [
+      {
+        id: 'empty',
+        type: 'info',
+        title: 'Aucune notification',
+        subtitle: 'Vos nouvelles interactions apparaîtront ici.',
+        time: '',
+        avatar: 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png',
+        icon: Sparkles,
+        iconBg: '#F3F4F6',
+        iconColor: '#9CA3AF',
+        targetTab: 'feed'
+      }
+    ];
 
   const handleNotificationClick = (item) => {
     onClose();
@@ -103,7 +136,7 @@ export default function NotificationsDrawer({ isOpen, onClose, onSelectChat, onN
 
         {/* Notifications List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {notifications.map((n) => {
+          {displayNotifications.map((n) => {
             const Icon = n.icon;
             return (
               <div

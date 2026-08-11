@@ -72,7 +72,8 @@ function MainApp() {
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [isCameraRecorderOpen, setIsCameraRecorderOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(2);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
 
@@ -135,11 +136,12 @@ function MainApp() {
   useEffect(() => {
     const handleProfileUpdated = (e) => {
       if (e.detail) {
-        const { updatedPosts, updatedStories, updatedChats, updatedUsers } = e.detail;
+        const { updatedPosts, updatedStories, updatedChats, updatedUsers, updatedNotifications } = e.detail;
         if (updatedPosts) setPosts(updatedPosts);
         if (updatedStories) setStories(updatedStories);
         if (updatedChats) setChats(updatedChats);
         if (updatedUsers) setAllUsers(updatedUsers);
+        if (updatedNotifications) setNotifications(updatedNotifications);
       }
     };
 
@@ -221,7 +223,7 @@ function MainApp() {
             // Fetch live posts
             const { data: supaPosts } = await supabase
               .from('posts')
-              .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge)')
+              .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge), post_likes(user_id), post_comments(id, user_id, content, created_at, profiles:user_id(full_name))')
               .order('created_at', { ascending: false });
 
             if (supaPosts) {
@@ -238,10 +240,16 @@ function MainApp() {
                 hasAudio: Boolean(p.audio_url),
                 audioTitle: p.audio_title || 'Extrait Audio',
                 audioUrl: p.audio_url || null,
-                likesCount: p.likes_count || 0,
-                isLiked: false,
-                commentsCount: p.comments_count || 0,
-                comments: [],
+                likesCount: p.post_likes ? p.post_likes.length : (p.likes_count || 0),
+                isLiked: p.post_likes ? p.post_likes.some(l => l.user_id === currentUser?.id) : false,
+                commentsCount: p.post_comments ? p.post_comments.length : (p.comments_count || 0),
+                comments: p.post_comments ? p.post_comments.map(c => ({
+                  id: c.id,
+                  userId: c.user_id,
+                  userName: c.profiles?.full_name || 'Artiste',
+                  text: c.content,
+                  time: new Date(c.created_at).toLocaleDateString()
+                })) : [],
                 timeAgo: 'Récemment'
               }));
             }
@@ -249,7 +257,7 @@ function MainApp() {
             // Fetch live active stories (unexpired)
             const { data: supaStories } = await supabase
               .from('stories')
-              .select('*, profiles:user_id(full_name, avatar_url)')
+              .select('*, profiles:user_id(full_name, avatar_url), story_views(viewer_id, profiles:viewer_id(full_name, avatar_url, role)), story_likes(user_id)')
               .gte('expires_at', new Date().toISOString())
               .order('created_at', { ascending: false });
 
@@ -262,6 +270,14 @@ function MainApp() {
                 hasUnread: true,
                 storyMedia: s.media_url,
                 caption: s.caption || '',
+                likesCount: s.story_likes ? s.story_likes.length : 0,
+                isLiked: s.story_likes ? s.story_likes.some(l => l.user_id === currentUser?.id) : false,
+                viewers: s.story_views ? s.story_views.map(v => ({
+                  id: v.viewer_id,
+                  name: v.profiles?.full_name || 'Artiste',
+                  avatar: v.profiles?.avatar_url || '',
+                  role: v.profiles?.role || 'Artiste'
+                })) : [],
                 time: 'Récemment'
               }));
             }
@@ -466,7 +482,7 @@ function MainApp() {
           // Sync Live Posts
           const { data: supaPosts } = await supabase
             .from('posts')
-            .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge)')
+            .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge), post_likes(user_id), post_comments(id, user_id, content, created_at, profiles:user_id(full_name))')
             .order('created_at', { ascending: false });
 
           if (supaPosts) {
@@ -483,10 +499,16 @@ function MainApp() {
               hasAudio: Boolean(p.audio_url),
               audioTitle: p.audio_title || 'Extrait Audio',
               audioUrl: p.audio_url || null,
-              likesCount: p.likes_count || 0,
-              isLiked: false,
-              commentsCount: p.comments_count || 0,
-              comments: [],
+              likesCount: p.post_likes ? p.post_likes.length : (p.likes_count || 0),
+              isLiked: p.post_likes ? p.post_likes.some(l => l.user_id === currentUser?.id) : false,
+              commentsCount: p.post_comments ? p.post_comments.length : (p.comments_count || 0),
+              comments: p.post_comments ? p.post_comments.map(c => ({
+                id: c.id,
+                userId: c.user_id,
+                userName: c.profiles?.full_name || 'Artiste',
+                text: c.content,
+                time: new Date(c.created_at).toLocaleDateString()
+              })) : [],
               timeAgo: 'Récemment'
             }));
             setPosts(freshPosts);
@@ -495,7 +517,7 @@ function MainApp() {
           // Sync Live Stories
           const { data: supaStories } = await supabase
             .from('stories')
-            .select('*, profiles:user_id(full_name, avatar_url)')
+            .select('*, profiles:user_id(full_name, avatar_url), story_views(viewer_id, profiles:viewer_id(full_name, avatar_url, role)), story_likes(user_id)')
             .gte('expires_at', new Date().toISOString())
             .order('created_at', { ascending: false });
 
@@ -508,6 +530,14 @@ function MainApp() {
               hasUnread: true,
               storyMedia: s.media_url,
               caption: s.caption || '',
+              likesCount: s.story_likes ? s.story_likes.length : 0,
+              isLiked: s.story_likes ? s.story_likes.some(l => l.user_id === currentUser?.id) : false,
+              viewers: s.story_views ? s.story_views.map(v => ({
+                id: v.viewer_id,
+                name: v.profiles?.full_name || 'Artiste',
+                avatar: v.profiles?.avatar_url || '',
+                role: v.profiles?.role || 'Artiste'
+              })) : [],
               time: 'Récemment'
             }));
             setStories(freshStories);
@@ -515,8 +545,36 @@ function MainApp() {
         } catch (e) {}
       };
 
-      // 1. Instant Realtime Subscription Setup for Posts, Stories, Profiles & Messages (<100ms sync)
-      let postsSub, storiesSub, profilesSub, messagesSub;
+      const syncNotifications = async () => {
+        if (!isSupabaseConfigured() || !currentUser?.id) return;
+        try {
+          const { data: supaNotifs } = await supabase
+            .from('notifications')
+            .select('*, profiles:actor_id(full_name, avatar_url)')
+            .eq('user_id', currentUser.id)
+            .order('created_at', { ascending: false });
+            
+          if (supaNotifs) {
+            const mappedNotifs = supaNotifs.map(n => ({
+              id: n.id,
+              actorName: n.profiles?.full_name || 'Utilisateur',
+              actorAvatar: n.profiles?.avatar_url || '',
+              type: n.type,
+              referenceId: n.reference_id,
+              isRead: n.is_read,
+              time: new Date(n.created_at).toLocaleDateString()
+            }));
+            setNotifications(mappedNotifs);
+            setUnreadNotificationsCount(mappedNotifs.filter(n => !n.isRead).length);
+          }
+        } catch (e) {
+          console.warn('Sync notifications note:', e);
+        }
+      };
+
+      // 1. Instant Realtime Subscription Setup for Posts, Stories, Profiles, Messages & Notifications (<100ms sync)
+      syncNotifications();
+      let profilesSub, postsSub, storiesSub, messagesSub, notificationsSub;
       if (isSupabaseConfigured()) {
         try {
           profilesSub = supabase
@@ -525,13 +583,22 @@ function MainApp() {
             .subscribe();
 
           postsSub = supabase
-            .channel('realtime:posts')
+            .channel('realtime:posts_interactions')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => syncPostsStoriesAndProfiles())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, () => syncPostsStoriesAndProfiles())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, () => syncPostsStoriesAndProfiles())
             .subscribe();
 
           storiesSub = supabase
-            .channel('realtime:stories')
+            .channel('realtime:stories_interactions')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'stories' }, () => syncPostsStoriesAndProfiles())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'story_likes' }, () => syncPostsStoriesAndProfiles())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'story_views' }, () => syncPostsStoriesAndProfiles())
+            .subscribe();
+            
+          notificationsSub = supabase
+            .channel('realtime:notifications')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => syncNotifications())
             .subscribe();
 
           messagesSub = supabase
@@ -652,9 +719,15 @@ function MainApp() {
     return <AuthScreen />;
   }
 
-  const handleOpenNotifications = () => {
+  const handleOpenNotifications = async () => {
     setIsNotificationsOpen(true);
     setUnreadNotificationsCount(0);
+    if (isSupabaseConfigured() && currentUser?.id) {
+      try {
+        await supabase.from('notifications').update({ is_read: true }).eq('user_id', currentUser.id).eq('is_read', false);
+        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      } catch (e) {}
+    }
   };
 
   const handleSelectChat = async (chat) => {
@@ -888,19 +961,29 @@ function MainApp() {
     setPosts(updated);
     setStoredItem(STORAGE_KEYS.POSTS, updated);
 
-    if (isSupabaseConfigured() && targetPost) {
+    if (isSupabaseConfigured() && targetPost && currentUser) {
       try {
-        await supabase
-          .from('posts')
-          .update({ likes_count: targetPost.likesCount })
-          .eq('id', postId);
+        if (targetPost.isLiked) {
+          await supabase.from('post_likes').insert({ post_id: postId, user_id: currentUser.id });
+          if (targetPost.userId && targetPost.userId !== currentUser.id) {
+            await supabase.from('notifications').insert({
+              user_id: targetPost.userId,
+              actor_id: currentUser.id,
+              type: 'like_post',
+              reference_id: postId
+            });
+          }
+        } else {
+          await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', currentUser.id);
+        }
       } catch (e) {
         console.warn('Supabase post like update note:', e.message);
       }
     }
   };
 
-  const handleAddComment = (postId, commentText) => {
+  const handleAddComment = async (postId, commentText) => {
+    let targetPost = null;
     const updated = posts.map((p) => {
       if (p.id === postId) {
         const comments = p.comments || [];
@@ -910,6 +993,7 @@ function MainApp() {
           text: commentText,
           time: 'À l\'instant'
         };
+        targetPost = p;
         return {
           ...p,
           comments: [...comments, newC],
@@ -920,6 +1004,65 @@ function MainApp() {
     });
     setPosts(updated);
     setStoredItem(STORAGE_KEYS.POSTS, updated);
+
+    if (isSupabaseConfigured() && targetPost && currentUser) {
+      try {
+        await supabase.from('post_comments').insert({
+          post_id: postId,
+          user_id: currentUser.id,
+          content: commentText
+        });
+        
+        if (targetPost.userId && targetPost.userId !== currentUser.id) {
+          await supabase.from('notifications').insert({
+            user_id: targetPost.userId,
+            actor_id: currentUser.id,
+            type: 'comment_post',
+            reference_id: postId
+          });
+        }
+      } catch (e) {
+        console.warn('Supabase post comment note:', e.message);
+      }
+    }
+  };
+
+  const handleLikeStory = async (storyId, storyUserId, isNowLiked) => {
+    if (!isSupabaseConfigured() || !currentUser) return;
+    try {
+      if (isNowLiked) {
+        await supabase.from('story_likes').insert({ story_id: storyId, user_id: currentUser.id });
+        if (storyUserId && storyUserId !== currentUser.id) {
+          await supabase.from('notifications').insert({
+            user_id: storyUserId,
+            actor_id: currentUser.id,
+            type: 'like_story',
+            reference_id: storyId
+          });
+        }
+      } else {
+        await supabase.from('story_likes').delete().eq('story_id', storyId).eq('user_id', currentUser.id);
+      }
+    } catch (e) {
+      console.warn('Story like error:', e.message);
+    }
+  };
+
+  const handleViewStory = async (storyId, storyUserId) => {
+    if (!isSupabaseConfigured() || !currentUser || storyUserId === currentUser.id) return;
+    try {
+      await supabase.from('story_views').insert({ story_id: storyId, viewer_id: currentUser.id });
+      if (storyUserId && storyUserId !== currentUser.id) {
+        await supabase.from('notifications').insert({
+          user_id: storyUserId,
+          actor_id: currentUser.id,
+          type: 'view_story',
+          reference_id: storyId
+        });
+      }
+    } catch (e) {
+      // Ignore unique constraint violation if already viewed
+    }
   };
 
   const handleCreatePost = async (newPostData) => {
@@ -1344,6 +1487,8 @@ function MainApp() {
               }
             }
           }}
+          onLikeStory={handleLikeStory}
+          onViewStory={handleViewStory}
           onReshareStory={(st) => {
             setActiveStory(null);
             setResharedStoryData(st);
@@ -1487,6 +1632,7 @@ function MainApp() {
       <NotificationsDrawer
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
+        notifications={notifications}
         onSelectChat={(chat) => {
           setIsNotificationsOpen(false);
           handleSelectChat(chat);
