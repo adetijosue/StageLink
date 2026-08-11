@@ -366,7 +366,7 @@ function MainApp() {
                         id: partnerId,
                         name: partnerName,
                         avatar: partnerAvatar,
-                        online: true,
+                        online: false,
                         role: partnerRole
                       },
                       unreadCount: (!isMeSender && !msg.is_read) ? 1 : 0,
@@ -449,7 +449,7 @@ function MainApp() {
                 id: 'usr_stagelink_team',
                 name: 'StageLink Support Officiel',
                 avatar: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150&auto=format&fit=crop&q=80',
-                online: true,
+                online: false,
                 verified: true,
                 badgeType: 'gold',
                 role: 'Équipe Officielle StageLink'
@@ -636,7 +636,7 @@ function MainApp() {
                       name: p.full_name || 'Artiste',
                       avatar: p.avatar_url,
                       role: p.role,
-                      online: true
+                      online: false
                     };
                   });
                 }
@@ -1033,7 +1033,7 @@ function MainApp() {
           name: targetUserName,
           avatar: targetAvatar,
           role: targetRole,
-          online: true
+          online: false
         },
         unreadCount: 0,
         lastMessageTime: 'À l\'instant',
