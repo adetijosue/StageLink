@@ -62,8 +62,8 @@ export default function AuthScreen() {
         const res = await login(email.trim(), password.trim());
         if (!res.success) {
           let errText = typeof res.error === 'string' ? res.error : res.error?.message;
-          if (!errText || errText === '{}' || errText.includes('{')) {
-            errText = 'Identifiants ou mot de passe incorrect.';
+          if (!errText || errText === '{}' || errText.includes('{') || errText.includes('Load failed') || errText.includes('Failed to fetch')) {
+            errText = isLogin ? 'Identifiants incorrects ou problème de connexion.' : 'Erreur de connexion au serveur. Veuillez réessayer.';
           }
           setError(errText);
         }
@@ -77,8 +77,8 @@ export default function AuthScreen() {
         const res = await signup({ email: email.trim(), password: password.trim(), name: name.trim(), role, gender });
         if (!res.success) {
           let errText = typeof res.error === 'string' ? res.error : res.error?.message;
-          if (!errText || errText === '{}' || errText.includes('{')) {
-            errText = 'Erreur lors de l’inscription. Veuillez réessayer.';
+          if (!errText || errText === '{}' || errText.includes('{') || errText.includes('Load failed') || errText.includes('Failed to fetch')) {
+            errText = 'Erreur de connexion au serveur. Veuillez vérifier votre connexion Internet et réessayer.';
           }
           setError(errText);
         }

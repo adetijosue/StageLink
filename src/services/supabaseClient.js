@@ -33,7 +33,9 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
 
     if (authError) {
       let rawMsg = authError.message || (typeof authError === 'string' ? authError : '');
-      if (rawMsg.includes('already registered') || rawMsg.includes('User already exists') || rawMsg.includes('user_already_exists')) {
+      if (rawMsg.includes('Load failed') || rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError')) {
+        rawMsg = 'Erreur de connexion au serveur. Veuillez vérifier votre connexion Internet et réessayer.';
+      } else if (rawMsg.includes('already registered') || rawMsg.includes('User already exists') || rawMsg.includes('user_already_exists')) {
         rawMsg = 'Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter.';
       } else if (rawMsg.includes('at least 6 characters') || rawMsg.includes('Password should be')) {
         rawMsg = 'Le mot de passe doit contenir au moins 6 caractères.';
@@ -142,13 +144,14 @@ export async function signInUser({ email, password }) {
 
     if (authError) {
       let rawMsg = authError.message || (typeof authError === 'string' ? authError : '');
-      if (!rawMsg || rawMsg === '{}' || rawMsg.includes('{')) {
-        rawMsg = 'Adresse e-mail ou mot de passe incorrect.';
-      }
-      if (rawMsg.includes('Invalid login credentials')) {
+      if (rawMsg.includes('Load failed') || rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError')) {
+        rawMsg = 'Erreur de connexion au serveur. Veuillez vérifier votre connexion Internet et réessayer.';
+      } else if (rawMsg.includes('Invalid login credentials')) {
         rawMsg = 'Adresse e-mail ou mot de passe incorrect.';
       } else if (rawMsg.includes('Email not confirmed')) {
         rawMsg = 'Veuillez confirmer votre adresse e-mail pour vous connecter.';
+      } else if (!rawMsg || rawMsg === '{}' || rawMsg.includes('{')) {
+        rawMsg = 'Adresse e-mail ou mot de passe incorrect.';
       }
       return { success: false, error: rawMsg };
     }
