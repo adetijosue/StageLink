@@ -606,6 +606,7 @@ function MainApp() {
       // 1. Instant Realtime Subscription Setup for Posts, Stories, Profiles, Messages & Notifications (<100ms sync)
       syncNotifications();
       let profilesSub, postsSub, storiesSub, messagesSub, notificationsSub;
+        let syncMessagesFallback = null;
       if (isSupabaseConfigured()) {
         try {
           const syncMessages = async () => {
@@ -690,8 +691,8 @@ function MainApp() {
                   reconstructedChats = reconstructedChats.filter(chat => {
                     const partnerId = chat.participant?.id;
                     const state = statesMap[partnerId];
-                    if (state?.is_deleted) return false;
-                    if (state?.is_archived) return false;
+                    if (state?.status === 'deleted') return false;
+                    if (state?.status === 'archived') return false;
                     if (state?.force_unread) chat.unreadCount = (chat.unreadCount || 0) + 1;
                     return true;
                   });
@@ -718,6 +719,7 @@ function MainApp() {
               }
             } catch(e) {}
           };
+          syncMessagesFallback = syncMessages;
           
           syncMessages();
 
@@ -901,7 +903,9 @@ function MainApp() {
       // 2. Background Live Posts, Stories & Profiles Polling Sync (Fallback every 8 seconds)
       const pollInterval = setInterval(() => {
         syncPostsStoriesAndProfiles();
-      }, 8000);
+        syncNotifications();
+        if (syncMessagesFallback) syncMessagesFallback();
+      }, 5000);
 
       return () => {
         clearInterval(pollInterval);
