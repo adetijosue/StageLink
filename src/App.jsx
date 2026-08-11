@@ -209,28 +209,31 @@ function MainApp() {
         if (isSupabaseConfigured()) {
           try {
             // Fetch live profiles from Supabase
-            const { data: supaProfiles } = await supabase.from('profiles').select('*');
-            let mappedSupaUsers = [];
-            if (supaProfiles && supaProfiles.length > 0) {
-              mappedSupaUsers = supaProfiles.map(p => ({
-                id: p.id,
-                name: p.full_name || 'Artiste StageLink',
-                email: p.email || '',
-                role: p.role || 'Artiste',
-                company: p.company || '',
-                avatar: p.avatar_url || '',
-                verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
-                badgeType: p.verified_badge || 'none',
-                bio: p.bio || '',
-                location: p.location || '',
-                instruments: p.instruments || [],
-                genres: p.genres || [],
-                gear: p.gear || []
-              }));
+            const { data: supaProfiles, error: supaProfilesErr } = await supabase.from('profiles').select('*');
+            if (supaProfilesErr) {
+              console.warn('Supabase live profiles fetch returned error:', supaProfilesErr.message);
+            } else {
+              let mappedSupaUsers = [];
+              if (supaProfiles && supaProfiles.length > 0) {
+                mappedSupaUsers = supaProfiles.map(p => ({
+                  id: p.id,
+                  name: p.full_name || 'Artiste StageLink',
+                  email: p.email || '',
+                  role: p.role || 'Artiste',
+                  company: p.company || '',
+                  avatar: p.avatar_url || '',
+                  verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+                  badgeType: p.verified_badge || 'none',
+                  bio: p.bio || '',
+                  location: p.location || '',
+                  instruments: p.instruments || [],
+                  genres: p.genres || [],
+                  gear: p.gear || []
+                }));
+              }
+              loadedUsers = mappedSupaUsers;
+              setStoredItem(STORAGE_KEYS.USERS, loadedUsers);
             }
-
-            loadedUsers = mappedSupaUsers;
-            setStoredItem(STORAGE_KEYS.USERS, loadedUsers);
           } catch (err) {
             console.warn('Supabase live profiles fetch note:', err.message);
           }

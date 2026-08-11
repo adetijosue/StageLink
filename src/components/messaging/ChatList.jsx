@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Plus, Search, MessageSquare, PhoneCall } from 'lucide-react';
 import SwipeableChatItem from './SwipeableChatItem';
 
 export default function ChatList({ chats, onSelectChat, onOpenNewChatModal, onOpenCallHistoryModal, isDarkMode, onArchiveChat, onDeleteChat, onToggleUnread }) {
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Check if there are any missed calls across chats
   let missedCallsCount = 0;
   (chats || []).forEach((c) => {
@@ -11,6 +13,12 @@ export default function ChatList({ chats, onSelectChat, onOpenNewChatModal, onOp
         missedCallsCount++;
       }
     });
+  });
+
+  const filteredChats = (chats || []).filter(chat => {
+    if (!searchQuery) return true;
+    const partnerName = chat.participant?.name?.toLowerCase() || '';
+    return partnerName.includes(searchQuery.toLowerCase());
   });
 
   return (
@@ -83,6 +91,8 @@ export default function ChatList({ chats, onSelectChat, onOpenNewChatModal, onOp
         <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
         <input
           type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Rechercher une discussion..."
           style={{
             width: '100%',
@@ -99,7 +109,7 @@ export default function ChatList({ chats, onSelectChat, onOpenNewChatModal, onOp
 
       {/* Chat Conversations List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {chats.map((chat) => (
+        {filteredChats.map((chat) => (
           <SwipeableChatItem
             key={chat.id}
             chat={chat}
