@@ -7,9 +7,19 @@ export default function SwipeMatching({ matches, onApplyMatch }) {
   const [activeFilter, setActiveFilter] = useState('All');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showMatchSuccess, setShowMatchSuccess] = useState(null);
+  const [appliedIds, setAppliedIds] = useState([]);
 
-  const filteredMatches = matches;
-  const currentCard = filteredMatches[currentIndex];
+  const filteredMatches = (matches || []).filter(card => {
+    if (activeFilter === 'Applied') {
+      return appliedIds.includes(card.id);
+    }
+    if (activeFilter === 'Recommended') {
+      return (card.matchPercentage || 90) >= 90;
+    }
+    return true;
+  });
+
+  const currentCard = filteredMatches[currentIndex] || filteredMatches[0];
 
   const triggerConfetti = () => {
     confetti({
@@ -25,6 +35,9 @@ export default function SwipeMatching({ matches, onApplyMatch }) {
     if (type === 'apply' || type === 'like') {
       triggerConfetti();
       setShowMatchSuccess(currentCard);
+      if (currentCard.id && !appliedIds.includes(currentCard.id)) {
+        setAppliedIds(prev => [...prev, currentCard.id]);
+      }
       if (onApplyMatch) onApplyMatch(currentCard);
     }
 

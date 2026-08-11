@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import Logo from '../common/Logo';
 import { Mail, Lock, User, Music, ArrowRight, CheckCircle } from 'lucide-react';
+import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 
 export default function AuthScreen() {
   const { login, signup } = useAuth();
@@ -14,7 +15,31 @@ export default function AuthScreen() {
   const [role, setRole] = useState('Beatmaker / Compositeur');
   const [gender, setGender] = useState('male');
   const [error, setError] = useState('');
+  const [resetMessage, setResetMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError('Veuillez saisir votre e-mail professionnel.');
+      return;
+    }
+    setError('');
+    setResetMessage('');
+    try {
+      if (isSupabaseConfigured()) {
+        const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email.trim());
+        if (resetErr) {
+          setError(resetErr.message);
+        } else {
+          setResetMessage('Un lien de réinitialisation a été envoyé à votre e-mail.');
+        }
+      } else {
+        setResetMessage('Lien de réinitialisation envoyé.');
+      }
+    } catch (e) {
+      setError(e.message || 'Erreur lors de l\'envoi.');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -312,6 +337,24 @@ export default function AuthScreen() {
                 />
               </div>
             </div>
+
+            {resetMessage && (
+              <div style={{ padding: '8px 12px', background: '#ECFDF5', border: '1px solid #6EE7B7', color: '#047857', borderRadius: '10px', fontSize: '0.78rem', fontWeight: 600 }}>
+                {resetMessage}
+              </div>
+            )}
+
+            {isLogin && (
+              <div style={{ textAlign: 'right', marginTop: '-4px' }}>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  style={{ background: 'none', border: 'none', color: '#0066FF', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                >
+                  Mot de passe oublié ?
+                </button>
+              </div>
+            )}
 
             <button
               type="submit"

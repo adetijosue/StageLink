@@ -112,12 +112,12 @@ export default function PublicProfileModal({ isOpen, onClose, user, onStartChat,
 
           {/* Location & Bio */}
           <div style={{ display: 'flex', gap: '10px', fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
-             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={13} /> {user.location || 'Paris'}</span>
-             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Briefcase size={13} /> {user.company || 'Indépendant'}</span>
+             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={13} /> {user.location || 'Studio & En ligne'}</span>
+             <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Briefcase size={13} /> {user.company || 'Artiste Indépendant'}</span>
           </div>
 
           <div style={{ background: '#FFF', border: '1px solid #E2E8F0', padding: '14px', borderRadius: '18px' }}>
-            <p style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.5, margin: 0 }}>"{user.bio || 'Passionné de musique...'}"</p>
+            <p style={{ fontSize: '0.85rem', color: '#334155', lineHeight: 1.5, margin: 0 }}>"{user.bio || 'Membre passionné de la communauté StageLink.'}"</p>
           </div>
 
           {/* Portfolio */}
@@ -138,9 +138,9 @@ export default function PublicProfileModal({ isOpen, onClose, user, onStartChat,
 
           {/* Instruments */}
           <div>
-            <h4 style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', marginBottom: '8px' }}>Instruments</h4>
+            <h4 style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', marginBottom: '8px' }}>Spécialités</h4>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {(user.instruments || ['Chanteur', 'Piano']).map(inst => (
+              {(Array.isArray(user.instruments) && user.instruments.length > 0 ? user.instruments : [user.role || 'Artiste']).map(inst => (
                 <span key={inst} style={{ background: '#EFF6FF', color: '#0066FF', padding: '5px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700 }}>
                   {instrumentIcons[inst] || '🎵'} {inst}
                 </span>

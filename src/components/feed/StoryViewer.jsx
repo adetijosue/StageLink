@@ -39,10 +39,7 @@ export default function StoryViewer({
   const isVideoMedia = story?.mediaType === 'video' || story?.isVideo || (typeof activeMediaUrl === 'string' && (activeMediaUrl.includes('.mp4') || activeMediaUrl.startsWith('data:video')));
   const canReshare = story?.allowReshare !== false;
 
-  const viewersList = [
-    { id: 'vw_1', name: 'Sarah Jenkins', role: 'Artiste Chanteuse', timeAgo: '2m', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100' },
-    { id: 'vw_2', name: 'Alex Rivera', role: 'Ingénieur Mixage', timeAgo: '8m', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100' }
-  ];
+  const viewersList = Array.isArray(story?.viewers) ? story.viewers : [];
 
   const isPaused = showViewersModal || showConfirmDeleteStory || isHoldingPress || isTypingReply || replyText.trim().length > 0;
 
