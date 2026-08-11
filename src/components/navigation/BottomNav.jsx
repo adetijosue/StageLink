@@ -31,8 +31,8 @@ export default function BottomNav({ activeTab, setActiveTab, unreadMessagesCount
     }}>
       <div style={{
         position: 'relative',
-        paddingTop: '6px',
-        paddingBottom: 'max(10px, env(safe-area-inset-bottom, 10px))',
+        paddingTop: '8px',
+        paddingBottom: '12px',
         background: bgColor,
         borderTop: isDarkMode ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
         backdropFilter: 'blur(16px)',

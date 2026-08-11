@@ -1,55 +1,64 @@
 import React from 'react';
-import { X, Heart, Sparkles, MessageCircle, Crown } from 'lucide-react';
+import { X, Heart, Sparkles, MessageCircle, Crown, Eye } from 'lucide-react';
 
-export default function NotificationsDrawer({ isOpen, onClose, onSelectChat, onNavigateTab }) {
+function NotificationsDrawer({ isOpen, onClose, onSelectChat, onNavigateTab, notifications }) {
   if (!isOpen) return null;
 
   const mapNotificationToUI = (n) => {
+    if (!n) return null;
     let title, subtitle, icon, iconBg, iconColor, targetTab;
     switch (n.type) {
       case 'like_post':
-        title = `${n.actorName} a aimé votre publication.`;
-        subtitle = 'Ouvrez le fil d\'actualité pour voir.';
+        title = `${n.actorName || "Quelqu'un"} a aimé votre publication.`;
+        subtitle = "Ouvrez le fil d'actualité pour voir.";
         icon = Heart;
         iconBg = '#FEF2F2';
         iconColor = '#EF4444';
         targetTab = 'feed';
         break;
       case 'like_story':
-        title = `${n.actorName} a aimé votre story.`;
-        subtitle = 'Appuyez pour revoir votre story.';
+        title = `${n.actorName || "Quelqu'un"} a aimé votre story.`;
+        subtitle = "Appuyez pour revoir votre story.";
         icon = Heart;
         iconBg = '#FEF2F2';
         iconColor = '#EF4444';
         targetTab = 'feed';
         break;
       case 'comment_post':
-        title = `${n.actorName} a commenté votre publication.`;
-        subtitle = 'Appuyez pour lire le commentaire.';
+        title = `${n.actorName || "Quelqu'un"} a commenté votre publication.`;
+        subtitle = "Appuyez pour lire le commentaire.";
         icon = MessageCircle;
         iconBg = '#ECFDF5';
         iconColor = '#10B981';
         targetTab = 'feed';
         break;
       case 'view_story':
-        title = `${n.actorName} a vu votre story.`;
-        subtitle = 'Regardez qui interagit avec vous.';
+        title = `${n.actorName || "Quelqu'un"} a vu votre story.`;
+        subtitle = "Regardez qui interagit avec vous.";
         icon = Eye;
         iconBg = '#EFF6FF';
         iconColor = '#0066FF';
         targetTab = 'feed';
         break;
+      case 'message':
+        title = `${n.actorName || "Quelqu'un"} vous a envoyé un message.`;
+        subtitle = "Appuyez pour voir la discussion.";
+        icon = MessageCircle;
+        iconBg = '#EEF2FF';
+        iconColor = '#4F46E5';
+        targetTab = 'discussions';
+        break;
       case 'reshare_story':
       case 'reshare_post':
-        title = `${n.actorName} a partagé votre contenu.`;
-        subtitle = 'Votre portée s\'étend !';
+        title = `${n.actorName || "Quelqu'un"} a partagé votre contenu.`;
+        subtitle = "Votre portée s'étend !";
         icon = Sparkles;
         iconBg = '#FEF3C7';
         iconColor = '#D97706';
         targetTab = 'feed';
         break;
       default:
-        title = `${n.actorName} a interagi avec vous.`;
+        title = `${n.actorName || "Quelqu'un"} a interagi avec vous.`;
         subtitle = '';
         icon = Sparkles;
         iconBg = '#EFF6FF';
@@ -58,44 +67,51 @@ export default function NotificationsDrawer({ isOpen, onClose, onSelectChat, onN
     }
     
     return {
-      id: n.id,
-      type: n.type,
+      id: n.id || Math.random().toString(),
+      type: n.type || 'info',
       title,
       subtitle,
-      time: n.time,
-      avatar: n.actorAvatar,
-      icon,
-      iconBg,
-      iconColor,
+      time: n.time || "À l'instant",
+      avatar: n.actorAvatar || 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png',
+      icon: icon || Sparkles,
+      iconBg: iconBg || '#EFF6FF',
+      iconColor: iconColor || '#0066FF',
       targetTab,
       isRead: n.isRead,
       chatObj: n.chatObj
     };
   };
 
-  const displayNotifications = notifications && notifications.length > 0 
-    ? notifications.map(mapNotificationToUI) 
-    : [
-      {
-        id: 'empty',
-        type: 'info',
-        title: 'Aucune notification',
-        subtitle: 'Vos nouvelles interactions apparaîtront ici.',
-        time: '',
-        avatar: 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png',
-        icon: Sparkles,
-        iconBg: '#F3F4F6',
-        iconColor: '#9CA3AF',
-        targetTab: 'feed'
-      }
-    ];
+  const safeNotifications = Array.isArray(notifications) ? notifications : [];
+  
+  let displayNotifications = [];
+  try {
+    displayNotifications = safeNotifications.length > 0 
+      ? safeNotifications.map(mapNotificationToUI).filter(Boolean)
+      : [
+        {
+          id: 'empty',
+          type: 'info',
+          title: 'Aucune notification',
+          subtitle: 'Vos nouvelles interactions apparaîtront ici.',
+          time: '',
+          avatar: 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png',
+          icon: Sparkles,
+          iconBg: '#F3F4F6',
+          iconColor: '#9CA3AF',
+          targetTab: 'feed'
+        }
+      ];
+  } catch (err) {
+    console.error("Erreur lors du mappage des notifications:", err);
+  }
 
   const handleNotificationClick = (item) => {
-    onClose();
+    if (typeof onClose === 'function') onClose();
 
-    if (item.type === 'message' && item.chatObj && onSelectChat) {
+    if (item.type === 'message' && item.chatObj && typeof onSelectChat === 'function') {
       onSelectChat(item.chatObj);
-    } else if (item.targetTab && onNavigateTab) {
+    } else if (item.targetTab && typeof onNavigateTab === 'function') {
       onNavigateTab(item.targetTab);
     }
   };
@@ -127,7 +143,7 @@ export default function NotificationsDrawer({ isOpen, onClose, onSelectChat, onN
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A' }}>
-            Fil d'Activité & Notifications
+            Fil d\\'Activité & Notifications
           </h3>
           <button onClick={onClose} style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <X size={18} />
@@ -136,11 +152,12 @@ export default function NotificationsDrawer({ isOpen, onClose, onSelectChat, onN
 
         {/* Notifications List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {displayNotifications.map((n) => {
-            const Icon = n.icon;
+          {displayNotifications.map((n, i) => {
+            if (!n) return null;
+            const Icon = n.icon || Sparkles;
             return (
               <div
-                key={n.id}
+                key={n.id || i}
                 onClick={() => handleNotificationClick(n)}
                 style={{
                   padding: '12px 14px',
@@ -186,5 +203,40 @@ export default function NotificationsDrawer({ isOpen, onClose, onSelectChat, onN
         </div>
       </div>
     </div>
+  );
+}
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.8)', color: 'white', padding: '20px', overflowY: 'auto' }}>
+          <h2 style={{ color: '#EF4444' }}>Erreur Notifications</h2>
+          <p>L\\'interface de notification a rencontré un problème. Veuillez signaler cette erreur.</p>
+          <pre style={{ whiteSpace: 'pre-wrap', background: '#333', padding: '10px', borderRadius: '8px', fontSize: '0.8rem' }}>
+            {this.state.error && this.state.error.toString()}
+          </pre>
+          <button onClick={this.props.onClose} style={{ marginTop: 20, padding: '10px 20px', background: '#0066FF', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+            Fermer la page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function NotificationsDrawerWrapper(props) {
+  return (
+    <ErrorBoundary onClose={props.onClose}>
+      <NotificationsDrawer {...props} />
+    </ErrorBoundary>
   );
 }

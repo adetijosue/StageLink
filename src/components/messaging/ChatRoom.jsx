@@ -173,6 +173,9 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
         };
 
         mediaRecorder.start(100);
+      } else {
+        alert("Votre navigateur ne supporte pas l'enregistrement audio.");
+        return;
       }
       setIsRecordingAudio(true);
       setRecordingTime(0);
@@ -183,13 +186,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
       }, 1000);
     } catch (err) {
       console.warn('Microphone Access Notice:', err.message);
-      setIsRecordingAudio(true);
-      setRecordingTime(0);
-      setTypingStatusText("En train d'enregistrer un vocal...");
-
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
-      }, 1000);
+      alert("Impossible d'accéder au microphone. Veuillez vérifier les permissions.");
     }
   };
 
@@ -229,10 +226,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
       };
       mediaRecorderRef.current.stop();
     } else {
-      setAudioPreviewData({
-        audioUrl: null,
-        audioDuration: durationFormatted
-      });
+      setAudioPreviewData(null);
     }
   };
 
@@ -349,18 +343,21 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
         audio.playbackRate = playbackSpeed;
         audio.onended = () => setPlayingAudioMsgId(null);
         audio.onerror = () => {
-          soundEngine.generateAndPlay(120, 'Afro-Gospel');
+          alert("Erreur lors de la lecture de l'audio.");
+          setPlayingAudioMsgId(null);
         };
 
         const playPromise = audio.play();
         if (playPromise !== undefined) {
           playPromise.catch(() => {
-            soundEngine.generateAndPlay(120, 'Afro-Gospel');
+            alert("Erreur lors de la lecture de l'audio.");
+            setPlayingAudioMsgId(null);
           });
         }
         activeAudioInstanceRef.current = audio;
       } else {
-        soundEngine.generateAndPlay(120, 'Afro-Gospel');
+        alert("Audio introuvable ou corrompu.");
+        setPlayingAudioMsgId(null);
       }
     }
   };

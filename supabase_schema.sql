@@ -117,7 +117,9 @@ CREATE TABLE IF NOT EXISTS public.messages (
     receiver_id    UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     content        TEXT,
     media_url      TEXT,
+    audio_url      TEXT,
     audio_note_url TEXT,
+    metadata       JSONB DEFAULT '{}'::jsonb,
     is_ephemeral   BOOLEAN DEFAULT FALSE,
     ttl_seconds    INT DEFAULT NULL,
     is_read        BOOLEAN DEFAULT FALSE,
@@ -134,6 +136,22 @@ CREATE TABLE IF NOT EXISTS public.followers (
     following_id  UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
     created_at    TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     UNIQUE(follower_id, following_id)
+);
+
+
+-- ════════════════════════════════════════════════════════════════
+-- 9b. TABLE — CHAT_STATES (états et paramètres des conversations)
+-- ════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.chat_states (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    partner_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    is_archived BOOLEAN DEFAULT FALSE,
+    force_unread BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    UNIQUE(user_id, partner_id)
 );
 
 
@@ -196,6 +214,7 @@ ALTER TABLE public.stories       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.matches       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.followers     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chat_states   ENABLE ROW LEVEL SECURITY;
 
 -- ── PROFILES ──
 CREATE POLICY "Tout le monde peut voir les profils"
@@ -267,6 +286,10 @@ CREATE POLICY "Les utilisateurs voient leurs conversations"
 CREATE POLICY "Les utilisateurs peuvent envoyer des messages"
     ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
 
+-- ── CHAT_STATES ──
+CREATE POLICY "Les utilisateurs gèrent leurs états"
+    ON public.chat_states FOR ALL USING (auth.uid() = user_id);
+
 CREATE POLICY "Les utilisateurs peuvent supprimer leurs messages"
     ON public.messages FOR DELETE USING (auth.uid() = sender_id);
 
@@ -285,11 +308,52 @@ CREATE POLICY "Les utilisateurs peuvent se desabonner"
 
 
 -- ════════════════════════════════════════════════════════════════
--- 13. REALTIME — Activer les notifications en temps réel
+-- 13. TABLE — NOTIFICATIONS
+-- ════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id            UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id       UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    actor_id      UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    type          TEXT NOT NULL,
+    reference_id  UUID,
+    is_read       BOOLEAN DEFAULT FALSE,
+    created_at    TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON public.notifications(created_at DESC);
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Les utilisateurs voient leurs propres notifications" 
+    ON public.notifications FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Les utilisateurs peuvent marquer comme lu"
+    ON public.notifications FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Tout le monde peut inserer des notifications"
+    ON public.notifications FOR INSERT WITH CHECK (true);
+
+
+-- ════════════════════════════════════════════════════════════════-- 14. REALTIME — Activer les notifications en temps réel
 -- ════════════════════════════════════════════════════════════════
 DO $$
 BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+EXCEPTION WHEN duplicate_object THEN
+    NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_states;
+EXCEPTION WHEN duplicate_object THEN
+    NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
 EXCEPTION WHEN duplicate_object THEN
     NULL;
 END $$;

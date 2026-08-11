@@ -316,8 +316,8 @@ function MainApp() {
             try {
               const { data: supaMessages } = await supabase
                 .from('messages')
-                .select('*, sender:sender_id(id, full_name, avatar_url, role), recipient:recipient_id(id, full_name, avatar_url, role)')
-                .or(`sender_id.eq.${currentUser.id},recipient_id.eq.${currentUser.id}`)
+                .select('*, sender:sender_id(id, full_name, avatar_url, role), recipient:receiver_id(id, full_name, avatar_url, role)')
+                .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
                 .order('created_at', { ascending: true });
 
               if (supaMessages && supaMessages.length > 0) {
@@ -325,7 +325,7 @@ function MainApp() {
 
                 supaMessages.forEach(msg => {
                   const isMeSender = msg.sender_id === currentUser.id;
-                  const partnerId = isMeSender ? msg.recipient_id : msg.sender_id;
+                  const partnerId = isMeSender ? msg.receiver_id : msg.sender_id;
                   const partnerProfile = isMeSender ? msg.recipient : msg.sender;
                   const partnerUser = (loadedUsers || []).find(u => u.id === partnerId);
 
@@ -342,7 +342,10 @@ function MainApp() {
                     text: msg.content || '',
                     mediaUrl: msg.media_url || null,
                     audioUrl: msg.audio_url || null,
-                    isAudio: Boolean(msg.audio_url),
+                    isAudio: msg.metadata?.isAudio || Boolean(msg.audio_url),
+                    audioDuration: msg.metadata?.audioDuration || null,
+                    quotedMessage: msg.metadata?.quotedMessage || null,
+                    documentName: msg.metadata?.documentName || null,
                     timestamp: 'Récemment',
                     createdAtTimestamp: new Date(msg.created_at || Date.now()).getTime(),
                     isRead: msg.is_read !== false
@@ -605,14 +608,14 @@ function MainApp() {
               const { data: supaMsgs } = await supabase
                 .from('messages')
                 .select('*')
-                .or(`sender_id.eq.${currentUser.id},recipient_id.eq.${currentUser.id}`)
+                .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
                 .order('created_at', { ascending: true });
               
               if (supaMsgs && supaMsgs.length > 0) {
                 const partnerIds = new Set();
                 supaMsgs.forEach(m => {
                   if (m.sender_id !== currentUser.id) partnerIds.add(m.sender_id);
-                  if (m.recipient_id !== currentUser.id) partnerIds.add(m.recipient_id);
+                  if (m.receiver_id !== currentUser.id) partnerIds.add(m.receiver_id);
                 });
 
                 const { data: profiles } = await supabase.from('profiles').select('*').in('id', Array.from(partnerIds));
@@ -632,7 +635,7 @@ function MainApp() {
                 const chatGroups = {};
                 supaMsgs.forEach(msg => {
                   const isMeSender = msg.sender_id === currentUser.id;
-                  const partnerId = isMeSender ? msg.recipient_id : msg.sender_id;
+                  const partnerId = isMeSender ? msg.receiver_id : msg.sender_id;
                   
                   if (!chatGroups[partnerId]) {
                     chatGroups[partnerId] = {
@@ -650,7 +653,10 @@ function MainApp() {
                     text: msg.content || '',
                     mediaUrl: msg.media_url || null,
                     audioUrl: msg.audio_url || null,
-                    isAudio: Boolean(msg.audio_url),
+                    isAudio: msg.metadata?.isAudio || Boolean(msg.audio_url),
+                    audioDuration: msg.metadata?.audioDuration || null,
+                    quotedMessage: msg.metadata?.quotedMessage || null,
+                    documentName: msg.metadata?.documentName || null,
                     timestamp: new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                     createdAtTimestamp: new Date(msg.created_at).getTime(),
                     isRead: true
@@ -685,8 +691,17 @@ function MainApp() {
                   });
                 }
                 
-                setChats(reconstructedChats);
-                setStoredItem(STORAGE_KEYS.CHATS, reconstructedChats);
+                setChats(prevChats => {
+                  const existingEmptyChats = prevChats.filter(c => !c.messages || c.messages.length === 0);
+                  const merged = [...reconstructedChats];
+                  existingEmptyChats.forEach(ec => {
+                    if (!merged.find(mc => mc.id === ec.id)) {
+                      merged.unshift(ec); // Keep them at the top
+                    }
+                  });
+                  setStoredItem(STORAGE_KEYS.CHATS, merged);
+                  return merged;
+                });
                 setSelectedChat(prev => {
                   if (prev) {
                     const updatedActive = reconstructedChats.find(c => c.id === prev.id);
@@ -748,13 +763,13 @@ function MainApp() {
               const newMsg = payload.new;
               if (!newMsg) return;
 
-              if (newMsg.recipient_id === currentUser.id || newMsg.sender_id === currentUser.id) {
-                if (newMsg.recipient_id === currentUser.id) {
+              if (newMsg.receiver_id === currentUser.id || newMsg.sender_id === currentUser.id) {
+                if (newMsg.receiver_id === currentUser.id) {
                   soundEngine.playMessagePopSound();
                 }
 
                 const isMeSender = newMsg.sender_id === currentUser.id;
-                const partnerId = isMeSender ? newMsg.recipient_id : newMsg.sender_id;
+                const partnerId = isMeSender ? newMsg.receiver_id : newMsg.sender_id;
                 const chatId = `chat_${partnerId}`;
 
                 let partner = (allUsers || []).find(u => u.id === partnerId);
@@ -770,7 +785,7 @@ function MainApp() {
                   partner = { id: partnerId, name: 'Utilisateur', avatar: null, role: 'Artiste' };
                 }
 
-                if (newMsg.recipient_id === currentUser.id) {
+                if (newMsg.receiver_id === currentUser.id) {
                   const isAudio = Boolean(newMsg.audio_url);
                   const isMedia = Boolean(newMsg.media_url);
                   const msgText = newMsg.content || (isAudio ? '🎤 Message vocal' : (isMedia ? '📷 Média' : 'Nouveau message'));
@@ -784,7 +799,10 @@ function MainApp() {
                   text: newMsg.content || '',
                   mediaUrl: newMsg.media_url || null,
                   audioUrl: newMsg.audio_url || null,
-                  isAudio: Boolean(newMsg.audio_url),
+                  isAudio: newMsg.metadata?.isAudio || Boolean(newMsg.audio_url),
+                  audioDuration: newMsg.metadata?.audioDuration || null,
+                  quotedMessage: newMsg.metadata?.quotedMessage || null,
+                  documentName: newMsg.metadata?.documentName || null,
                   timestamp: 'À l\'instant',
                   createdAtTimestamp: Date.now(),
                   isRead: isMeSender
@@ -845,6 +863,29 @@ function MainApp() {
                 syncMessages();
               }
             })
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, async (payload) => {
+              const oldMsg = payload.old;
+              if (!oldMsg || !oldMsg.id) return;
+              
+              setChats(prevChats => {
+                return prevChats.map(c => ({
+                  ...c,
+                  messages: c.messages.filter(m => m.id !== oldMsg.id)
+                }));
+              });
+
+              setSelectedChat(prevSelected => {
+                if (prevSelected) {
+                  return {
+                    ...prevSelected,
+                    messages: prevSelected.messages.filter(m => m.id !== oldMsg.id)
+                  };
+                }
+                return prevSelected;
+              });
+              
+              syncMessages();
+            })
             .subscribe();
         } catch (re) {
           console.warn('Realtime subscription fallback note:', re);
@@ -902,7 +943,7 @@ function MainApp() {
         await supabase
           .from('messages')
           .update({ is_read: true })
-          .eq('recipient_id', currentUser.id)
+          .eq('receiver_id', currentUser.id)
           .eq('sender_id', partnerId);
       } catch (me) {
         console.warn('Supabase mark read note:', me?.message || me);
@@ -918,13 +959,12 @@ function MainApp() {
       setActiveTab('discussions');
     } else {
       const newChat = {
-        id: `chat_${targetUser.id || Date.now()}`,
+        id: `chat_${targetUser.id}`,
         participant: {
-          id: targetUser.id || `usr_${Date.now()}`,
-          name: targetUser.name || targetUser.userName,
-          avatar: targetUser.avatar || targetUser.userAvatar,
-          online: true,
-          role: targetUser.role || targetUser.userRole
+          id: targetUser.id,
+          name: targetUser.name || targetUser.userName || targetUser.full_name,
+          avatar: targetUser.avatar || targetUser.avatar_url,
+          role: targetUser.role || 'Artiste'
         },
         unreadCount: 0,
         lastMessageTime: 'À l\'instant',
@@ -1029,7 +1069,7 @@ function MainApp() {
           supabase.from('messages').insert({
             id: msgUuid,
             sender_id: currentUser.id,
-            recipient_id: targetUserId,
+            receiver_id: targetUserId,
             content: replyText,
             media_url: rawMedia || null
           });
@@ -1365,16 +1405,52 @@ function MainApp() {
     // Save message directly to Supabase Database for instant delivery to recipient
     if (isSupabaseConfigured() && recipientId) {
       try {
-        await supabase.from('messages').insert({
+        const { error: insertErr } = await supabase.from('messages').insert({
           id: msgUuid,
           sender_id: currentUser.id,
-          recipient_id: recipientId,
+          receiver_id: recipientId,
           content: newMsg.text || '',
           media_url: newMsg.mediaUrl || null,
-          audio_url: newMsg.audioUrl || null
+          audio_url: newMsg.audioUrl || null,
+          metadata: {
+            quotedMessage: newMsg.quotedMessage || null,
+            isAudio: newMsg.isAudio || false,
+            audioDuration: newMsg.audioDuration || null,
+            documentName: newMsg.documentName || null
+          }
         });
+
+        if (insertErr) {
+          console.warn('Supabase message send note with metadata:', insertErr.message || insertErr);
+          // Fallback if metadata column doesn't exist yet
+          const { error: fallbackErr } = await supabase.from('messages').insert({
+            id: msgUuid,
+            sender_id: currentUser.id,
+            receiver_id: recipientId,
+            content: newMsg.text || '',
+            media_url: newMsg.mediaUrl || null,
+            audio_url: newMsg.audioUrl || null
+          });
+          
+          if (fallbackErr) {
+            console.error('Supabase fallback insert failed:', fallbackErr);
+            return; // Stop if fallback also failed
+          }
+        }
+        
+        // Push a notification for the message
+        try {
+          await supabase.from('notifications').insert({
+            user_id: recipientId,
+            actor_id: currentUser.id,
+            type: 'message',
+            reference_id: msgUuid
+          });
+        } catch (ne) {
+          console.warn('Supabase message notification note:', ne);
+        }
       } catch (me) {
-        console.warn('Supabase message send note:', me?.message || me);
+        console.error('Network or unexpected error during insert:', me);
       }
     }
   };
