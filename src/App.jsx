@@ -200,20 +200,7 @@ function MainApp() {
               }));
             }
 
-            const storedLocalUsers = getStoredItem(STORAGE_KEYS.USERS, []);
-            const mergedMap = new Map();
-
-            // 1. Add Supabase profiles first
-            mappedSupaUsers.forEach(u => mergedMap.set(u.id, u));
-
-            // 2. Add stored local users if not already in Supabase list
-            storedLocalUsers.forEach(u => {
-              if (!mergedMap.has(u.id) && !Array.from(mergedMap.values()).some(m => m.name === u.name || (m.email && m.email === u.email))) {
-                mergedMap.set(u.id, u);
-              }
-            });
-
-            loadedUsers = Array.from(mergedMap.values());
+            loadedUsers = mappedSupaUsers;
             setStoredItem(STORAGE_KEYS.USERS, loadedUsers);
           } catch (err) {
             console.warn('Supabase live profiles fetch note:', err.message);
@@ -364,15 +351,7 @@ function MainApp() {
                 });
 
                 const supaChats = Array.from(chatMap.values());
-                const mergedChatsMap = new Map();
-                supaChats.forEach(c => mergedChatsMap.set(c.id, c));
-                (loadedChats || []).forEach(c => {
-                  if (!mergedChatsMap.has(c.id)) {
-                    mergedChatsMap.set(c.id, c);
-                  }
-                });
-
-                loadedChats = Array.from(mergedChatsMap.values());
+                loadedChats = supaChats;
               }
             } catch (me) {
               console.warn('Supabase live messages fetch note:', me.message);
