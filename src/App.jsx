@@ -2023,6 +2023,7 @@ function MainApp() {
         callerName={incomingCallData ? incomingCallData.callerName : (selectedChat?.participant?.name || 'Artiste StageLink')}
         callerAvatar={incomingCallData ? incomingCallData.callerAvatar : (selectedChat?.participant?.avatar || null)}
         remoteUserId={incomingCallData ? incomingCallData.callerId : selectedChat?.participant?.id}
+        chatId={incomingCallData ? `chat_${incomingCallData.callerId}` : selectedChat?.id}
         isAudioOnly={incomingCallData ? incomingCallData.isAudioOnly : isAudioCallOnly}
         onCallEnded={handleCallEnded}
       />

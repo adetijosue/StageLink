@@ -7,7 +7,8 @@ import UserAvatar from '../common/UserAvatar';
 
 export default function VideoCallScreen({
   isOpen, onClose, callerName, callerAvatar, isAudioOnly, onCallEnded,
-  isIncoming = false, isMinimized = false, onMinimize, onMaximize
+  isIncoming = false, isMinimized = false, onMinimize, onMaximize,
+  chatId, remoteUserId
 }) {
   const { currentUser } = useAuth();
 
