@@ -93,6 +93,12 @@ function MainApp() {
   const [isEphemeralOpen, setIsEphemeralOpen] = useState(false);
   const [isVideoCallActive, setIsVideoCallActive] = useState(false);
   const [isIncomingCall, setIsIncomingCall] = useState(false); // New state for incoming call
+  const [incomingCallData, setIncomingCallData] = useState(null);
+  const incomingCallDataRef = useRef(null);
+  useEffect(() => {
+    incomingCallDataRef.current = incomingCallData;
+  }, [incomingCallData]);
+  const [activeCallNotificationId, setActiveCallNotificationId] = useState(null);
   const [isCallMinimized, setIsCallMinimized] = useState(false); // New state for PiP
   const [isAudioCallOnly, setIsAudioCallOnly] = useState(false);
   const [isCallHistoryModalOpen, setIsCallHistoryModalOpen] = useState(false);
@@ -760,6 +766,25 @@ function MainApp() {
             .channel('realtime:notifications')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, async (payload) => {
               if (payload.new && payload.new.user_id === currentUser.id) {
+                if (payload.new.type === 'incoming_call') {
+                  const isAudioOnly = payload.new.reference_id === 'audio';
+                  const callerId = payload.new.actor_id;
+                  try {
+                    const { data: actor } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', callerId).maybeSingle();
+                    const callerName = actor ? actor.full_name : 'Utilisateur';
+                    const callerAvatar = actor ? actor.avatar_url : '';
+                    setIncomingCallData({
+                      callerName,
+                      callerAvatar,
+                      isAudioOnly,
+                      notificationId: payload.new.id,
+                      callerId
+                    });
+                    setIsVideoCallActive(true);
+                  } catch(e) {}
+                  return; // Do not push native notification or regular sync for calls
+                }
+
                 let body = 'Vous avez une nouvelle notification';
                 try {
                   const { data: actor } = await supabase.from('profiles').select('full_name').eq('id', payload.new.actor_id).maybeSingle();
@@ -776,7 +801,14 @@ function MainApp() {
               syncNotifications();
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications' }, () => syncNotifications())
-            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'notifications' }, () => syncNotifications())
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'notifications' }, (payload) => {
+              if (payload.old && incomingCallDataRef.current && payload.old.id === incomingCallDataRef.current.notificationId) {
+                // The caller cancelled the call (deleted the incoming_call notification)
+                setIsVideoCallActive(false);
+                setIncomingCallData(null);
+              }
+              syncNotifications();
+            })
             .subscribe();
 
           messagesSub = supabase
@@ -1540,10 +1572,18 @@ function MainApp() {
     }
   };
 
-  const handleCallEnded = (callResult) => {
+  const handleCallEnded = async (callResult) => {
     setIsVideoCallActive(false);
     setIsIncomingCall(false);
     setIsCallMinimized(false);
+
+    if (activeCallNotificationId && isSupabaseConfigured()) {
+      try {
+        await supabase.from('notifications').delete().eq('id', activeCallNotificationId);
+      } catch(e) {}
+      setActiveCallNotificationId(null);
+    }
+    setIncomingCallData(null);
 
     if (!selectedChat) return;
 
@@ -1849,13 +1889,37 @@ function MainApp() {
         <ChatRoom
           chat={selectedChat}
           onBack={handleBackFromChat}
-          onStartAudioCall={() => {
+          onStartAudioCall={async () => {
             setIsAudioCallOnly(true);
             setIsVideoCallActive(true);
+            setIncomingCallData(null); // Ensure it's not an incoming call
+            if (isSupabaseConfigured() && currentUser?.id && selectedChat?.participant?.id) {
+              try {
+                const { data } = await supabase.from('notifications').insert({
+                  user_id: selectedChat.participant.id,
+                  actor_id: currentUser.id,
+                  type: 'incoming_call',
+                  reference_id: 'audio'
+                }).select('id').single();
+                if (data) setActiveCallNotificationId(data.id);
+              } catch(e) {}
+            }
           }}
-          onStartVideoCall={() => {
+          onStartVideoCall={async () => {
             setIsAudioCallOnly(false);
             setIsVideoCallActive(true);
+            setIncomingCallData(null);
+            if (isSupabaseConfigured() && currentUser?.id && selectedChat?.participant?.id) {
+              try {
+                const { data } = await supabase.from('notifications').insert({
+                  user_id: selectedChat.participant.id,
+                  actor_id: currentUser.id,
+                  type: 'incoming_call',
+                  reference_id: 'video'
+                }).select('id').single();
+                if (data) setActiveCallNotificationId(data.id);
+              } catch(e) {}
+            }
           }}
           onOpenEphemeralModal={() => setIsEphemeralOpen(true)}
           onSendMessage={handleSendMessage}
@@ -1950,14 +2014,17 @@ function MainApp() {
       {/* Live Video / Audio Call Screen */}
       <VideoCallScreen
         isOpen={isVideoCallActive}
-        isIncoming={isIncomingCall}
+        isIncoming={!!incomingCallData}
         isMinimized={isCallMinimized}
         onMinimize={() => setIsCallMinimized(true)}
         onMaximize={() => setIsCallMinimized(false)}
-        onClose={() => setIsVideoCallActive(false)}
-        callerName={selectedChat ? selectedChat.participant.name : 'Artiste StageLink'}
-        callerAvatar={selectedChat ? selectedChat.participant.avatar : null}
-        isAudioOnly={isAudioCallOnly}
+        onClose={() => {
+          setIsVideoCallActive(false);
+          handleCallEnded({ status: 'ended', duration: 0, isAudioOnly: incomingCallData ? incomingCallData.isAudioOnly : isAudioCallOnly });
+        }}
+        callerName={incomingCallData ? incomingCallData.callerName : (selectedChat ? selectedChat.participant.name : 'Artiste StageLink')}
+        callerAvatar={incomingCallData ? incomingCallData.callerAvatar : (selectedChat ? selectedChat.participant.avatar : null)}
+        isAudioOnly={incomingCallData ? incomingCallData.isAudioOnly : isAudioCallOnly}
         onCallEnded={handleCallEnded}
       />
 

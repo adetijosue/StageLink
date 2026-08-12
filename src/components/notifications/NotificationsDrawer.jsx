@@ -58,6 +58,14 @@ function NotificationsDrawer({ isOpen, onClose, onSelectChat, onNavigateTab, not
         iconColor = '#D97706';
         targetTab = 'feed';
         break;
+      case 'incoming_call':
+        title = `Appel manqué de ${n.actorName || "Quelqu'un"}`;
+        subtitle = "Appuyez pour voir la discussion.";
+        icon = MessageCircle; // fallback icon since Phone is not imported here
+        iconBg = '#FEF2F2';
+        iconColor = '#EF4444';
+        targetTab = 'discussions';
+        break;
       default:
         title = `${n.actorName || "Quelqu'un"} a interagi avec vous.`;
         subtitle = '';
@@ -110,7 +118,7 @@ function NotificationsDrawer({ isOpen, onClose, onSelectChat, onNavigateTab, not
   const handleNotificationClick = (item) => {
     if (typeof onClose === 'function') onClose();
 
-    if (item.type === 'message' && typeof onSelectChat === 'function') {
+    if ((item.type === 'message' || item.type === 'incoming_call') && typeof onSelectChat === 'function') {
       const chatObj = chats.find(c => c.id === item.actorId || (c.participant && c.participant.id === item.actorId));
       if (chatObj) {
         onSelectChat(chatObj);
