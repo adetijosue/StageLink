@@ -2,7 +2,7 @@ import React from 'react';
 import { X, Heart, Sparkles, MessageCircle, Eye } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 
-function NotificationsDrawer({ isOpen, onClose, onSelectChat, onNavigateTab, notifications }) {
+function NotificationsDrawer({ isOpen, onClose, onSelectChat, onNavigateTab, notifications, chats = [], onDeleteNotification }) {
   if (!isOpen) return null;
 
   const mapNotificationToUI = (n) => {
@@ -110,10 +110,19 @@ function NotificationsDrawer({ isOpen, onClose, onSelectChat, onNavigateTab, not
   const handleNotificationClick = (item) => {
     if (typeof onClose === 'function') onClose();
 
-    if (item.type === 'message' && item.chatObj && typeof onSelectChat === 'function') {
-      onSelectChat(item.chatObj);
+    if (item.type === 'message' && typeof onSelectChat === 'function') {
+      const chatObj = chats.find(c => c.id === item.actorId || (c.participant && c.participant.id === item.actorId));
+      if (chatObj) {
+        onSelectChat(chatObj);
+      } else {
+        onNavigateTab('discussions');
+      }
     } else if (item.targetTab && typeof onNavigateTab === 'function') {
       onNavigateTab(item.targetTab);
+    }
+    
+    if (typeof onDeleteNotification === 'function' && item.id) {
+      onDeleteNotification(item.id);
     }
   };
 

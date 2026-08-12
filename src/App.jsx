@@ -1503,6 +1503,18 @@ function MainApp() {
     }
   };
 
+  const handleDeleteNotification = async (notificationId) => {
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('notifications').delete().eq('id', notificationId);
+      } catch (e) {
+        console.error("Erreur suppression notification:", e);
+      }
+    }
+    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    setUnreadNotificationsCount(prev => Math.max(0, prev - 1));
+  };
+
   const handleDeleteMessageForEveryone = async (chatId, messageId) => {
     const updatedChats = chats.map((c) => {
       if (c.id === chatId) {
@@ -1961,6 +1973,8 @@ function MainApp() {
         isOpen={isNotificationsOpen}
         onClose={() => setIsNotificationsOpen(false)}
         notifications={notifications}
+        chats={chats}
+        onDeleteNotification={handleDeleteNotification}
         onSelectChat={(chat) => {
           setIsNotificationsOpen(false);
           handleSelectChat(chat);
