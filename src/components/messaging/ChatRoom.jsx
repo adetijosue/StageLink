@@ -8,6 +8,7 @@ import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
 export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoCall, onOpenEphemeralModal, onSendMessage, onDeleteMessageForMe, onDeleteMessageForEveryone, onOpenPublicProfile, onOpenStory }) {
   const [inputText, setInputText] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const [activeEmojiCategory, setActiveEmojiCategory] = useState('smileys');
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
