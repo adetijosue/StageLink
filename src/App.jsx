@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Volume2, User } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
@@ -2022,8 +2022,8 @@ function MainApp() {
           setIsVideoCallActive(false);
           handleCallEnded({ status: 'ended', duration: 0, isAudioOnly: incomingCallData ? incomingCallData.isAudioOnly : isAudioCallOnly });
         }}
-        callerName={incomingCallData ? incomingCallData.callerName : (selectedChat ? selectedChat.participant.name : 'Artiste StageLink')}
-        callerAvatar={incomingCallData ? incomingCallData.callerAvatar : (selectedChat ? selectedChat.participant.avatar : null)}
+        callerName={incomingCallData ? incomingCallData.callerName : (selectedChat?.participant?.name || 'Artiste StageLink')}
+        callerAvatar={incomingCallData ? incomingCallData.callerAvatar : (selectedChat?.participant?.avatar || null)}
         isAudioOnly={incomingCallData ? incomingCallData.isAudioOnly : isAudioCallOnly}
         onCallEnded={handleCallEnded}
       />
