@@ -68,6 +68,10 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
 
   // Universal Touch & Pointer Swipe Gesture Handling (Mobile Touch + Mouse Drag) + Long Press
   const handlePointerDownMessage = (e, msg) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
     touchStartXRef.current = e.clientX || (e.touches && e.touches[0].clientX) || 0;
     touchStartYRef.current = e.clientY || (e.touches && e.touches[0].clientY) || 0;
     isSwipingRef.current = true;
