@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PhoneOff, Mic, MicOff, Video, VideoOff, SwitchCamera, Volume2, VolumeX, Clock, Maximize2, Minimize2, ShieldCheck, Zap, Phone, X, Repeat, ArrowLeftRight, User, Check, AlertCircle } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
+import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import UserAvatar from '../common/UserAvatar';
 
@@ -16,67 +17,180 @@ export default function VideoCallScreen({
   // Audio to Video Call Migration State
   const [currentIsAudioOnly, setCurrentIsAudioOnly] = useState(isAudioOnly);
   const [isVideoOff, setIsVideoOff] = useState(isAudioOnly);
-  const [showVideoUpgradePrompt, setShowVideoUpgradePrompt] = useState(false); // Accept/Reject modal - ONLY shown to remote partner receiving upgrade invitation
-  const [isUpgradePending, setIsUpgradePending] = useState(false); // Waiting overlay - ONLY shown to initiator while waiting for partner acceptance
-  const [upgradeMessage, setUpgradeMessage] = useState(null);
-  const upgradeTimerRef = useRef(null);
-
+  
+  // Removing manual video upgrade states to auto-activate video
   const [callDuration, setCallDuration] = useState(0);
   const [facingMode, setFacingMode] = useState('user');
   const [cameraActive, setCameraActive] = useState(false);
-  const [isConnected, setIsConnected] = useState(!isIncoming);
+  const [isConnected, setIsConnected] = useState(false); // WebRTC will set this to true when connected
   const [isBlurActive, setIsBlurActive] = useState(false);
 
-  // Screen Swap State: true = local user on main full screen, false = remote participant on main full screen
+  // Screen Swap State
   const [isLocalMain, setIsLocalMain] = useState(false);
   const [swapFeedback, setSwapFeedback] = useState(false);
 
   const localVideoRef = useRef(null);
   const pipVideoRef = useRef(null);
+  const remoteVideoMainRef = useRef(null);
+  const remoteVideoPipRef = useRef(null);
+  
   const mediaStreamRef = useRef(null);
+  const remoteStreamRef = useRef(null);
   const timerRef = useRef(null);
-  const connectTimerRef = useRef(null);
+  
+  // WebRTC Refs
+  const peerConnectionRef = useRef(null);
+  const channelRef = useRef(null);
 
-  // Initialize Media Stream (Camera Hardware ONLY active if NOT audio-only or video is explicitly requested)
+  // WebRTC ICE Servers
+  const iceServers = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:global.stun.twilio.com:3478' }
+    ],
+  };
+
+  const setupWebRTC = async () => {
+    if (!chatId) return;
+
+    // Create Peer Connection
+    const pc = new RTCPeerConnection(iceServers);
+    peerConnectionRef.current = pc;
+
+    // Handle ICE candidates
+    pc.onicecandidate = (event) => {
+      if (event.candidate && channelRef.current) {
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'ice-candidate',
+          payload: { candidate: event.candidate }
+        });
+      }
+    };
+
+    // Handle receiving remote tracks
+    pc.ontrack = (event) => {
+      if (!remoteStreamRef.current) {
+        remoteStreamRef.current = new MediaStream();
+      }
+      remoteStreamRef.current.addTrack(event.track);
+      
+      if (remoteVideoMainRef.current) remoteVideoMainRef.current.srcObject = remoteStreamRef.current;
+      if (remoteVideoPipRef.current) remoteVideoPipRef.current.srcObject = remoteStreamRef.current;
+      
+      setIsConnected(true);
+      soundEngine.stopRingtone();
+      soundEngine.playCallConnectedChime();
+    };
+
+    // Setup Supabase Realtime Channel for signaling
+    const roomName = `call_${[currentUser?.id, remoteUserId].sort().join('_')}`;
+    const channel = supabase.channel(roomName);
+    channelRef.current = channel;
+
+    channel.on('broadcast', { event: 'ice-candidate' }, (payload) => {
+      if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription) {
+        peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(payload.payload.candidate)).catch(e => console.error(e));
+      }
+    });
+
+    channel.on('broadcast', { event: 'offer' }, async (payload) => {
+      if (!peerConnectionRef.current) return;
+      try {
+        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(payload.payload.sdp));
+        const answer = await peerConnectionRef.current.createAnswer();
+        await peerConnectionRef.current.setLocalDescription(answer);
+        channel.send({
+          type: 'broadcast',
+          event: 'answer',
+          payload: { sdp: peerConnectionRef.current.localDescription }
+        });
+      } catch (e) {
+        console.error("Error handling offer:", e);
+      }
+    });
+
+    channel.on('broadcast', { event: 'answer' }, async (payload) => {
+      if (!peerConnectionRef.current) return;
+      try {
+        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(payload.payload.sdp));
+      } catch (e) {
+        console.error("Error handling answer:", e);
+      }
+    });
+
+    channel.on('broadcast', { event: 'callee_ready' }, async () => {
+      // Callee is ready, Caller should send the offer
+      if (!isIncoming && peerConnectionRef.current) {
+        try {
+          const offer = await peerConnectionRef.current.createOffer();
+          await peerConnectionRef.current.setLocalDescription(offer);
+          channel.send({
+            type: 'broadcast',
+            event: 'offer',
+            payload: { sdp: peerConnectionRef.current.localDescription }
+          });
+        } catch(e) {
+           console.error("Error creating offer:", e);
+        }
+      }
+    });
+
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+         if (isIncoming) {
+            // Callee tells Caller they are ready to receive offer
+            channel.send({
+              type: 'broadcast',
+              event: 'callee_ready'
+            });
+         }
+      }
+    });
+  };
+
   const initStream = async (mode, forceVideo = false) => {
     stopMediaStream();
     const shouldEnableVideo = forceVideo || !currentIsAudioOnly;
 
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      if (!shouldEnableVideo) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-          mediaStreamRef.current = stream;
-          setCameraActive(false);
-        } catch (e) {}
-        return;
-      }
-
-      // Try 1: Primary facing mode request
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: { facingMode: mode }
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+           audio: true, 
+           video: shouldEnableVideo ? { facingMode: mode } : false 
         });
         mediaStreamRef.current = stream;
-        setCameraActive(true);
+        setCameraActive(shouldEnableVideo);
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
         if (pipVideoRef.current) pipVideoRef.current.srcObject = stream;
-      } catch (err1) {
-        // Try 2: Generic video stream fallback (works universally on all cameras & webcams)
-        try {
-          const streamFallback = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-            video: true
-          });
-          mediaStreamRef.current = streamFallback;
-          setCameraActive(true);
-          if (localVideoRef.current) localVideoRef.current.srcObject = streamFallback;
-          if (pipVideoRef.current) pipVideoRef.current.srcObject = streamFallback;
-        } catch (err2) {
-          console.warn('Camera stream fallback notice:', err2.message);
-          setCameraActive(false);
+
+        // Add tracks to peer connection
+        if (peerConnectionRef.current) {
+           // Remove old tracks first if renegotiating
+           const senders = peerConnectionRef.current.getSenders();
+           senders.forEach(sender => peerConnectionRef.current.removeTrack(sender));
+
+           stream.getTracks().forEach(track => {
+              peerConnectionRef.current.addTrack(track, stream);
+           });
+           
+           // Renegotiation is handled automatically by some browsers, but for manual:
+           // If we're already connected, we need to send a new offer
+           if (isConnected) {
+              const offer = await peerConnectionRef.current.createOffer();
+              await peerConnectionRef.current.setLocalDescription(offer);
+              if (channelRef.current) {
+                 channelRef.current.send({
+                    type: 'broadcast',
+                    event: 'offer',
+                    payload: { sdp: peerConnectionRef.current.localDescription }
+                 });
+              }
+           }
         }
+      } catch (err) {
+         console.warn('Camera stream error:', err.message);
+         setCameraActive(false);
       }
     }
   };
@@ -85,37 +199,54 @@ export default function VideoCallScreen({
     if (isOpen) {
       setCurrentIsAudioOnly(isAudioOnly);
       setIsVideoOff(isAudioOnly);
+      setIsConnected(false); // reset state
 
       if (!isIncoming) {
         soundEngine.playCallingRingtone();
-        connectTimerRef.current = setTimeout(() => {
-          setIsConnected(true);
-          soundEngine.stopRingtone();
-          soundEngine.playCallConnectedChime();
-        }, 4000);
       } else {
         soundEngine.playIncomingRingtone();
       }
 
-      timerRef.current = setInterval(() => {
-        if (isConnected) {
-          setCallDuration(v => v + 1);
-        }
-      }, 1000);
+      setupWebRTC().then(() => {
+         if (!isIncoming) {
+             initStream(facingMode, !isAudioOnly);
+         }
+      });
 
-      initStream(facingMode, !isAudioOnly);
+      timerRef.current = setInterval(() => {
+        setIsConnected((connected) => {
+           if (connected) setCallDuration(v => v + 1);
+           return connected;
+        });
+      }, 1000);
+      
     } else {
-      stopMediaStream();
-      soundEngine.stopRingtone();
+      cleanupCall();
     }
-    return () => {
+    
+    return cleanupCall;
+  }, [isOpen, isIncoming, isAudioOnly, chatId]);
+
+  const cleanupCall = () => {
       clearInterval(timerRef.current);
-      clearTimeout(connectTimerRef.current);
-      clearTimeout(upgradeTimerRef.current);
       stopMediaStream();
       soundEngine.stopRingtone();
-    };
-  }, [isOpen, isConnected, isIncoming, isAudioOnly]);
+      setIsConnected(false);
+      setCallDuration(0);
+      
+      if (channelRef.current) {
+         supabase.removeChannel(channelRef.current);
+         channelRef.current = null;
+      }
+      if (peerConnectionRef.current) {
+         peerConnectionRef.current.close();
+         peerConnectionRef.current = null;
+      }
+      if (remoteStreamRef.current) {
+         remoteStreamRef.current.getTracks().forEach(t => t.stop());
+         remoteStreamRef.current = null;
+      }
+  };
 
   const stopMediaStream = () => {
     if (mediaStreamRef.current) {
@@ -125,17 +256,18 @@ export default function VideoCallScreen({
   };
 
   const handleAcceptCall = () => {
-    setIsConnected(true);
     soundEngine.stopRingtone();
-    soundEngine.playCallConnectedChime();
+    // Callee initializes their stream, WebRTC tracks are added, and negotiation triggers
+    initStream(facingMode, !currentIsAudioOnly);
   };
 
   const handleRejectCall = () => {
-    soundEngine.stopRingtone();
+    cleanupCall();
     onCallEnded({ status: 'rejected', duration: 0, isAudioOnly: currentIsAudioOnly, isIncoming: true });
   };
 
   const handleEndCall = () => {
+    cleanupCall();
     onCallEnded({ status: 'completed', duration: callDuration, isAudioOnly: currentIsAudioOnly, isIncoming });
   };
 
@@ -147,7 +279,6 @@ export default function VideoCallScreen({
     setTimeout(() => setSwapFeedback(false), 1200);
   };
 
-  // AUDIO CALL TO VIDEO CALL MIGRATION LOGIC
   const handleToggleVideo = () => {
     soundEngine.playPopSound();
 
@@ -177,44 +308,9 @@ export default function VideoCallScreen({
   };
 
   // Called when partner ACCEPTS video upgrade (initiator's side)
-  const handlePartnerAcceptedUpgrade = () => {
-    soundEngine.playCallConnectedChime();
-    setIsUpgradePending(false);
-    setCurrentIsAudioOnly(false);
-    setIsVideoOff(false);
-    setUpgradeMessage('📹 Appel Vidéo HD activé !');
-    initStream(facingMode, true);
-    setTimeout(() => setUpgradeMessage(null), 2500);
-  };
-
   // Called when partner REJECTS video upgrade (initiator's side)
-  const handlePartnerRejectedUpgrade = () => {
-    soundEngine.playPopSound();
-    setIsUpgradePending(false);
-    setUpgradeMessage(`${callerName || 'L\'interlocuteur'} a préféré rester en appel audio.`);
-    initStream(facingMode, false);
-    setIsVideoOff(true);
-    setTimeout(() => setUpgradeMessage(null), 3000);
-  };
-
   // REMOTE PARTNER receives video upgrade invitation (incoming side)
   // In a real app, this would be triggered by a WebSocket event
-  const handleAcceptVideoUpgrade = () => {
-    soundEngine.playCallConnectedChime();
-    setShowVideoUpgradePrompt(false);
-    setCurrentIsAudioOnly(false);
-    setIsVideoOff(false);
-    setUpgradeMessage(null);
-    initStream(facingMode, true);
-  };
-
-  const handleRejectVideoUpgrade = () => {
-    soundEngine.playPopSound();
-    setShowVideoUpgradePrompt(false);
-    setUpgradeMessage(`Vous avez refusé l'appel vidéo.`);
-    setTimeout(() => setUpgradeMessage(null), 3000);
-  };
-
   if (!isOpen) return null;
 
   const formatDuration = (s) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;

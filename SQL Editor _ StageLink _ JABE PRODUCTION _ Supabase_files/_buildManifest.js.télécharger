@@ -1,0 +1,845 @@
+self.__BUILD_MANIFEST = {
+  "/404": [
+    "static/chunks/0-i8lw8v5511e.js"
+  ],
+  "/500": [
+    "static/chunks/41s8gscj82vzt.js"
+  ],
+  "/_error": [
+    "static/chunks/2nphg3wxvjx-v.js"
+  ],
+  "/account/audit": [
+    "static/chunks/3zzb8i1d9265_.js"
+  ],
+  "/account/me": [
+    "static/chunks/2qhi7splwmado.js"
+  ],
+  "/account/security": [
+    "static/chunks/105rwtn92uvuh.js"
+  ],
+  "/account/tokens": [
+    "static/chunks/06tjdmlqy3zr2.js"
+  ],
+  "/account/tokens/scoped": [
+    "static/chunks/14wh3nkr3b7go.js"
+  ],
+  "/authorize": [
+    "static/chunks/2ll1pc4nssvii.js"
+  ],
+  "/aws-marketplace-onboarding": [
+    "static/chunks/37udvxl50wjez.js"
+  ],
+  "/claim-project": [
+    "static/chunks/43_a62l7bot_6.js"
+  ],
+  "/cli/login": [
+    "static/chunks/05js-z5drxtrt.js"
+  ],
+  "/forgot-password": [
+    "static/chunks/2c21fagt8gqe4.js"
+  ],
+  "/forgot-password-mfa": [
+    "static/chunks/3puila6op7jec.js"
+  ],
+  "/integrations/github/authorize": [
+    "static/chunks/43wac_1374r14.js"
+  ],
+  "/integrations/vercel/[slug]/deploy-button/new-project": [
+    "static/chunks/2pznkzwff9n7-.js"
+  ],
+  "/integrations/vercel/[slug]/marketplace/choose-project": [
+    "static/chunks/0hrpll8ffd513.js"
+  ],
+  "/integrations/vercel/install": [
+    "static/chunks/1xd4sddvzrzgg.js"
+  ],
+  "/join": [
+    "static/chunks/1crnhqfoz9-k3.js"
+  ],
+  "/logout": [
+    "static/chunks/28cp02kuarr6-.js"
+  ],
+  "/maintenance": [
+    "static/chunks/2cb2g_je8uxd9.js"
+  ],
+  "/new": [
+    "static/chunks/2n8ykcg45k4_f.js"
+  ],
+  "/new/[slug]": [
+    "static/chunks/3py1so35d_z_t.js"
+  ],
+  "/org": [
+    "static/chunks/3u5gqv1puw38b.js"
+  ],
+  "/org/[slug]": [
+    "static/chunks/1whq2truq-gk9.js"
+  ],
+  "/org/[slug]/apps": [
+    "static/chunks/1asykzxyalpbx.js"
+  ],
+  "/org/[slug]/audit": [
+    "static/chunks/3pxn65bg71dp3.js"
+  ],
+  "/org/[slug]/audit-log-drains": [
+    "static/chunks/0yryhw4uvvcfq.js"
+  ],
+  "/org/[slug]/billing": [
+    "static/chunks/2v3rp5upvi_5c.js"
+  ],
+  "/org/[slug]/documents": [
+    "static/chunks/0wa97meymhqvs.js"
+  ],
+  "/org/[slug]/general": [
+    "static/chunks/2ctt330gbgqyr.js"
+  ],
+  "/org/[slug]/integrations": [
+    "static/chunks/3x8wt7tpl9-h8.js"
+  ],
+  "/org/[slug]/private-apps": [
+    "static/chunks/16kk4t-e37nn9.js"
+  ],
+  "/org/[slug]/security": [
+    "static/chunks/2z2pat8l3a5bt.js"
+  ],
+  "/org/[slug]/sso": [
+    "static/chunks/1mprit0ms_bs_.js"
+  ],
+  "/org/[slug]/team": [
+    "static/chunks/22c186mqtobv3.js"
+  ],
+  "/org/[slug]/usage": [
+    "static/chunks/3mhb_wp-j_tdr.js"
+  ],
+  "/org/[slug]/webhooks": [
+    "static/chunks/18clsquu1izdm.js"
+  ],
+  "/org/[slug]/webhooks/[endpointId]": [
+    "static/chunks/3bhmudpf_ss7_.js"
+  ],
+  "/org/_/[[...routeSlug]]": [
+    "static/chunks/1etj2g003nd_x.js"
+  ],
+  "/organizations": [
+    "static/chunks/0rdx8aow85oio.js"
+  ],
+  "/partners/stripe/projects/login": [
+    "static/chunks/1qpcnfymnvm5h.js"
+  ],
+  "/project/[ref]": [
+    "static/chunks/3060fl8e4-fs9.js"
+  ],
+  "/project/[ref]/advisors/performance": [
+    "static/chunks/3yscwydxm68z8.js"
+  ],
+  "/project/[ref]/advisors/rules/performance": [
+    "static/chunks/1u8n-1lyj5k4k.js"
+  ],
+  "/project/[ref]/advisors/rules/security": [
+    "static/chunks/0_h0t08dvmnux.js"
+  ],
+  "/project/[ref]/advisors/security": [
+    "static/chunks/0ver6-7s01ho1.js"
+  ],
+  "/project/[ref]/api": [
+    "static/chunks/3t2unl0emdywg.js"
+  ],
+  "/project/[ref]/auth/audit-logs": [
+    "static/chunks/3ypvh-xxp4ghv.js"
+  ],
+  "/project/[ref]/auth/hooks": [
+    "static/chunks/3li6rsqhktdlk.js"
+  ],
+  "/project/[ref]/auth/mfa": [
+    "static/chunks/40czh8d0txd4v.js"
+  ],
+  "/project/[ref]/auth/oauth-apps": [
+    "static/chunks/09mhzbw7rzd7u.js"
+  ],
+  "/project/[ref]/auth/oauth-server": [
+    "static/chunks/3ov1diwua7fn1.js"
+  ],
+  "/project/[ref]/auth/overview": [
+    "static/chunks/2ofqj-_8kmbu-.js"
+  ],
+  "/project/[ref]/auth/passkeys": [
+    "static/chunks/3ltajlbdn62aj.js"
+  ],
+  "/project/[ref]/auth/performance": [
+    "static/chunks/1knjcx0yvy9cm.js"
+  ],
+  "/project/[ref]/auth/protection": [
+    "static/chunks/1p1lmxn5rxyzq.js"
+  ],
+  "/project/[ref]/auth/providers": [
+    "static/chunks/1tvlcoqfrjzw1.js"
+  ],
+  "/project/[ref]/auth/rate-limits": [
+    "static/chunks/2rm9v-xdbuhcu.js"
+  ],
+  "/project/[ref]/auth/sessions": [
+    "static/chunks/308_35j-1ksv4.js"
+  ],
+  "/project/[ref]/auth/smtp": [
+    "static/chunks/1176kwmkaut5k.js"
+  ],
+  "/project/[ref]/auth/templates": [
+    "static/chunks/0ee54kznhf870.js"
+  ],
+  "/project/[ref]/auth/templates/[templateId]": [
+    "static/chunks/013ech-0blyw5.js"
+  ],
+  "/project/[ref]/auth/third-party": [
+    "static/chunks/2ph2f4o4i9l0-.js"
+  ],
+  "/project/[ref]/auth/url-configuration": [
+    "static/chunks/0ty34mm63nibl.js"
+  ],
+  "/project/[ref]/auth/users": [
+    "static/chunks/306x0jrjdnmrt.js"
+  ],
+  "/project/[ref]/branches": [
+    "static/chunks/3qb94urm4jj1u.js"
+  ],
+  "/project/[ref]/branches/merge-requests": [
+    "static/chunks/1nble7yqbwz1z.js"
+  ],
+  "/project/[ref]/database/backups/pitr": [
+    "static/chunks/00j97mufg3tnb.js"
+  ],
+  "/project/[ref]/database/backups/restore-to-new-project": [
+    "static/chunks/2c0ehh4i1xm3x.js"
+  ],
+  "/project/[ref]/database/backups/scheduled": [
+    "static/chunks/36n1isjar6amh.js"
+  ],
+  "/project/[ref]/database/column-privileges": [
+    "static/chunks/1w95lu8vx55_m.js"
+  ],
+  "/project/[ref]/database/extensions": [
+    "static/chunks/159uiv-08sdvc.js"
+  ],
+  "/project/[ref]/database/functions": [
+    "static/chunks/3z74lko29qcop.js"
+  ],
+  "/project/[ref]/database/indexes": [
+    "static/chunks/3ajzzl_v8-uhy.js"
+  ],
+  "/project/[ref]/database/migrations": [
+    "static/chunks/2u-6cwv7azl1h.js"
+  ],
+  "/project/[ref]/database/policies": [
+    "static/chunks/1-fnhx9faqjlj.js"
+  ],
+  "/project/[ref]/database/publications": [
+    "static/chunks/28qi2tb_r0k35.js"
+  ],
+  "/project/[ref]/database/publications/[id]": [
+    "static/chunks/3_-t7_i3ny9ll.js"
+  ],
+  "/project/[ref]/database/replication": [
+    "static/chunks/21wlwm1mjcxay.js"
+  ],
+  "/project/[ref]/database/replication/[pipelineId]": [
+    "static/chunks/2lutrtibvmlto.js"
+  ],
+  "/project/[ref]/database/replication/replica/[replicaId]": [
+    "static/chunks/1rmxqozbgel-u.js"
+  ],
+  "/project/[ref]/database/roles": [
+    "static/chunks/10nn6ml-3e6cl.js"
+  ],
+  "/project/[ref]/database/schemas": [
+    "static/chunks/0m7he3wuj0zq-.js"
+  ],
+  "/project/[ref]/database/settings": [
+    "static/chunks/2g1t61gvn1zr3.js"
+  ],
+  "/project/[ref]/database/tables": [
+    "static/chunks/019ph3nex2huu.js"
+  ],
+  "/project/[ref]/database/tables/[id]": [
+    "static/chunks/3npjpsk_qp2jz.js"
+  ],
+  "/project/[ref]/database/triggers": [
+    "static/chunks/1wfhq2st48b0_.js"
+  ],
+  "/project/[ref]/database/triggers/data": [
+    "static/chunks/2zxsuou1xdxur.js"
+  ],
+  "/project/[ref]/database/triggers/event": [
+    "static/chunks/01jycjq6i3ob2.js"
+  ],
+  "/project/[ref]/database/types": [
+    "static/chunks/0h7kuqkth2iwb.js"
+  ],
+  "/project/[ref]/editor": [
+    "static/chunks/2d22xx136occl.js"
+  ],
+  "/project/[ref]/editor/[id]": [
+    "static/chunks/3y59g22o39ho_.js"
+  ],
+  "/project/[ref]/editor/new": [
+    "static/chunks/1_gym_n9l-qjj.js"
+  ],
+  "/project/[ref]/explorer": [
+    "static/chunks/1iz49b5mrh8-2.js"
+  ],
+  "/project/[ref]/explorer/notebook/[id]": [
+    "static/chunks/3fpitm3-ejupp.js"
+  ],
+  "/project/[ref]/functions": [
+    "static/chunks/1w4k9ci5br9gf.js"
+  ],
+  "/project/[ref]/functions/[functionSlug]": [
+    "static/chunks/16jsfg40w7d50.js"
+  ],
+  "/project/[ref]/functions/[functionSlug]/code": [
+    "static/chunks/3ki3ie6yn1kvd.js"
+  ],
+  "/project/[ref]/functions/[functionSlug]/details": [
+    "static/chunks/3u58vbws80dn3.js"
+  ],
+  "/project/[ref]/functions/[functionSlug]/invocations": [
+    "static/chunks/0k821zxf-sn04.js"
+  ],
+  "/project/[ref]/functions/[functionSlug]/logs": [
+    "static/chunks/2v3ub254ys319.js"
+  ],
+  "/project/[ref]/functions/new": [
+    "static/chunks/2wkkdt7z81xxu.js"
+  ],
+  "/project/[ref]/functions/secrets": [
+    "static/chunks/3htm6d3vacygc.js"
+  ],
+  "/project/[ref]/integrations": [
+    "static/chunks/2sm3itsnh5q6n.js"
+  ],
+  "/project/[ref]/integrations/[id]": [
+    "static/chunks/1txdpir8c5ope.js"
+  ],
+  "/project/[ref]/integrations/[id]/[pageId]": [
+    "static/chunks/2s_5nn_x8-fdg.js"
+  ],
+  "/project/[ref]/integrations/[id]/[pageId]/[childId]": [
+    "static/chunks/3fqgm3ep76u_h.js"
+  ],
+  "/project/[ref]/logs": [
+    "static/chunks/3r74x16sppgpr.js"
+  ],
+  "/project/[ref]/logs/auth-logs": [
+    "static/chunks/04j_rnjvens-i.js"
+  ],
+  "/project/[ref]/logs/cron-logs": [
+    "static/chunks/34_i6v_ba_974.js"
+  ],
+  "/project/[ref]/logs/dedicated-pooler-logs": [
+    "static/chunks/0kul-a11f-imk.js"
+  ],
+  "/project/[ref]/logs/edge-functions-logs": [
+    "static/chunks/1znliwacm-ubw.js"
+  ],
+  "/project/[ref]/logs/edge-logs": [
+    "static/chunks/1fn96g22ocgoi.js"
+  ],
+  "/project/[ref]/logs/explorer": [
+    "static/chunks/3hwvhh044uski.js"
+  ],
+  "/project/[ref]/logs/explorer/recent": [
+    "static/chunks/0vp8c4sa109rt.js"
+  ],
+  "/project/[ref]/logs/explorer/saved": [
+    "static/chunks/2b73xtprcrab4.js"
+  ],
+  "/project/[ref]/logs/explorer/templates": [
+    "static/chunks/08rhlmhh7rtkn.js"
+  ],
+  "/project/[ref]/logs/multigres-logs": [
+    "static/chunks/40vkbxfilqiy-.js"
+  ],
+  "/project/[ref]/logs/pg-upgrade-logs": [
+    "static/chunks/32j0xn82djz4-.js"
+  ],
+  "/project/[ref]/logs/pgcron-logs": [
+    "static/chunks/11vw7vxnz1wet.js"
+  ],
+  "/project/[ref]/logs/pooler-logs": [
+    "static/chunks/1chdekqf-rjh0.js"
+  ],
+  "/project/[ref]/logs/postgres-logs": [
+    "static/chunks/440_mww-3enn5.js"
+  ],
+  "/project/[ref]/logs/postgrest-logs": [
+    "static/chunks/3no-095bz32y3.js"
+  ],
+  "/project/[ref]/logs/realtime-logs": [
+    "static/chunks/3j7825ikke4b2.js"
+  ],
+  "/project/[ref]/logs/replication-logs": [
+    "static/chunks/1mkx38_xctg3c.js"
+  ],
+  "/project/[ref]/logs/storage-logs": [
+    "static/chunks/21j244wd9nvod.js"
+  ],
+  "/project/[ref]/merge": [
+    "static/chunks/2ra94m0r67ium.js"
+  ],
+  "/project/[ref]/observability": [
+    "static/chunks/12gzbmc7-izvg.js"
+  ],
+  "/project/[ref]/observability/[id]": [
+    "static/chunks/2amg-4sczkrp5.js"
+  ],
+  "/project/[ref]/observability/api-overview": [
+    "static/chunks/131ofmd2kq5kw.js"
+  ],
+  "/project/[ref]/observability/auth": [
+    "static/chunks/1rpwvqhsa7846.js"
+  ],
+  "/project/[ref]/observability/connections": [
+    "static/chunks/2gyo2tmcp490w.js"
+  ],
+  "/project/[ref]/observability/database": [
+    "static/chunks/0xae59wp0n4vz.js"
+  ],
+  "/project/[ref]/observability/edge-functions": [
+    "static/chunks/3lxy7ihlqpkti.js"
+  ],
+  "/project/[ref]/observability/postgrest": [
+    "static/chunks/2u_suif_86pbd.js"
+  ],
+  "/project/[ref]/observability/query-insights": [
+    "static/chunks/1bdhe3dix-1pe.js"
+  ],
+  "/project/[ref]/observability/query-performance": [
+    "static/chunks/39c4hhum86cle.js"
+  ],
+  "/project/[ref]/observability/realtime": [
+    "static/chunks/0abhxw4e5ndj_.js"
+  ],
+  "/project/[ref]/observability/storage": [
+    "static/chunks/25m2t5ov4hdgg.js"
+  ],
+  "/project/[ref]/realtime/inspector": [
+    "static/chunks/3_gw5q28cmg15.js"
+  ],
+  "/project/[ref]/realtime/policies": [
+    "static/chunks/02irnsrnf471q.js"
+  ],
+  "/project/[ref]/realtime/settings": [
+    "static/chunks/0tzm3ig3bvzt9.js"
+  ],
+  "/project/[ref]/settings/addons": [
+    "static/chunks/3zj_64h24q71n.js"
+  ],
+  "/project/[ref]/settings/api": [
+    "static/chunks/43ofewc3bhga9.js"
+  ],
+  "/project/[ref]/settings/api-keys": [
+    "static/chunks/2xupcndebeegb.js"
+  ],
+  "/project/[ref]/settings/api-keys/legacy": [
+    "static/chunks/2yuaulbfhl6vc.js"
+  ],
+  "/project/[ref]/settings/billing/usage": [
+    "static/chunks/1-f8c2v8azydk.js"
+  ],
+  "/project/[ref]/settings/dashboard": [
+    "static/chunks/3suugun0jfwcv.js"
+  ],
+  "/project/[ref]/settings/general": [
+    "static/chunks/1silpmh_1a1ju.js"
+  ],
+  "/project/[ref]/settings/infrastructure": [
+    "static/chunks/0qvmstj15z3jz.js"
+  ],
+  "/project/[ref]/settings/integrations": [
+    "static/chunks/2vcfnvuhp-_g2.js"
+  ],
+  "/project/[ref]/settings/jwt": [
+    "static/chunks/1uwv8avkb6lys.js"
+  ],
+  "/project/[ref]/settings/jwt/legacy": [
+    "static/chunks/1av3x70tc2l9_.js"
+  ],
+  "/project/[ref]/settings/log-drains": [
+    "static/chunks/0ms99rkl3mdqa.js"
+  ],
+  "/project/[ref]/settings/webhooks": [
+    "static/chunks/1n7bro-t4klcv.js"
+  ],
+  "/project/[ref]/settings/webhooks/[endpointId]": [
+    "static/chunks/2uxh5pn7dyzpy.js"
+  ],
+  "/project/[ref]/sql": [
+    "static/chunks/43kfar6yx0xen.js"
+  ],
+  "/project/[ref]/sql/[id]": [
+    "static/chunks/2za4oy9fx43k-.js"
+  ],
+  "/project/[ref]/sql/examples": [
+    "static/chunks/2-i1b_f5wa3ij.js"
+  ],
+  "/project/[ref]/sql/templates": [
+    "static/chunks/040ntlf4kt_7m.js"
+  ],
+  "/project/[ref]/storage/analytics": [
+    "static/chunks/3tb8wg969-1me.js"
+  ],
+  "/project/[ref]/storage/analytics/buckets/[bucketId]": [
+    "static/chunks/30rzgdzf9msq2.js"
+  ],
+  "/project/[ref]/storage/files": [
+    "static/chunks/1s4rjrtvwv6x9.js"
+  ],
+  "/project/[ref]/storage/files/buckets/[bucketId]": [
+    "static/chunks/199py402vh77c.js"
+  ],
+  "/project/[ref]/storage/files/policies": [
+    "static/chunks/1ggjyiferwnfp.js"
+  ],
+  "/project/[ref]/storage/files/settings": [
+    "static/chunks/0l6yq8bn10h6m.js"
+  ],
+  "/project/[ref]/storage/s3": [
+    "static/chunks/3x2lr58t_uo_g.js"
+  ],
+  "/project/[ref]/storage/vectors": [
+    "static/chunks/0hy8zwqoczupn.js"
+  ],
+  "/project/[ref]/storage/vectors/buckets/[bucketId]": [
+    "static/chunks/1wbmv7o671wxc.js"
+  ],
+  "/project/_/[[...routeSlug]]": [
+    "static/chunks/3_nwj44c19xok.js"
+  ],
+  "/redeem": [
+    "static/chunks/188mj97uu_0cf.js"
+  ],
+  "/reset-password": [
+    "static/chunks/2pxcje7b5yy92.js"
+  ],
+  "/sign-in": [
+    "static/chunks/26yb5a8-oxyua.js"
+  ],
+  "/sign-in-mfa": [
+    "static/chunks/0tt3-3un5-rzp.js"
+  ],
+  "/sign-in-partner": [
+    "static/chunks/0a6m7-9ao9ji_.js"
+  ],
+  "/sign-in-sso": [
+    "static/chunks/262x4122wvtvf.js"
+  ],
+  "/sign-up": [
+    "static/chunks/0jkxn68vtbm_j.js"
+  ],
+  "/support/link": [
+    "static/chunks/31rn-lq-iusvp.js"
+  ],
+  "/support/new": [
+    "static/chunks/1b7q4izdod4fs.js"
+  ],
+  "/verify-email": [
+    "static/chunks/0s0ujsviw4334.js"
+  ],
+  "__rewrites": {
+    "afterFiles": [
+      {
+        "source": "/.well-known/vercel/flags"
+      }
+    ],
+    "beforeFiles": [
+      {
+        "source": "/studio/de39dda38745/_next/:path+",
+        "destination": "/dashboard/_next/:path+"
+      }
+    ],
+    "fallback": []
+  },
+  "sortedPages": [
+    "/404",
+    "/500",
+    "/_app",
+    "/_error",
+    "/account/audit",
+    "/account/me",
+    "/account/security",
+    "/account/tokens",
+    "/account/tokens/scoped",
+    "/api/ai/code/complete",
+    "/api/ai/docs",
+    "/api/ai/feedback/classify",
+    "/api/ai/feedback/rate",
+    "/api/ai/onboarding/design",
+    "/api/ai/sql/check-api-key",
+    "/api/ai/sql/cron-v2",
+    "/api/ai/sql/filter-v1",
+    "/api/ai/sql/generate-v4",
+    "/api/ai/sql/parse-client-code",
+    "/api/ai/sql/policy",
+    "/api/ai/sql/title-v2",
+    "/api/check-cname",
+    "/api/cli-release-version",
+    "/api/connect",
+    "/api/content/graphql",
+    "/api/edge-functions/test",
+    "/api/enabled-features-overrides",
+    "/api/generate-attachment-url",
+    "/api/get-deployment-commit",
+    "/api/get-ip-address",
+    "/api/get-s3-keys",
+    "/api/get-utc-time",
+    "/api/integrations/stripe-sync",
+    "/api/mcp",
+    "/api/parse-query",
+    "/api/platform/auth/[ref]/invite",
+    "/api/platform/auth/[ref]/magiclink",
+    "/api/platform/auth/[ref]/otp",
+    "/api/platform/auth/[ref]/recover",
+    "/api/platform/auth/[ref]/users",
+    "/api/platform/auth/[ref]/users/[id]",
+    "/api/platform/auth/[ref]/users/[id]/factors",
+    "/api/platform/database/[ref]/pooling",
+    "/api/platform/deployment-mode",
+    "/api/platform/integrations/github/authorization",
+    "/api/platform/integrations/github/connections",
+    "/api/platform/integrations/github/repositories",
+    "/api/platform/integrations/[slug]",
+    "/api/platform/organizations",
+    "/api/platform/organizations/[slug]/billing/subscription",
+    "/api/platform/pg-meta/[ref]/column-privileges",
+    "/api/platform/pg-meta/[ref]/extensions",
+    "/api/platform/pg-meta/[ref]/foreign-tables",
+    "/api/platform/pg-meta/[ref]/materialized-views",
+    "/api/platform/pg-meta/[ref]/policies",
+    "/api/platform/pg-meta/[ref]/publications",
+    "/api/platform/pg-meta/[ref]/query",
+    "/api/platform/pg-meta/[ref]/tables",
+    "/api/platform/pg-meta/[ref]/triggers",
+    "/api/platform/pg-meta/[ref]/types",
+    "/api/platform/pg-meta/[ref]/views",
+    "/api/platform/profile",
+    "/api/platform/projects",
+    "/api/platform/projects/[ref]",
+    "/api/platform/projects/[ref]/analytics/endpoints/[name]",
+    "/api/platform/projects/[ref]/analytics/log-drains",
+    "/api/platform/projects/[ref]/analytics/log-drains/[uuid]",
+    "/api/platform/projects/[ref]/api/graphql",
+    "/api/platform/projects/[ref]/api/rest",
+    "/api/platform/projects/[ref]/api-keys/temporary",
+    "/api/platform/projects/[ref]/billing/addons",
+    "/api/platform/projects/[ref]/config",
+    "/api/platform/projects/[ref]/config/postgrest",
+    "/api/platform/projects/[ref]/config/secrets/update-status",
+    "/api/platform/projects/[ref]/content",
+    "/api/platform/projects/[ref]/content/count",
+    "/api/platform/projects/[ref]/content/folders",
+    "/api/platform/projects/[ref]/content/folders/[id]",
+    "/api/platform/projects/[ref]/content/item/[id]",
+    "/api/platform/projects/[ref]/databases",
+    "/api/platform/projects/[ref]/infra-monitoring",
+    "/api/platform/projects/[ref]/run-lints",
+    "/api/platform/projects/[ref]/settings",
+    "/api/platform/props/org/[slug]",
+    "/api/platform/props/project/[ref]",
+    "/api/platform/props/project/[ref]/api",
+    "/api/platform/storage/[ref]/buckets",
+    "/api/platform/storage/[ref]/buckets/[id]",
+    "/api/platform/storage/[ref]/buckets/[id]/empty",
+    "/api/platform/storage/[ref]/buckets/[id]/objects",
+    "/api/platform/storage/[ref]/buckets/[id]/objects/download",
+    "/api/platform/storage/[ref]/buckets/[id]/objects/list",
+    "/api/platform/storage/[ref]/buckets/[id]/objects/move",
+    "/api/platform/storage/[ref]/buckets/[id]/objects/public-url",
+    "/api/platform/storage/[ref]/buckets/[id]/objects/sign",
+    "/api/platform/storage/[ref]/buckets/[id]/objects/sign-multi",
+    "/api/platform/storage/[ref]/vector-buckets",
+    "/api/platform/storage/[ref]/vector-buckets/[id]",
+    "/api/platform/storage/[ref]/vector-buckets/[id]/indexes",
+    "/api/platform/storage/[ref]/vector-buckets/[id]/indexes/[indexName]",
+    "/api/platform/telemetry/event",
+    "/api/status-override",
+    "/api/v1/projects/[ref]/api-keys",
+    "/api/v1/projects/[ref]/api-keys/[id]",
+    "/api/v1/projects/[ref]/config/auth/signing-keys",
+    "/api/v1/projects/[ref]/config/auth/signing-keys/legacy",
+    "/api/v1/projects/[ref]/database/migrations",
+    "/api/v1/projects/[ref]/functions",
+    "/api/v1/projects/[ref]/functions/[slug]",
+    "/api/v1/projects/[ref]/functions/[slug]/body",
+    "/api/v1/projects/[ref]/types/typescript",
+    "/authorize",
+    "/aws-marketplace-onboarding",
+    "/claim-project",
+    "/cli/login",
+    "/forgot-password",
+    "/forgot-password-mfa",
+    "/integrations/github/authorize",
+    "/integrations/vercel/install",
+    "/integrations/vercel/[slug]/deploy-button/new-project",
+    "/integrations/vercel/[slug]/marketplace/choose-project",
+    "/join",
+    "/logout",
+    "/maintenance",
+    "/new",
+    "/new/[slug]",
+    "/org",
+    "/org/_/[[...routeSlug]]",
+    "/org/[slug]",
+    "/org/[slug]/apps",
+    "/org/[slug]/audit",
+    "/org/[slug]/audit-log-drains",
+    "/org/[slug]/billing",
+    "/org/[slug]/documents",
+    "/org/[slug]/general",
+    "/org/[slug]/integrations",
+    "/org/[slug]/private-apps",
+    "/org/[slug]/security",
+    "/org/[slug]/sso",
+    "/org/[slug]/team",
+    "/org/[slug]/usage",
+    "/org/[slug]/webhooks",
+    "/org/[slug]/webhooks/[endpointId]",
+    "/organizations",
+    "/partners/stripe/projects/login",
+    "/project/_/[[...routeSlug]]",
+    "/project/[ref]",
+    "/project/[ref]/advisors/performance",
+    "/project/[ref]/advisors/rules/performance",
+    "/project/[ref]/advisors/rules/security",
+    "/project/[ref]/advisors/security",
+    "/project/[ref]/api",
+    "/project/[ref]/auth/audit-logs",
+    "/project/[ref]/auth/hooks",
+    "/project/[ref]/auth/mfa",
+    "/project/[ref]/auth/oauth-apps",
+    "/project/[ref]/auth/oauth-server",
+    "/project/[ref]/auth/overview",
+    "/project/[ref]/auth/passkeys",
+    "/project/[ref]/auth/performance",
+    "/project/[ref]/auth/protection",
+    "/project/[ref]/auth/providers",
+    "/project/[ref]/auth/rate-limits",
+    "/project/[ref]/auth/sessions",
+    "/project/[ref]/auth/smtp",
+    "/project/[ref]/auth/templates",
+    "/project/[ref]/auth/templates/[templateId]",
+    "/project/[ref]/auth/third-party",
+    "/project/[ref]/auth/url-configuration",
+    "/project/[ref]/auth/users",
+    "/project/[ref]/branches",
+    "/project/[ref]/branches/merge-requests",
+    "/project/[ref]/database/backups/pitr",
+    "/project/[ref]/database/backups/restore-to-new-project",
+    "/project/[ref]/database/backups/scheduled",
+    "/project/[ref]/database/column-privileges",
+    "/project/[ref]/database/extensions",
+    "/project/[ref]/database/functions",
+    "/project/[ref]/database/indexes",
+    "/project/[ref]/database/migrations",
+    "/project/[ref]/database/policies",
+    "/project/[ref]/database/publications",
+    "/project/[ref]/database/publications/[id]",
+    "/project/[ref]/database/replication",
+    "/project/[ref]/database/replication/replica/[replicaId]",
+    "/project/[ref]/database/replication/[pipelineId]",
+    "/project/[ref]/database/roles",
+    "/project/[ref]/database/schemas",
+    "/project/[ref]/database/settings",
+    "/project/[ref]/database/tables",
+    "/project/[ref]/database/tables/[id]",
+    "/project/[ref]/database/triggers",
+    "/project/[ref]/database/triggers/data",
+    "/project/[ref]/database/triggers/event",
+    "/project/[ref]/database/types",
+    "/project/[ref]/editor",
+    "/project/[ref]/editor/new",
+    "/project/[ref]/editor/[id]",
+    "/project/[ref]/explorer",
+    "/project/[ref]/explorer/notebook/[id]",
+    "/project/[ref]/functions",
+    "/project/[ref]/functions/new",
+    "/project/[ref]/functions/secrets",
+    "/project/[ref]/functions/[functionSlug]",
+    "/project/[ref]/functions/[functionSlug]/code",
+    "/project/[ref]/functions/[functionSlug]/details",
+    "/project/[ref]/functions/[functionSlug]/invocations",
+    "/project/[ref]/functions/[functionSlug]/logs",
+    "/project/[ref]/integrations",
+    "/project/[ref]/integrations/[id]",
+    "/project/[ref]/integrations/[id]/[pageId]",
+    "/project/[ref]/integrations/[id]/[pageId]/[childId]",
+    "/project/[ref]/logs",
+    "/project/[ref]/logs/auth-logs",
+    "/project/[ref]/logs/cron-logs",
+    "/project/[ref]/logs/dedicated-pooler-logs",
+    "/project/[ref]/logs/edge-functions-logs",
+    "/project/[ref]/logs/edge-logs",
+    "/project/[ref]/logs/explorer",
+    "/project/[ref]/logs/explorer/recent",
+    "/project/[ref]/logs/explorer/saved",
+    "/project/[ref]/logs/explorer/templates",
+    "/project/[ref]/logs/multigres-logs",
+    "/project/[ref]/logs/pg-upgrade-logs",
+    "/project/[ref]/logs/pgcron-logs",
+    "/project/[ref]/logs/pooler-logs",
+    "/project/[ref]/logs/postgres-logs",
+    "/project/[ref]/logs/postgrest-logs",
+    "/project/[ref]/logs/realtime-logs",
+    "/project/[ref]/logs/replication-logs",
+    "/project/[ref]/logs/storage-logs",
+    "/project/[ref]/merge",
+    "/project/[ref]/observability",
+    "/project/[ref]/observability/api-overview",
+    "/project/[ref]/observability/auth",
+    "/project/[ref]/observability/connections",
+    "/project/[ref]/observability/database",
+    "/project/[ref]/observability/edge-functions",
+    "/project/[ref]/observability/postgrest",
+    "/project/[ref]/observability/query-insights",
+    "/project/[ref]/observability/query-performance",
+    "/project/[ref]/observability/realtime",
+    "/project/[ref]/observability/storage",
+    "/project/[ref]/observability/[id]",
+    "/project/[ref]/realtime/inspector",
+    "/project/[ref]/realtime/policies",
+    "/project/[ref]/realtime/settings",
+    "/project/[ref]/settings/addons",
+    "/project/[ref]/settings/api",
+    "/project/[ref]/settings/api-keys",
+    "/project/[ref]/settings/api-keys/legacy",
+    "/project/[ref]/settings/billing/usage",
+    "/project/[ref]/settings/dashboard",
+    "/project/[ref]/settings/general",
+    "/project/[ref]/settings/infrastructure",
+    "/project/[ref]/settings/integrations",
+    "/project/[ref]/settings/jwt",
+    "/project/[ref]/settings/jwt/legacy",
+    "/project/[ref]/settings/log-drains",
+    "/project/[ref]/settings/webhooks",
+    "/project/[ref]/settings/webhooks/[endpointId]",
+    "/project/[ref]/sql",
+    "/project/[ref]/sql/examples",
+    "/project/[ref]/sql/templates",
+    "/project/[ref]/sql/[id]",
+    "/project/[ref]/storage/analytics",
+    "/project/[ref]/storage/analytics/buckets/[bucketId]",
+    "/project/[ref]/storage/files",
+    "/project/[ref]/storage/files/buckets/[bucketId]",
+    "/project/[ref]/storage/files/policies",
+    "/project/[ref]/storage/files/settings",
+    "/project/[ref]/storage/s3",
+    "/project/[ref]/storage/vectors",
+    "/project/[ref]/storage/vectors/buckets/[bucketId]",
+    "/redeem",
+    "/reset-password",
+    "/sign-in",
+    "/sign-in-mfa",
+    "/sign-in-partner",
+    "/sign-in-sso",
+    "/sign-up",
+    "/support/link",
+    "/support/new",
+    "/verify-email"
+  ]
+};self.__BUILD_MANIFEST_CB && self.__BUILD_MANIFEST_CB()
