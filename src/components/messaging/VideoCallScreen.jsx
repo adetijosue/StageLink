@@ -314,7 +314,10 @@ export default function VideoCallScreen({
   // In a real app, this would be triggered by a WebSocket event
   if (!isOpen) return null;
 
-  const formatDuration = (s) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
+  const formatDuration = (s) => {
+    if (isNaN(s) || s == null) return "00:00";
+    return `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
+  };
   const safeAvatar = callerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
   const myAvatar = currentUser?.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200';
   const myName = currentUser?.name || 'Moi';
@@ -401,16 +404,31 @@ export default function VideoCallScreen({
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <UserAvatar
-              user={{ avatar: safeAvatar, name: partnerName }}
-              size={300} // Approximate large size for background
+            <video
+              ref={isFullScreen ? remoteVideoMainRef : remoteVideoPipRef}
+              autoPlay
+              playsInline
               style={{
+                position: 'absolute',
+                inset: 0,
                 width: '100%',
                 height: '100%',
-                borderRadius: 0,
-                filter: 'brightness(0.95)'
+                objectFit: 'cover',
+                zIndex: 1
               }}
             />
+            <div style={{ position: 'relative', zIndex: 0, width: '100%', height: '100%' }}>
+              <UserAvatar
+                user={{ avatar: safeAvatar, name: partnerName }}
+                size={300} // Approximate large size for background
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: 0,
+                  filter: 'brightness(0.95)'
+                }}
+              />
+            </div>
 
             {/* Live HD Calling Badge Overlay */}
             {isFullScreen && (
@@ -456,6 +474,19 @@ export default function VideoCallScreen({
             }}>
               <UserAvatar user={{ avatar: safeAvatar }} size={isFullScreen ? 140 : 50} style={{ width: '100%', height: '100%', borderRadius: 0 }} />
             </div>
+            
+            <video
+              ref={isFullScreen ? remoteVideoMainRef : remoteVideoPipRef}
+              autoPlay
+              playsInline
+              style={{
+                position: 'absolute',
+                opacity: 0,
+                width: '1px',
+                height: '1px',
+                pointerEvents: 'none'
+              }}
+            />
             {isFullScreen && (
               <>
                 <h2 style={{ fontSize: '1.8rem', fontWeight: 900 }}>{partnerName}</h2>
