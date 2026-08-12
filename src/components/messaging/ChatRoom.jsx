@@ -18,7 +18,9 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [highlightedMsgId, setHighlightedMsgId] = useState(null);
   const touchStartXRef = useRef(0);
+  const touchStartYRef = useRef(0);
   const isSwipingRef = useRef(false);
+  const longPressTimerRef = useRef(null);
 
   // Recorded Audio Preview State (Hold to record -> Release to Preview & Listen before sending)
   const [audioPreviewData, setAudioPreviewData] = useState(null);
