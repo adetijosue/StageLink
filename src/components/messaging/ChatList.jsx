@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Search, MessageSquare, PhoneCall } from 'lucide-react';
 import SwipeableChatItem from './SwipeableChatItem';
 
-export default function ChatList({ chats, onSelectChat, onOpenNewChatModal, onOpenCallHistoryModal, isDarkMode, onArchiveChat, onDeleteChat, onToggleUnread }) {
+export default function ChatList({ chats, onSelectChat, onOpenNewChatModal, onOpenCallHistoryModal, isDarkMode, onArchiveChat, onDeleteChat, onToggleUnread, onOpenPublicProfile }) {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Check if there are any missed calls across chats
@@ -117,6 +117,7 @@ export default function ChatList({ chats, onSelectChat, onOpenNewChatModal, onOp
             onArchive={onArchiveChat}
             onDelete={onDeleteChat}
             onToggleUnread={onToggleUnread}
+            onOpenPublicProfile={onOpenPublicProfile}
           />
         ))}
       </div>

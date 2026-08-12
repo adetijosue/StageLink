@@ -904,6 +904,11 @@ function MainApp() {
     }
   };
 
+  const handleOpenPublicProfile = (userObj) => {
+    window.history.pushState({ page: 'profile' }, '');
+    setPublicProfileUser(userObj);
+  };
+
   const handleSelectChat = async (chat) => {
     window.history.pushState({ page: 'chat' }, '');
     const updatedChats = chats.map((c) => {
@@ -1665,10 +1670,7 @@ function MainApp() {
                     onDeletePost={handleDeletePost}
                     onOpenShare={(p) => setSharePost(p)}
                     onOpenReport={(p) => setReportPost(p)}
-                    onOpenPublicProfile={(userObj) => {
-                      window.history.pushState({ page: 'profile' }, '');
-                      setPublicProfileUser(userObj);
-                    }}
+                    onOpenPublicProfile={handleOpenPublicProfile}
                   />
                 ))}
               </div>
@@ -1688,6 +1690,7 @@ function MainApp() {
             onSelectChat={handleSelectChat}
             onOpenNewChatModal={() => setIsNewChatModalOpen(true)}
             onOpenCallHistoryModal={() => setIsCallHistoryModalOpen(true)}
+            onOpenPublicProfile={handleOpenPublicProfile}
             isDarkMode={isDarkMode}
             onArchiveChat={async (chat) => {
               const partnerId = chat.participant.id;
@@ -1846,10 +1849,7 @@ function MainApp() {
           onSendMessage={handleSendMessage}
           onDeleteMessageForMe={handleDeleteMessageForMe}
           onDeleteMessageForEveryone={handleDeleteMessageForEveryone}
-          onOpenPublicProfile={(usr) => {
-            window.history.pushState({ page: 'profile' }, '');
-            setPublicProfileUser(usr);
-          }}
+          onOpenPublicProfile={handleOpenPublicProfile}
           onOpenStory={handleOpenStoryFromMessage}
         />
       )}
@@ -1889,10 +1889,7 @@ function MainApp() {
         isOpen={isUserSearchOpen}
         onClose={() => setIsUserSearchOpen(false)}
         users={allUsers}
-        onOpenPublicProfile={(usr) => {
-          window.history.pushState({ page: 'profile' }, '');
-          setPublicProfileUser(usr);
-        }}
+        onOpenPublicProfile={handleOpenPublicProfile}
         onStartChat={handleStartChatWithUser}
         isDarkMode={isDarkMode}
       />

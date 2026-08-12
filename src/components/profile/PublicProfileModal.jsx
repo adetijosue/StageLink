@@ -14,6 +14,7 @@ export default function PublicProfileModal({ isOpen, onClose, user, onStartChat,
   const [playingTrackId, setPlayingTrackId] = useState(null);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isCvModalOpen, setIsCvModalOpen] = useState(false);
+  const [showFullAvatar, setShowFullAvatar] = useState(false);
 
   if (!isOpen || !user) return null;
 
@@ -84,7 +85,16 @@ export default function PublicProfileModal({ isOpen, onClose, user, onStartChat,
           </button>
 
           <div style={{ position: 'absolute', bottom: '-40px', left: '20px', display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
-            <UserAvatar user={{ avatar: user.userAvatar || user.avatar, name: user.userName || user.name }} size={85} border="4px solid #F8FAFC" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }} />
+            <UserAvatar 
+              user={{ avatar: user.userAvatar || user.avatar, name: user.userName || user.name }} 
+              size={85} 
+              border="4px solid #F8FAFC" 
+              style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.15)', cursor: 'pointer' }} 
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowFullAvatar(true);
+              }}
+            />
             <div style={{ paddingBottom: '45px' }}>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#FFF', textShadow: '0 2px 6px rgba(0,0,0,0.5)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {user.userName || user.name} {isVip && <Crown size={15} color="#F59E0B" fill="#F59E0B" />}
@@ -154,6 +164,28 @@ export default function PublicProfileModal({ isOpen, onClose, user, onStartChat,
 
         </div>
       </div>
+
+      {/* Full Screen Avatar Modal */}
+      {showFullAvatar && (
+        <div 
+          onClick={(e) => { e.stopPropagation(); setShowFullAvatar(false); }}
+          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <button 
+            onClick={() => setShowFullAvatar(false)}
+            style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', padding: '10px', color: '#FFF', cursor: 'pointer' }}
+          >
+            <X size={24} />
+          </button>
+          <div onClick={(e) => e.stopPropagation()} style={{ padding: '20px' }}>
+            <UserAvatar 
+              user={{ avatar: user.userAvatar || user.avatar, name: user.userName || user.name }} 
+              size={typeof window !== 'undefined' && window.innerWidth * 0.8 > 400 ? 400 : 300} 
+              style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }} 
+            />
+          </div>
+        </div>
+      )}
 
       <ProfileQRCodeModal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} user={user} isDarkMode={false} />
       <MusicalCVModal isOpen={isCvModalOpen} onClose={() => setIsCvModalOpen(false)} user={user} isOwnProfile={isSelf} isDarkMode={false} />

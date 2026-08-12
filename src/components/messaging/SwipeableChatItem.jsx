@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Trash2, Archive, MessageSquare, MessageCircle } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 
-export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDelete, onToggleUnread }) {
+export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDelete, onToggleUnread, onOpenPublicProfile }) {
   const [startX, setStartX] = useState(0);
   const [currentX, setCurrentX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -134,7 +134,14 @@ export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDel
       >
         {/* Avatar with Online indicator */}
         <div style={{ position: 'relative' }}>
-          <UserAvatar user={{ avatar: chat.participant.avatar, name: chat.participant.name }} size={48} />
+          <UserAvatar 
+            user={{ avatar: chat.participant.avatar, name: chat.participant.name }} 
+            size={48} 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpenPublicProfile) onOpenPublicProfile(chat.participant);
+            }}
+          />
           {chat.participant.online && (
             <span style={{
               position: 'absolute',
