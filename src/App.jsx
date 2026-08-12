@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Volume2 } from 'lucide-react';
+import { Plus, Volume2, User } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import AuthScreen from './components/auth/AuthScreen';
 import TopBar from './components/navigation/TopBar';
 import GlobalUserSearchModal from './components/navigation/GlobalUserSearchModal';
 import BottomNav from './components/navigation/BottomNav';
+import UserAvatar from './components/common/UserAvatar';
 import StoryBar from './components/feed/StoryBar';
 import StoryViewer from './components/feed/StoryViewer';
 import FeedCard from './components/feed/FeedCard';
@@ -66,7 +67,12 @@ function MainApp() {
 
   // Navigation & View States
   const [activeTab, setActiveTab] = useState('feed');
+  const [activeStoryView, setActiveStoryView] = useState(null);
   const [activeStory, setActiveStory] = useState(null);
+  
+  // Toast Notification State
+  const [toastNotification, setToastNotification] = useState(null);
+
   const [savedStoryContext, setSavedStoryContext] = useState(null);
   const [resharedStoryData, setResharedStoryData] = useState(null);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
@@ -646,6 +652,9 @@ function MainApp() {
 
                 const chatGroups = {};
                 supaMsgs.forEach(msg => {
+                  // Filter out messages deleted for me
+                  if (msg.metadata?.deleted_for?.includes(currentUser.id)) return;
+
                   const isMeSender = msg.sender_id === currentUser.id;
                   const partnerId = isMeSender ? msg.receiver_id : msg.sender_id;
                   
@@ -696,8 +705,8 @@ function MainApp() {
                   reconstructedChats = reconstructedChats.filter(chat => {
                     const partnerId = chat.participant?.id;
                     const state = statesMap[partnerId];
-                    if (state?.status === 'deleted') return false;
-                    if (state?.status === 'archived') return false;
+                    if (state?.is_deleted) return false;
+                    if (state?.is_archived) return false;
                     if (state?.force_unread) chat.unreadCount = (chat.unreadCount || 0) + 1;
                     return true;
                   });
@@ -773,108 +782,65 @@ function MainApp() {
           messagesSub = supabase
             .channel('realtime:messages')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
-              const newMsg = payload.new;
-              if (!newMsg) return;
+              const msgRecord = payload.new;
+              if (!msgRecord || msgRecord.receiver_id !== currentUser.id) return;
+              
+              // Filter out messages deleted for me
+              if (msgRecord.metadata?.deleted_for?.includes(currentUser.id)) return;
 
-              if (newMsg.receiver_id === currentUser.id || newMsg.sender_id === currentUser.id) {
-                if (newMsg.receiver_id === currentUser.id) {
-                  soundEngine.playMessagePopSound();
-                }
+              const senderId = msgRecord.sender_id;
+              const { data: senderProfile } = await supabase.from('profiles').select('*').eq('id', senderId).single();
 
-                const isMeSender = newMsg.sender_id === currentUser.id;
-                const partnerId = isMeSender ? newMsg.receiver_id : newMsg.sender_id;
-                const chatId = `chat_${partnerId}`;
+              const formattedMsg = {
+                id: msgRecord.id,
+                sender: 'other',
+                senderId: msgRecord.sender_id,
+                text: msgRecord.content || '',
+                mediaUrl: msgRecord.media_url || null,
+                audioUrl: msgRecord.audio_url || msgRecord.audio_note_url || null,
+                isAudio: msgRecord.metadata?.isAudio || Boolean(msgRecord.audio_url || msgRecord.audio_note_url),
+                audioDuration: msgRecord.metadata?.audioDuration || null,
+                quotedMessage: msgRecord.metadata?.quotedMessage || null,
+                documentName: msgRecord.metadata?.documentName || null,
+                timestamp: new Date(msgRecord.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                createdAtTimestamp: new Date(msgRecord.created_at).getTime(),
+                isRead: false
+              };
 
-                let partner = (allUsers || []).find(u => u.id === partnerId);
-                if (!partner) {
-                  try {
-                    const { data: p } = await supabase.from('profiles').select('*').eq('id', partnerId).maybeSingle();
-                    if (p) {
-                      partner = { id: p.id, name: p.full_name, avatar: p.avatar_url, role: p.role };
-                    }
-                  } catch (e) {}
-                }
-                if (!partner) {
-                  partner = { id: partnerId, name: 'Utilisateur', avatar: null, role: 'Artiste' };
-                }
-
-                if (newMsg.receiver_id === currentUser.id) {
-                  const isAudio = Boolean(newMsg.audio_url || newMsg.audio_note_url);
-                  const isMedia = Boolean(newMsg.media_url);
-                  const msgText = newMsg.content || (isAudio ? '🎤 Message vocal' : (isMedia ? '📷 Média' : 'Nouveau message'));
-                  sendNativeNotification(partner ? partner.name : 'Nouveau message', msgText);
-                }
-
-                const formattedMsg = {
-                  id: newMsg.id,
-                  sender: isMeSender ? 'current' : 'other',
-                  senderId: newMsg.sender_id,
-                  text: newMsg.content || '',
-                  mediaUrl: newMsg.media_url || null,
-                  audioUrl: newMsg.audio_url || newMsg.audio_note_url || null,
-                  isAudio: newMsg.metadata?.isAudio || Boolean(newMsg.audio_url || newMsg.audio_note_url),
-                  audioDuration: newMsg.metadata?.audioDuration || null,
-                  quotedMessage: newMsg.metadata?.quotedMessage || null,
-                  documentName: newMsg.metadata?.documentName || null,
-                  timestamp: 'À l\'instant',
-                  createdAtTimestamp: Date.now(),
-                  isRead: isMeSender
-                };
-
-                setChats(prevChats => {
-                  let chatFound = false;
-                  const updated = prevChats.map(c => {
-                    if (c.id === chatId || (c.participant && c.participant.id === partnerId)) {
-                      chatFound = true;
-                      const msgExists = (c.messages || []).some(m => m.id === formattedMsg.id);
-                      if (msgExists) return c;
-
-                      return {
-                        ...c,
-                        unreadCount: isMeSender ? c.unreadCount : (c.unreadCount || 0) + 1,
-                        lastMessageTime: 'À l\'instant',
-                        lastMessageText: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Audio' : (formattedMsg.mediaUrl ? '📷 Média' : '')),
-                        messages: [...(c.messages || []), formattedMsg]
-                      };
-                    }
-                    return c;
-                  });
-
-                  let finalChats = updated;
-                  if (!chatFound && partner) {
-                      finalChats = [{
-                        id: chatId,
-                        participant: partner,
-                        unreadCount: isMeSender ? 0 : 1,
-                        lastMessageTime: 'À l\'instant',
-                        lastMessageText: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Audio' : (formattedMsg.mediaUrl ? '📷 Média' : '')),
-                        messages: [formattedMsg]
-                      }, ...updated];
-                  }
-                  
-                  try {
-                    localStorage.setItem('stagelink_chats', JSON.stringify(finalChats));
-                  } catch(e) {}
-                  
-                  return finalChats;
-                });
-
-                setSelectedChat(prevSelected => {
-                  if (prevSelected && (prevSelected.id === chatId || prevSelected.participant?.id === partnerId)) {
-                    const msgExists = (prevSelected.messages || []).some(m => m.id === formattedMsg.id);
-                    if (msgExists) return prevSelected;
-
-                    return {
-                      ...prevSelected,
-                      messages: [...(prevSelected.messages || []), formattedMsg]
-                    };
-                  }
-                  return prevSelected;
-                });
+              soundEngine.playMessageReceivedSound();
+              
+              // Show Toast Notification if we are not actively in this chat
+              setChats(prevChats => {
+                let shouldToast = true;
                 
-                // Fallback: Re-sync entire message history to guarantee identical state
-                syncMessages();
-              }
+                if (selectedChat && selectedChat.participant.id === senderId) {
+                  shouldToast = false;
+                }
+
+                if (shouldToast) {
+                  setToastNotification({
+                    title: senderProfile?.full_name || 'Nouveau message',
+                    message: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Message audio' : '📷 Média'),
+                    avatar: senderProfile?.avatar_url
+                  });
+                  setTimeout(() => setToastNotification(null), 4000);
+                }
+                
+                // Add message to chat list
+                const chatId = `chat_${senderId}`;
+                const chatExists = prevChats.find(c => c.id === chatId);
+                
+                if (chatExists) {
+                  return prevChats.map(c => c.id === chatId ? { ...c, messages: [...c.messages, formattedMsg] } : c);
+                } else {
+                  return [{
+                    id: chatId,
+                    participant: { id: senderId, name: senderProfile?.full_name || 'Utilisateur', avatar: senderProfile?.avatar_url },
+                    messages: [formattedMsg],
+                    unreadCount: 1
+                  }, ...prevChats];
+                }
+              });
             })
             .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, async (payload) => {
               const oldMsg = payload.old;
@@ -896,7 +862,8 @@ function MainApp() {
                 }
                 return prevSelected;
               });
-              
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, async (payload) => {
               syncMessages();
             })
             .subscribe();
@@ -1430,64 +1397,67 @@ function MainApp() {
 
     // Save message directly to Supabase Database for instant delivery to recipient
     if (isSupabaseConfigured() && recipientId) {
-      try {
-        const { error: insertErr } = await supabase.from('messages').insert({
-          id: msgUuid,
-          sender_id: currentUser.id,
-          receiver_id: recipientId,
-          content: newMsg.text || '',
-          media_url: newMsg.mediaUrl || null,
-          audio_url: newMsg.audioUrl || null,
-          metadata: {
-            quotedMessage: newMsg.quotedMessage || null,
-            isAudio: newMsg.isAudio || false,
-            audioDuration: newMsg.audioDuration || null,
-            documentName: newMsg.documentName || null
-          }
-        });
+        // Play send sound
+        soundEngine.playMessageSentSound();
 
-        if (insertErr) {
-          console.warn('Supabase message send note with metadata:', insertErr.message || insertErr);
-          // Fallback 1: try with audio_note_url
-          const { error: fallbackErr } = await supabase.from('messages').insert({
+        try {
+          const { error: insertErr } = await supabase.from('messages').insert({
             id: msgUuid,
             sender_id: currentUser.id,
             receiver_id: recipientId,
             content: newMsg.text || '',
             media_url: newMsg.mediaUrl || null,
-            audio_note_url: newMsg.audioUrl || null
+            audio_url: newMsg.audioUrl || null,
+            metadata: {
+              quotedMessage: newMsg.quotedMessage || null,
+              isAudio: newMsg.isAudio || false,
+              audioDuration: newMsg.audioDuration || null,
+              documentName: newMsg.documentName || null
+            }
           });
-          
-          if (fallbackErr) {
-            console.error('Supabase fallback insert failed:', fallbackErr);
-            // Fallback 2: Ultimate barebones insert
-            const { error: bareFallbackErr } = await supabase.from('messages').insert({
+
+          if (insertErr) {
+            console.warn('Supabase message send note with metadata:', insertErr.message || insertErr);
+            // Fallback 1: try with audio_note_url
+            const { error: fallbackErr } = await supabase.from('messages').insert({
               id: msgUuid,
               sender_id: currentUser.id,
               receiver_id: recipientId,
-              content: newMsg.text || ''
+              content: newMsg.text || '',
+              media_url: newMsg.mediaUrl || null,
+              audio_note_url: newMsg.audioUrl || null
             });
-            if (bareFallbackErr) {
-               console.error('All message insert fallbacks failed:', bareFallbackErr);
-               return; // Stop if everything failed
+            
+            if (fallbackErr) {
+              console.error('Supabase fallback insert failed:', fallbackErr);
+              // Fallback 2: Ultimate barebones insert
+              const { error: bareFallbackErr } = await supabase.from('messages').insert({
+                id: msgUuid,
+                sender_id: currentUser.id,
+                receiver_id: recipientId,
+                content: newMsg.text || ''
+              });
+              if (bareFallbackErr) {
+                console.error('All message insert fallbacks failed:', bareFallbackErr);
+                return; // Stop if everything failed
+              }
             }
           }
+          
+          // Push a notification for the message
+          try {
+            await supabase.from('notifications').insert({
+              user_id: recipientId,
+              actor_id: currentUser.id,
+              type: 'message',
+              reference_id: msgUuid
+            });
+          } catch (ne) {
+            console.warn('Supabase message notification note:', ne);
+          }
+        } catch (me) {
+          console.error('Network or unexpected error during insert:', me);
         }
-        
-        // Push a notification for the message
-        try {
-          await supabase.from('notifications').insert({
-            user_id: recipientId,
-            actor_id: currentUser.id,
-            type: 'message',
-            reference_id: msgUuid
-          });
-        } catch (ne) {
-          console.warn('Supabase message notification note:', ne);
-        }
-      } catch (me) {
-        console.error('Network or unexpected error during insert:', me);
-      }
     }
   };
 
@@ -1506,6 +1476,26 @@ function MainApp() {
 
     const active = updatedChats.find((c) => c.id === chatId);
     if (active) setSelectedChat(active);
+
+    if (isSupabaseConfigured() && messageId) {
+      try {
+        // Fetch existing message to get current metadata
+        supabase.from('messages').select('metadata').eq('id', messageId).single().then(({ data: msgData }) => {
+          if (msgData) {
+            const currentMetadata = msgData.metadata || {};
+            const currentDeletedFor = currentMetadata.deleted_for || [];
+            if (!currentDeletedFor.includes(currentUser.id)) {
+              currentDeletedFor.push(currentUser.id);
+              supabase.from('messages')
+                .update({ metadata: { ...currentMetadata, deleted_for: currentDeletedFor } })
+                .eq('id', messageId);
+            }
+          }
+        });
+      } catch (me) {
+        console.warn('Supabase message Delete for me note:', me?.message || me);
+      }
+    }
   };
 
   const handleDeleteMessageForEveryone = async (chatId, messageId) => {
@@ -1710,13 +1700,24 @@ function MainApp() {
               }
             }}
             onDeleteChat={async (chat) => {
-              const partnerId = chat.participant.id;
+              // 1. Remove it from local UI instantly
               const updatedChats = chats.filter(c => c.id !== chat.id);
               setChats(updatedChats);
-              if (isSupabaseConfigured()) {
+              setStoredItem(STORAGE_KEYS.CHATS, updatedChats);
+              if (selectedChat?.id === chat.id) setSelectedChat(null);
+              
+              // 2. Persist deletion in Supabase using the specialized RPC
+              if (isSupabaseConfigured() && currentUser?.id) {
+                const partnerId = chat.participant?.id;
+                if (!partnerId) return;
                 try {
-                  await supabase.from('chat_states').upsert({ user_id: currentUser.id, partner_id: partnerId, is_deleted: true, updated_at: new Date().toISOString() });
-                } catch (e) { console.warn('Delete error:', e); }
+                  // The RPC will update chat_states to is_deleted = true
+                  // AND mark all messages as deleted_for = currentUser.id
+                  await supabase.rpc('delete_discussion', { partner: partnerId });
+                  
+                  // Also refresh messages sync to ensure messages are cleared from memory
+                  if (syncMessagesFallback) syncMessagesFallback();
+                } catch (e) { console.warn('Delete discussion error:', e); }
               }
             }}
             onToggleUnread={async (chat) => {
@@ -1764,12 +1765,36 @@ function MainApp() {
         />
       )}
 
-
-
       {/* PWA INSTALLATION ASSISTANT & TUTORIAL */}
       <PWAInstallPrompt isDarkMode={isDarkMode} />
 
       {/* Fullscreen Story Viewer Overlay */}
+      {activeStoryView && (
+        <StoryViewer 
+          storyData={activeStoryView.storyData}
+          initialIndex={activeStoryView.initialIndex}
+          onClose={() => setActiveStoryView(null)}
+        />
+      )}
+
+      {/* Global Notification Toast */}
+      {toastNotification && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-bounce-in max-w-sm w-11/12 bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl p-4 flex items-center gap-4 cursor-pointer" onClick={() => setToastNotification(null)}>
+          <div className="w-12 h-12 shrink-0">
+            {toastNotification.avatar ? (
+              <UserAvatar avatarUrl={toastNotification.avatar} size={48} border="2px solid #0066FF" />
+            ) : (
+              <UserAvatar size={48} border="2px solid #0066FF" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="text-white font-semibold text-sm truncate">{toastNotification.title}</h4>
+            <p className="text-gray-300 text-xs truncate mt-0.5">{toastNotification.message}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Active Story Viewer Overlay */}
       {activeStory && (
         <StoryViewer
           story={activeStory}

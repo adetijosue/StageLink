@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, Heart, Sparkles, MessageCircle, Crown, Eye } from 'lucide-react';
+import { X, Heart, Sparkles, MessageCircle, Eye } from 'lucide-react';
+import UserAvatar from '../common/UserAvatar';
 
 function NotificationsDrawer({ isOpen, onClose, onSelectChat, onNavigateTab, notifications }) {
   if (!isOpen) return null;
@@ -172,7 +173,7 @@ function NotificationsDrawer({ isOpen, onClose, onSelectChat, onNavigateTab, not
                 }}
               >
                 <div style={{ position: 'relative' }}>
-                  <img src={n.avatar} alt="Avatar" style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover' }} />
+                  <UserAvatar user={{ avatar: n.avatar, name: n.actorName }} size={42} />
                   <span style={{
                     position: 'absolute',
                     bottom: '-2px',

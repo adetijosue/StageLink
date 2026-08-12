@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Trash2, Archive, MessageSquare, MessageCircle } from 'lucide-react';
+import UserAvatar from '../common/UserAvatar';
 
 export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDelete, onToggleUnread }) {
   const [startX, setStartX] = useState(0);
@@ -133,11 +134,7 @@ export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDel
       >
         {/* Avatar with Online indicator */}
         <div style={{ position: 'relative' }}>
-          <img
-            src={chat.participant.avatar}
-            alt={chat.participant.name}
-            style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }}
-          />
+          <UserAvatar user={{ avatar: chat.participant.avatar, name: chat.participant.name }} size={48} />
           {chat.participant.online && (
             <span style={{
               position: 'absolute',

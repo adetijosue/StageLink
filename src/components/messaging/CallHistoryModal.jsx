@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed, Search, Calendar, Play } from 'lucide-react';
+import { X, Phone, Video, Search, PhoneIncoming, PhoneOutgoing, PhoneMissed, Clock, Check, Calendar } from 'lucide-react';
+import UserAvatar from '../common/UserAvatar';
 import { soundEngine } from '../../services/audioService';
 
 export default function CallHistoryModal({ isOpen, onClose, chats, onStartCallWithUser, isDarkMode }) {
@@ -194,11 +195,7 @@ export default function CallHistoryModal({ isOpen, onClose, chats, onStartCallWi
                 }}
               >
                 {/* Avatar */}
-                <img
-                  src={call.participant?.avatar}
-                  alt={call.participant?.name}
-                  style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }}
-                />
+                <UserAvatar user={{ avatar: call.participant?.avatar, name: call.participant?.name }} size={44} />
 
                 {/* Call Info */}
                 <div style={{ flex: 1, minWidth: 0 }}>

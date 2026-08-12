@@ -428,3 +428,4 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ════════════════════════════════════════════════════════════════
 --  SCRIPT TERMINE — Votre base StageLink est prete !
 -- ════════════════════════════════════════════════════════════════
+NOTIFY pgrst, 'reload schema'; 

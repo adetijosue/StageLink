@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Check, MapPin, Briefcase, UserPlus, UserCheck, MessageSquare, Music, Disc, Cpu, Play, Pause, Sparkles, Globe, Mail, Phone, ExternalLink, QrCode, Share2, FileText, Crown, Users } from 'lucide-react';
+import UserAvatar from '../common/UserAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { soundEngine } from '../../services/audioService';
 import confetti from 'canvas-confetti';
@@ -83,10 +84,7 @@ export default function PublicProfileModal({ isOpen, onClose, user, onStartChat,
           </button>
 
           <div style={{ position: 'absolute', bottom: '-40px', left: '20px', display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
-            <img
-              src={user.userAvatar || user.avatar}
-              style={{ width: '85px', height: '90px', borderRadius: '50%', border: '4px solid #F8FAFC', objectFit: 'cover', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
-            />
+            <UserAvatar user={{ avatar: user.userAvatar || user.avatar, name: user.userName || user.name }} size={85} border="4px solid #F8FAFC" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }} />
             <div style={{ paddingBottom: '45px' }}>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#FFF', textShadow: '0 2px 6px rgba(0,0,0,0.5)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {user.userName || user.name} {isVip && <Crown size={15} color="#F59E0B" fill="#F59E0B" />}

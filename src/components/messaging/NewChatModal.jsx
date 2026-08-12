@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, Search, MessageSquare, Check, MapPin, Music } from 'lucide-react';
+import { X, Search, Check, MapPin, Music } from 'lucide-react';
+import UserAvatar from '../common/UserAvatar';
 import Logo from '../common/Logo';
 import { useAuth } from '../../context/AuthContext';
 
@@ -177,11 +178,7 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
               >
                 {/* Avatar */}
                 <div style={{ position: 'relative' }}>
-                  <img
-                    src={user.avatar}
-                    alt={user.name}
-                    style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }}
-                  />
+                  <UserAvatar user={{ avatar: user.avatar, name: user.name }} size={48} />
                   {user.verified && (
                     <span style={{
                       position: 'absolute',

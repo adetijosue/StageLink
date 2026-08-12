@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PhoneOff, Mic, MicOff, Video, VideoOff, SwitchCamera, Volume2, VolumeX, Clock, Maximize2, Minimize2, ShieldCheck, Zap, Phone, X, Repeat, ArrowLeftRight, User, Check, AlertCircle } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
+import UserAvatar from '../common/UserAvatar';
 
 export default function VideoCallScreen({
   isOpen, onClose, callerName, callerAvatar, isAudioOnly, onCallEnded,
@@ -230,7 +231,7 @@ export default function VideoCallScreen({
             <video ref={localVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
           ) : (
             <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1E293B' }}>
-              <img src={safeAvatar} style={{ width: '50px', height: '50px', borderRadius: '50%', border: '2px solid #0066FF' }} />
+              <UserAvatar user={{ avatar: safeAvatar }} size={50} border="2px solid #0066FF" />
             </div>
           )}
           <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.5)', borderRadius: '50%', padding: 4 }}><Maximize2 size={12} color="#FFF" /></div>
@@ -272,15 +273,11 @@ export default function VideoCallScreen({
             background: 'radial-gradient(circle at 50% 40%, #1E293B 0%, #070B14 100%)',
             color: '#FFFFFF'
           }}>
-            <img
-              src={myAvatar}
-              alt={myName}
+            <UserAvatar
+              user={{ avatar: myAvatar, name: myName }}
+              size={isFullScreen ? 120 : 44}
+              border="3px solid #0066FF"
               style={{
-                width: isFullScreen ? '120px' : '44px',
-                height: isFullScreen ? '120px' : '44px',
-                borderRadius: '50%',
-                border: '3px solid #0066FF',
-                objectFit: 'cover',
                 marginBottom: isFullScreen ? '14px' : '0'
               }}
             />
@@ -307,13 +304,13 @@ export default function VideoCallScreen({
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <img
-              src={safeAvatar}
-              alt={partnerName}
+            <UserAvatar
+              user={{ avatar: safeAvatar, name: partnerName }}
+              size={300} // Approximate large size for background
               style={{
                 width: '100%',
                 height: '100%',
-                objectFit: 'cover',
+                borderRadius: 0,
                 filter: 'brightness(0.95)'
               }}
             />
@@ -360,7 +357,7 @@ export default function VideoCallScreen({
               marginBottom: isFullScreen ? '20px' : '0',
               boxShadow: '0 8px 24px rgba(0, 102, 255, 0.4)'
             }}>
-              <img src={safeAvatar} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <UserAvatar user={{ avatar: safeAvatar }} size={isFullScreen ? 140 : 50} style={{ width: '100%', height: '100%', borderRadius: 0 }} />
             </div>
             {isFullScreen && (
               <>

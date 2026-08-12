@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Phone, Video, MoreVertical, Send, Paperclip, Smile, Mic, Play, Pause, ShieldCheck, CheckCheck, Trash2, Trash, Copy, X, PhoneCall, VideoOff, Reply, PhoneMissed, Eye } from 'lucide-react';
+import { ArrowLeft, Phone, Video, MoreVertical, Send, Paperclip, Smile, Mic, Play, Pause, ShieldCheck, CheckCheck, Trash2, Trash, Copy, X, PhoneCall, VideoOff, Reply, PhoneMissed, Eye, Forward, Image, FileText, Camera } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
+import TopBar from '../navigation/TopBar';
+import UserAvatar from '../common/UserAvatar';
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
 
 export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoCall, onOpenEphemeralModal, onSendMessage, onDeleteMessageForMe, onDeleteMessageForEveryone, onOpenPublicProfile, onOpenStory }) {
@@ -61,23 +63,46 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
 
   if (!chat) return null;
 
-  // Universal Touch & Pointer Swipe Gesture Handling (Mobile Touch + Mouse Drag)
-  const handlePointerDownMessage = (e, msgId) => {
+  // Universal Touch & Pointer Swipe Gesture Handling (Mobile Touch + Mouse Drag) + Long Press
+  const handlePointerDownMessage = (e, msg) => {
     touchStartXRef.current = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+    touchStartYRef.current = e.clientY || (e.touches && e.touches[0].clientY) || 0;
     isSwipingRef.current = true;
-    setSwipedMsgId(msgId);
+    setSwipedMsgId(msg.id);
+
+    longPressTimerRef.current = setTimeout(() => {
+      handleMessageLongPressSelect(msg);
+      longPressTimerRef.current = null;
+      isSwipingRef.current = false;
+      setSwipedMsgId(null);
+    }, 500);
   };
 
   const handlePointerMoveMessage = (e, msgId) => {
     if (!isSwipingRef.current || swipedMsgId !== msgId) return;
     const currentX = (e.clientX !== undefined) ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+    const currentY = (e.clientY !== undefined) ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
     const deltaX = currentX - touchStartXRef.current;
+    const deltaY = currentY - touchStartYRef.current;
+    
+    // Cancel long press if user moves finger
+    if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    }
+
     if (deltaX > 0 && deltaX < 110) {
       setSwipeOffset(deltaX);
     }
   };
 
   const handlePointerUpMessage = (msg) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
     if (isSwipingRef.current && swipeOffset > 40) {
       handleSelectMessageToQuote(msg);
     }
@@ -433,7 +458,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
             style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
           >
             <div style={{ position: 'relative' }}>
-              <img src={chat.participant.avatar} alt={chat.participant.name} style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover' }} />
+              <UserAvatar user={{ avatar: chat.participant.avatar, name: chat.participant.name }} size={42} />
               {chat.participant.online && (
                 <span style={{ position: 'absolute', bottom: 0, right: 0, width: '12px', height: '12px', borderRadius: '50%', background: '#10B981', border: '2px solid #FFF' }} />
               )}
@@ -493,12 +518,14 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
             <div
               key={msg.id}
               id={`msg_bubble_${msg.id}`}
-              onPointerDown={(e) => handlePointerDownMessage(e, msg.id)}
+              onPointerDown={(e) => handlePointerDownMessage(e, msg)}
               onPointerMove={(e) => handlePointerMoveMessage(e, msg.id)}
               onPointerUp={() => handlePointerUpMessage(msg)}
-              onTouchStart={(e) => handlePointerDownMessage(e, msg.id)}
+              onPointerLeave={() => handlePointerUpMessage(msg)}
+              onTouchStart={(e) => handlePointerDownMessage(e, msg)}
               onTouchMove={(e) => handlePointerMoveMessage(e, msg.id)}
               onTouchEnd={() => handlePointerUpMessage(msg)}
+              onTouchCancel={() => handlePointerUpMessage(msg)}
               onContextMenu={(e) => {
                 e.preventDefault();
                 handleMessageLongPressSelect(msg);
@@ -836,10 +863,11 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
             textAlign: 'center',
             margin: 'auto 0'
           }}>
-            <img
-              src={chat.participant?.avatar}
-              alt={chat.participant?.name}
-              style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: '3px solid #0066FF', marginBottom: '12px', boxShadow: '0 8px 24px rgba(0,102,255,0.2)' }}
+            <UserAvatar 
+              user={{ avatar: chat.participant?.avatar, name: chat.participant?.name }} 
+              size={72} 
+              border="3px solid #0066FF" 
+              style={{ marginBottom: '12px', boxShadow: '0 8px 24px rgba(0,102,255,0.2)' }} 
             />
             <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: '0 0 4px 0' }}>
               {chat.participant?.name}
@@ -952,6 +980,36 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
               </button>
 
               <button
+                onClick={async () => {
+                  if (navigator.share && selectedMessageForAction.text) {
+                    try {
+                      await navigator.share({
+                        title: 'Message',
+                        text: selectedMessageForAction.text
+                      });
+                    } catch (e) { console.warn('Error sharing', e); }
+                  }
+                  setSelectedMessageForAction(null);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: '14px',
+                  border: '1px solid #E2E8F0',
+                  background: '#F8FAFC',
+                  color: '#334155',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  cursor: 'pointer'
+                }}
+              >
+                <Forward size={16} color="#475569" /> Transférer
+              </button>
+
+              <button
                 onClick={() => {
                   const msgId = selectedMessageForAction.id;
                   setSelectedMessageForAction(null);
@@ -1028,6 +1086,17 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
             </div>
           </div>
         </div>
+      )}
+
+      {/* Click-away overlay for Emoji and Attachment pickers */}
+      {(showEmojiPicker || showAttachmentMenu) && (
+        <div 
+          onClick={() => {
+            setShowEmojiPicker(false);
+            setShowAttachmentMenu(false);
+          }}
+          style={{ position: 'fixed', inset: 0, zIndex: 1000 }}
+        />
       )}
 
       {/* Clean Uncluttered Emoji Picker Bar */}
@@ -1280,9 +1349,56 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
           gap: '10px',
           boxShadow: '0 -4px 12px rgba(0,0,0,0.03)'
         }}>
-          <button onClick={() => fileInputRef.current?.click()} style={{ background: 'transparent', border: 'none', color: '#64748B', cursor: 'pointer' }}>
-            <Paperclip size={22} />
-          </button>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <button onClick={() => setShowAttachmentMenu(!showAttachmentMenu)} style={{ background: 'transparent', border: 'none', color: '#64748B', cursor: 'pointer' }}>
+              <Paperclip size={22} color={showAttachmentMenu ? '#0066FF' : '#64748B'} />
+            </button>
+            
+            {showAttachmentMenu && (
+              <div style={{
+                position: 'absolute',
+                bottom: '140%',
+                left: 0,
+                background: '#FFFFFF',
+                borderRadius: '16px',
+                padding: '10px',
+                boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                minWidth: '150px',
+                zIndex: 1001
+              }}>
+                <button 
+                  onClick={() => {
+                    fileInputRef.current?.click();
+                    setShowAttachmentMenu(false);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', padding: '10px', cursor: 'pointer', color: '#0F172A', fontWeight: 600, fontSize: '0.9rem', borderRadius: '8px' }}
+                >
+                  <div style={{ background: '#EFF6FF', padding: '8px', borderRadius: '50%' }}><Image size={18} color="#0066FF" /></div>
+                  Galerie
+                </button>
+                <button 
+                  onClick={() => {
+                    fileInputRef.current?.click(); // Normally this would have capture="environment" for camera
+                    setShowAttachmentMenu(false);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', padding: '10px', cursor: 'pointer', color: '#0F172A', fontWeight: 600, fontSize: '0.9rem', borderRadius: '8px' }}
+                >
+                  <div style={{ background: '#FEF2F2', padding: '8px', borderRadius: '50%' }}><Camera size={18} color="#EF4444" /></div>
+                  Appareil Photo
+                </button>
+                <button 
+                  onClick={() => setShowAttachmentMenu(false)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', padding: '10px', cursor: 'pointer', color: '#0F172A', fontWeight: 600, fontSize: '0.9rem', borderRadius: '8px' }}
+                >
+                  <div style={{ background: '#F5F3FF', padding: '8px', borderRadius: '50%' }}><FileText size={18} color="#8B5CF6" /></div>
+                  Document
+                </button>
+              </div>
+            )}
+          </div>
 
           <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} style={{ background: 'transparent', border: 'none', color: '#64748B', cursor: 'pointer' }}>
             <Smile size={22} color={showEmojiPicker ? '#0066FF' : '#64748B'} />

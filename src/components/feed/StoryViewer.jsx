@@ -406,7 +406,7 @@ export default function StoryViewer({
               </div>
               {viewersList.map(v => (
                 <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', padding: '10px', background: '#F8FAFC', borderRadius: '12px' }}>
-                  <img src={v.avatar} style={{ width: '35px', height: '35px', borderRadius: '50%' }} />
+                  <UserAvatar user={{ avatar: v.avatar, name: v.name }} size={35} />
                   <div><h4 style={{ margin: 0, fontSize: '0.85rem', color: '#000' }}>{v.name}</h4><span style={{ fontSize: '0.7rem', color: '#64748B' }}>{v.role}</span></div>
                 </div>
               ))}

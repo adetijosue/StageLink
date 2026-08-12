@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { X, FileText, Download, Share2, Music, Edit3, Check, MapPin, Upload, Trash2 } from 'lucide-react';
+import UserAvatar from '../common/UserAvatar';
 import { soundEngine } from '../../services/audioService';
 import Logo from '../common/Logo';
 
@@ -76,7 +77,7 @@ export default function MusicalCVModal({ isOpen, onClose, user, isOwnProfile = t
           {activeTab === 'interactive' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', background: isDarkMode ? '#1E293B' : '#F8FAFC', padding: '12px', borderRadius: '16px' }}>
-                  <img src={user.avatar} style={{ width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover' }} />
+                  <UserAvatar user={{ avatar: user.avatar, name: user.name }} size={50} />
                   <div>
                     <div style={{ fontSize: '0.95rem', fontWeight: 900 }}>{user.name}</div>
                     <div style={{ fontSize: '0.75rem', color: '#0066FF', fontWeight: 700 }}>{user.role}</div>

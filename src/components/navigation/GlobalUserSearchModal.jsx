@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, Search, User, MessageSquare, MapPin, Music, Check, Sparkles, ChevronRight, UserPlus, UserCheck } from 'lucide-react';
+import { X, Search, Check, Sparkles, MapPin, Music, ChevronRight, UserPlus, UserCheck } from 'lucide-react';
+import UserAvatar from '../common/UserAvatar';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
 
@@ -224,11 +225,7 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
               >
                 {/* Avatar with Verified Badge */}
                 <div style={{ position: 'relative' }}>
-                  <img
-                    src={usr.avatar || usr.userAvatar}
-                    alt={usr.name || usr.userName}
-                    style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover' }}
-                  />
+                  <UserAvatar user={{ avatar: usr.avatar || usr.userAvatar, name: usr.name || usr.userName }} size={48} />
                   {usr.verified && (
                     <span style={{
                       position: 'absolute',
