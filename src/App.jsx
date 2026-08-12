@@ -766,8 +766,8 @@ function MainApp() {
             .channel('realtime:notifications')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, async (payload) => {
               if (payload.new && payload.new.user_id === currentUser.id) {
-                if (payload.new.type === 'incoming_call') {
-                  const isAudioOnly = payload.new.reference_id === 'audio';
+                if (payload.new.type === 'incoming_call_audio' || payload.new.type === 'incoming_call_video') {
+                  const isAudioOnly = payload.new.type === 'incoming_call_audio';
                   const callerId = payload.new.actor_id;
                   try {
                     const { data: actor } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', callerId).maybeSingle();
@@ -1898,8 +1898,7 @@ function MainApp() {
                 const { data } = await supabase.from('notifications').insert({
                   user_id: selectedChat.participant.id,
                   actor_id: currentUser.id,
-                  type: 'incoming_call',
-                  reference_id: 'audio'
+                  type: 'incoming_call_audio'
                 }).select('id').single();
                 if (data) setActiveCallNotificationId(data.id);
               } catch(e) {}
@@ -1914,8 +1913,7 @@ function MainApp() {
                 const { data } = await supabase.from('notifications').insert({
                   user_id: selectedChat.participant.id,
                   actor_id: currentUser.id,
-                  type: 'incoming_call',
-                  reference_id: 'video'
+                  type: 'incoming_call_video'
                 }).select('id').single();
                 if (data) setActiveCallNotificationId(data.id);
               } catch(e) {}
