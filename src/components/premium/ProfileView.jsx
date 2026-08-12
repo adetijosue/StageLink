@@ -13,6 +13,7 @@ import ProfileQRCodeModal from '../profile/ProfileQRCodeModal';
 import MusicalCVModal from '../profile/MusicalCVModal';
 import AvatarCropModal from '../profile/AvatarCropModal';
 import UserAvatar from '../common/UserAvatar';
+import { getBrandLogoSVG } from '../common/SocialBrandLogo';
 
 export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMode, onSimulateIncomingCall }) {
   const { currentUser, logout, updateUserProfile } = useAuth();
