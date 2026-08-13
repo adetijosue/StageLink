@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Phone, Video, MoreVertical, Send, Paperclip, Smile, Mic, Play, Pause, ShieldCheck, CheckCheck, Trash2, Trash, Copy, X, PhoneCall, VideoOff, Reply, PhoneMissed, Eye, Forward, Image, FileText, Camera } from 'lucide-react';
+import { ArrowLeft, Phone, Video, MoreVertical, Send, Paperclip, Smile, Mic, Play, Pause, ShieldCheck, CheckCheck, Trash2, Trash, Copy, X, PhoneCall, VideoOff, Reply, PhoneMissed, Eye, Forward, Image, FileText, Camera, Download, Film, Music, Maximize2, FileAudio } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import TopBar from '../navigation/TopBar';
 import UserAvatar from '../common/UserAvatar';
@@ -22,6 +22,72 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
   const touchStartYRef = useRef(0);
   const isSwipingRef = useRef(false);
   const longPressTimerRef = useRef(null);
+
+  // Full-Screen Media Lightbox Preview & Download State
+  const [previewMedia, setPreviewMedia] = useState(null);
+  const imageInputRef = useRef(null);
+  const videoInputRef = useRef(null);
+  const audioInputRef = useRef(null);
+  const docInputRef = useRef(null);
+
+  const downloadMedia = (url, filename = 'media_stagelink') => {
+    if (!url) return;
+    try {
+      soundEngine.playPopSound();
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename || 'media_stagelink';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (e) {
+      console.error('Download error:', e);
+    }
+  };
+
+  const handleGenericFileAttach = (e, fileTypeCategory) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result;
+      if (fileTypeCategory === 'image' || file.type.startsWith('image/')) {
+        handleSendMessageWithQuote({
+          text: '',
+          mediaUrl: result,
+          isImage: true,
+          fileName: file.name
+        });
+      } else if (fileTypeCategory === 'video' || file.type.startsWith('video/')) {
+        handleSendMessageWithQuote({
+          text: '',
+          mediaUrl: result,
+          isVideo: true,
+          videoUrl: result,
+          fileName: file.name
+        });
+      } else if (fileTypeCategory === 'audio' || file.type.startsWith('audio/') || file.name.match(/\.(mp3|wav|ogg|m4a|flac)$/i)) {
+        handleSendMessageWithQuote({
+          text: file.name,
+          audioUrl: result,
+          isAudio: true,
+          audioTitle: file.name,
+          fileName: file.name
+        });
+      } else {
+        handleSendMessageWithQuote({
+          text: `📄 Document : ${file.name}`,
+          documentName: file.name,
+          fileUrl: result,
+          fileName: file.name
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
 
   // Recorded Audio Preview State (Hold to record -> Release to Preview & Listen before sending)
   const [audioPreviewData, setAudioPreviewData] = useState(null);
@@ -756,14 +822,76 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
                     </div>
                   )}
 
-                  {/* Photo / Media Attachment Display */}
-                  {msg.mediaUrl && (
-                    <div style={{ borderRadius: '12px', overflow: 'hidden', marginBottom: msg.text ? '8px' : 0, border: '1px solid rgba(255,255,255,0.2)' }}>
-                      <img
-                        src={msg.mediaUrl}
-                        alt="Photo partagée"
-                        style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '280px', objectFit: 'cover' }}
-                      />
+                  {/* Photo / Video Attachment Display */}
+                  {(msg.mediaUrl || msg.videoUrl) && (
+                    <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', marginBottom: msg.text ? '8px' : 0, border: '1px solid rgba(255,255,255,0.2)' }}>
+                      {msg.isVideo || msg.videoUrl || (msg.mediaUrl && (msg.mediaUrl.startsWith('data:video') || msg.mediaUrl.endsWith('.mp4'))) ? (
+                        <div style={{ position: 'relative' }}>
+                          <video
+                            src={msg.videoUrl || msg.mediaUrl}
+                            controls
+                            preload="metadata"
+                            style={{ width: '100%', maxHeight: '280px', display: 'block', borderRadius: '12px', background: '#000' }}
+                          />
+                          <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '6px', zIndex: 10 }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewMedia({
+                                  type: 'video',
+                                  url: msg.videoUrl || msg.mediaUrl,
+                                  name: msg.fileName || 'video_stagelink.mp4',
+                                  senderName: isCurrent ? 'Vous' : (chat?.participant?.name || 'Artiste')
+                                });
+                              }}
+                              title="Agrandir en grand format"
+                              style={{ background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backdropFilter: 'blur(4px)' }}
+                            >
+                              <Maximize2 size={16} />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                downloadMedia(msg.videoUrl || msg.mediaUrl, msg.fileName || 'video_stagelink.mp4');
+                              }}
+                              title="Enregistrer / Télécharger la vidéo"
+                              style={{ background: 'rgba(0,102,255,0.85)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backdropFilter: 'blur(4px)', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}
+                            >
+                              <Download size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewMedia({
+                              type: 'image',
+                              url: msg.mediaUrl,
+                              name: msg.fileName || 'photo_stagelink.jpg',
+                              senderName: isCurrent ? 'Vous' : (chat?.participant?.name || 'Artiste')
+                            });
+                          }}
+                          style={{ position: 'relative', cursor: 'pointer' }}
+                          title="Cliquer pour agrandir et télécharger"
+                        >
+                          <img
+                            src={msg.mediaUrl}
+                            alt="Photo partagée"
+                            style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '280px', objectFit: 'cover' }}
+                          />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadMedia(msg.mediaUrl, msg.fileName || 'photo_stagelink.jpg');
+                            }}
+                            title="Enregistrer dans la galerie / appareil"
+                            style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.65)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backdropFilter: 'blur(4px)', boxShadow: '0 2px 8px rgba(0,0,0,0.3)', zIndex: 5 }}
+                          >
+                            <Download size={16} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -812,6 +940,28 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
                           />
                         ))}
                       </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadMedia(msg.audioUrl || msg.mediaUrl, msg.audioTitle || msg.fileName || 'audio_stagelink.mp3');
+                        }}
+                        title="Enregistrer / Télécharger le fichier audio (MP3/WAV)"
+                        style={{
+                          background: isCurrent ? 'rgba(255,255,255,0.25)' : '#EFF6FF',
+                          color: isCurrent ? '#FFFFFF' : '#0066FF',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '32px',
+                          height: '32px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Download size={15} />
+                      </button>
 
                       <button
                         onClick={(e) => {
@@ -1503,6 +1653,170 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
         message="Ce message sera définitivement effacé de la conversation pour tous les participants."
         confirmText="Supprimer pour tous"
       />
+
+      {/* FULLSCREEN MEDIA LIGHTBOX & DOWNLOAD MODAL */}
+      {previewMedia && (
+        <div
+          onClick={() => setPreviewMedia(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 2000,
+            background: 'rgba(0, 0, 0, 0.94)',
+            backdropFilter: 'blur(16px)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            padding: 'calc(12px + env(safe-area-inset-top, 12px)) 16px calc(16px + env(safe-area-inset-bottom, 16px)) 16px',
+            animation: 'fadeIn 0.2s ease'
+          }}
+        >
+          {/* Header Bar */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              width: '100%',
+              paddingBottom: '12px',
+              borderBottom: '1px solid rgba(255,255,255,0.1)'
+            }}
+          >
+            <div>
+              <h4 style={{ color: '#FFFFFF', fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>
+                {previewMedia.name || 'Média StageLink'}
+              </h4>
+              <span style={{ color: '#94A3B8', fontSize: '0.76rem' }}>
+                Partagé par {previewMedia.senderName || 'Membre'}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                onClick={() => downloadMedia(previewMedia.url, previewMedia.name)}
+                style={{
+                  background: '#0066FF',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '20px',
+                  padding: '8px 16px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(0, 102, 255, 0.4)'
+                }}
+              >
+                <Download size={16} /> Enregistrer
+              </button>
+              <button
+                onClick={() => setPreviewMedia(null)}
+                style={{
+                  background: 'rgba(255,255,255,0.15)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '38px',
+                  height: '38px',
+                  color: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Main Media Preview Content */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px 0',
+              overflow: 'hidden'
+            }}
+          >
+            {previewMedia.type === 'image' && (
+              <img
+                src={previewMedia.url}
+                alt="Aperçu Grand Format"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '75vh',
+                  objectFit: 'contain',
+                  borderRadius: '16px',
+                  boxShadow: '0 12px 40px rgba(0,0,0,0.6)'
+                }}
+              />
+            )}
+            {previewMedia.type === 'video' && (
+              <video
+                src={previewMedia.url}
+                controls
+                autoPlay
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '75vh',
+                  borderRadius: '16px',
+                  boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
+                  background: '#000'
+                }}
+              />
+            )}
+            {previewMedia.type === 'audio' && (
+              <div style={{ background: '#1E293B', padding: '24px', borderRadius: '24px', width: '100%', maxWidth: '400px', textAlign: 'center', color: '#FFF' }}>
+                <FileAudio size={48} color="#0066FF" style={{ marginBottom: '12px' }} />
+                <h4 style={{ margin: '0 0 16px 0', fontSize: '1.1rem' }}>{previewMedia.name}</h4>
+                <audio src={previewMedia.url} controls autoPlay style={{ width: '100%' }} />
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Action Footer */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingTop: '12px',
+              borderTop: '1px solid rgba(255,255,255,0.1)'
+            }}
+          >
+            <button
+              onClick={() => downloadMedia(previewMedia.url, previewMedia.name)}
+              style={{
+                width: '100%',
+                maxWidth: '360px',
+                background: 'linear-gradient(135deg, #0066FF, #0047FF)',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '24px',
+                padding: '14px 20px',
+                fontSize: '0.92rem',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                boxShadow: '0 6px 20px rgba(0, 102, 255, 0.4)'
+              }}
+            >
+              <Download size={18} /> Télécharger dans la Galerie / Explorateur
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
