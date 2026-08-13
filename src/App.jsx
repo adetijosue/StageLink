@@ -38,6 +38,59 @@ import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 const INITIAL_COMMUNITY_USERS = [];
 import { generateUUID } from './utils/uuid';
 
+// Helper to convert Data URL to File for Supabase Storage Upload
+const dataURLtoFile = (dataurl, filename = 'media_upload') => {
+  try {
+    const arr = dataurl.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    const ext = mime.split('/')[1] || 'png';
+    return new File([u8arr], `${filename}.${ext}`, { type: mime });
+  } catch (e) {
+    return null;
+  }
+};
+
+const uploadChatMediaToSupabase = async (dataUrl, fileName) => {
+  if (!dataUrl || !isSupabaseConfigured()) return dataUrl;
+  if (!dataUrl.startsWith('data:')) return dataUrl; // Already an HTTP URL
+
+  try {
+    const file = dataURLtoFile(dataUrl, fileName || `media_${Date.now()}`);
+    if (!file) return dataUrl;
+
+    const fileExt = (file.name && file.name.includes('.')) ? file.name.split('.').pop() : 'png';
+    const filePath = `chat_uploads/${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+
+    let bucketName = 'chat_media';
+    let { error: uploadErr } = await supabase.storage.from(bucketName).upload(filePath, file, { upsert: true });
+
+    if (uploadErr) {
+      bucketName = 'media';
+      const { error: err2 } = await supabase.storage.from(bucketName).upload(filePath, file, { upsert: true });
+      if (err2) {
+        bucketName = 'public';
+        await supabase.storage.from(bucketName).upload(filePath, file, { upsert: true });
+      }
+    }
+
+    const { data: publicUrlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
+    if (publicUrlData && publicUrlData.publicUrl) {
+      return publicUrlData.publicUrl;
+    }
+  } catch (e) {
+    console.warn('Storage upload fallback note:', e?.message || e);
+  }
+  return dataUrl;
+};
+
+
 function MainApp() {
   const { isAuthenticated, currentUser, updateUserProfile } = useAuth();
   const { t } = useLanguage();
@@ -771,9 +824,15 @@ function MainApp() {
                     mediaUrl: msg.media_url || null,
                     audioUrl: msg.audio_url || msg.audio_note_url || null,
                     isAudio: msg.metadata?.isAudio || Boolean(msg.audio_url || msg.audio_note_url),
+                    isVideo: msg.metadata?.isVideo || Boolean(msg.metadata?.videoUrl),
+                    videoUrl: msg.metadata?.videoUrl || msg.media_url || null,
+                    fileName: msg.metadata?.fileName || null,
                     audioDuration: msg.metadata?.audioDuration || null,
                     quotedMessage: msg.metadata?.quotedMessage || null,
                     documentName: msg.metadata?.documentName || null,
+                    isCallNotice: msg.metadata?.isCallNotice || Boolean(msg.content && (msg.content.includes('Appel') || msg.content.includes('📞') || msg.content.includes('📹'))),
+                    callStatus: msg.metadata?.callStatus || null,
+                    isAudioOnly: msg.metadata?.isAudioOnly || false,
                     timestamp: new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                     createdAtTimestamp: new Date(msg.created_at).getTime(),
                     isRead: true
@@ -809,13 +868,37 @@ function MainApp() {
                 }
                 
                 setChats(prevChats => {
-                  const existingEmptyChats = prevChats.filter(c => !c.messages || c.messages.length === 0);
                   const merged = [...reconstructedChats];
-                  existingEmptyChats.forEach(ec => {
-                    if (!merged.find(mc => mc.id === ec.id)) {
-                      merged.unshift(ec); // Keep them at the top
+                  
+                  prevChats.forEach(pc => {
+                    const existingIndex = merged.findIndex(mc => mc.id === pc.id);
+                    if (existingIndex === -1) {
+                      merged.push(pc);
+                    } else {
+                      const targetChat = merged[existingIndex];
+                      const localMsgs = pc.messages || [];
+                      const remoteMsgs = targetChat.messages || [];
+                      const combined = [...remoteMsgs];
+
+                      localMsgs.forEach(lm => {
+                        const remoteMatch = combined.find(rm => rm.id === lm.id);
+                        if (!remoteMatch) {
+                          combined.push(lm);
+                        } else {
+                          // Preserve local media URLs if remote ones are null
+                          if (!remoteMatch.mediaUrl && lm.mediaUrl) remoteMatch.mediaUrl = lm.mediaUrl;
+                          if (!remoteMatch.videoUrl && lm.videoUrl) remoteMatch.videoUrl = lm.videoUrl;
+                          if (!remoteMatch.audioUrl && lm.audioUrl) remoteMatch.audioUrl = lm.audioUrl;
+                          if (!remoteMatch.isVideo && lm.isVideo) remoteMatch.isVideo = lm.isVideo;
+                          if (!remoteMatch.fileName && lm.fileName) remoteMatch.fileName = lm.fileName;
+                        }
+                      });
+
+                      combined.sort((a, b) => (a.createdAtTimestamp || 0) - (b.createdAtTimestamp || 0));
+                      targetChat.messages = combined;
                     }
                   });
+
                   setStoredItem(STORAGE_KEYS.CHATS, merged);
                   return merged;
                 });
