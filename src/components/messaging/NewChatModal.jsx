@@ -1,18 +1,63 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Search, Check, MapPin, Music, MessageSquare } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 import Logo from '../common/Logo';
 import { useAuth } from '../../context/AuthContext';
+import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 
 export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onSelectUser, existingUsers, users }) {
   const { currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('All');
+  const [remoteUsers, setRemoteUsers] = useState([]);
+
+  useEffect(() => {
+    if (!isOpen || !isSupabaseConfigured() || !searchQuery.trim()) {
+      setRemoteUsers([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const q = searchQuery.trim();
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .or(`full_name.ilike.%${q}%,role.ilike.%${q}%,location.ilike.%${q}%`)
+          .limit(30);
+
+        if (data && !error) {
+          const mapped = data.map(p => ({
+            id: p.id,
+            name: p.full_name || 'Artiste StageLink',
+            userName: p.full_name || 'Artiste StageLink',
+            role: p.role || 'Artiste',
+            userRole: p.role || 'Artiste',
+            avatar: p.avatar_url || '',
+            userAvatar: p.avatar_url || '',
+            verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+            location: p.location || ''
+          }));
+          setRemoteUsers(mapped);
+        }
+      } catch (e) {
+        console.warn('Live chat user search note:', e?.message || e);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, isOpen]);
 
   if (!isOpen) return null;
 
   const rawUsers = users || existingUsers || [];
   const safeUsers = Array.isArray(rawUsers) ? rawUsers : [];
+  const combinedUsers = [...safeUsers];
+  remoteUsers.forEach(ru => {
+    if (!combinedUsers.some(u => u.id === ru.id)) {
+      combinedUsers.push(ru);
+    }
+  });
 
   const handleSelectUser = (user) => {
     const fn = onSelectUser || onStartChatWithUser;
@@ -21,25 +66,25 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
   };
 
   // Search & Role filtering logic
-  const filteredUsers = safeUsers.filter((user) => {
+  const filteredUsers = combinedUsers.filter((user) => {
     if (!user) return false;
 
     // Exclude current logged-in user from new chat contact list
     if (currentUser) {
       if (user.id && currentUser.id && user.id === currentUser.id) return false;
-      if (user.email && currentUser.email && user.email.toLowerCase() === currentUser.email.toLowerCase()) return false;
+      if (user.email && currentUser.email && String(user.email).toLowerCase() === String(currentUser.email).toLowerCase()) return false;
     }
 
-    const name = user.name || user.userName || '';
-    const role = user.role || user.userRole || '';
-    const location = user.location || '';
+    const name = String(user.name || user.userName || '');
+    const role = String(user.role || user.userRole || '');
+    const location = String(user.location || '');
 
     const matchesQuery =
       name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       role.toLowerCase().includes(searchQuery.toLowerCase()) ||
       location.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesRole = filterRole === 'All' || role.includes(filterRole);
+    const matchesRole = filterRole === 'All' || String(role).includes(String(filterRole));
 
     return matchesQuery && matchesRole;
   });

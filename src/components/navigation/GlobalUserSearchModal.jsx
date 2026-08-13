@@ -1,38 +1,87 @@
-import React, { useState } from 'react';
-import { X, Search, Check, Sparkles, MapPin, Music, ChevronRight, UserPlus, UserCheck, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Search, Check, Sparkles, MapPin, Music, ChevronRight, UserPlus, UserCheck, User, MessageSquare } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
+import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 
 export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPublicProfile, onStartChat, onConnectUser, isDarkMode }) {
   const { currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('All');
   const [followedUsers, setFollowedUsers] = useState({});
+  const [remoteUsers, setRemoteUsers] = useState([]);
+  const [isSearchingRemote, setIsSearchingRemote] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !isSupabaseConfigured() || !searchQuery.trim()) {
+      setRemoteUsers([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingRemote(true);
+      try {
+        const q = searchQuery.trim();
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .or(`full_name.ilike.%${q}%,role.ilike.%${q}%,location.ilike.%${q}%`)
+          .limit(30);
+
+        if (data && !error) {
+          const mapped = data.map(p => ({
+            id: p.id,
+            name: p.full_name || 'Artiste StageLink',
+            userName: p.full_name || 'Artiste StageLink',
+            role: p.role || 'Artiste',
+            userRole: p.role || 'Artiste',
+            avatar: p.avatar_url || '',
+            userAvatar: p.avatar_url || '',
+            verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+            location: p.location || ''
+          }));
+          setRemoteUsers(mapped);
+        }
+      } catch (e) {
+        console.warn('Live profile search note:', e?.message || e);
+      } finally {
+        setIsSearchingRemote(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, isOpen]);
 
   if (!isOpen) return null;
 
-  const safeUsers = Array.isArray(users) ? users : [];
+  const safeLocalUsers = Array.isArray(users) ? users : [];
+  const combinedUsers = [...safeLocalUsers];
+  remoteUsers.forEach(ru => {
+    if (!combinedUsers.some(u => u.id === ru.id)) {
+      combinedUsers.push(ru);
+    }
+  });
 
-  const filteredUsers = safeUsers.filter((u) => {
+  const filteredUsers = combinedUsers.filter((u) => {
     if (!u) return false;
 
     // Exclude current logged-in user from member search results
     if (currentUser) {
       if (u.id && currentUser.id && u.id === currentUser.id) return false;
-      if (u.email && currentUser.email && u.email.toLowerCase() === currentUser.email.toLowerCase()) return false;
+      if (u.email && currentUser.email && String(u.email).toLowerCase() === String(currentUser.email).toLowerCase()) return false;
     }
 
-    const name = u.name || u.userName || '';
-    const role = u.role || u.userRole || '';
-    const location = u.location || '';
+    const name = String(u.name || u.userName || '');
+    const role = String(u.role || u.userRole || '');
+    const location = String(u.location || '');
 
     const matchesQuery =
       name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       role.toLowerCase().includes(searchQuery.toLowerCase()) ||
       location.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesRole = filterRole === 'All' || role.toLowerCase().includes(filterRole.toLowerCase());
+    const matchesRole = filterRole === 'All' || String(role).toLowerCase().includes(String(filterRole).toLowerCase());
 
     return matchesQuery && matchesRole;
   });

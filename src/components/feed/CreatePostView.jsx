@@ -140,7 +140,7 @@ export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
     soundEngine.playPopSound();
     try {
       confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
-    } catch (e) {}
+    } catch (e) { console.error("Suppressed error", e); }
 
     onSubmitPost({
       text: postText,

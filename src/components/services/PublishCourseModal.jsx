@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, GraduationCap, DollarSign, BookOpen } from 'lucide-react';
+import { X, GraduationCap } from 'lucide-react';
 
 export default function PublishCourseModal({ isOpen, onClose, onCourseCreated }) {
   const [title, setTitle] = useState('');

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingBag, GraduationCap, Calendar, Play, Pause, DollarSign, Plus, Ticket, Crown, ShieldCheck, Zap, Sparkles, Check, TrendingUp, Sliders, Headphones, Layers, Award, ArrowRight } from 'lucide-react';
+import { ShoppingBag, GraduationCap, Calendar, Play, Pause, DollarSign, Plus, Crown, Sparkles, TrendingUp, Sliders } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
 import SellWorkModal from '../services/SellWorkModal';

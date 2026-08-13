@@ -108,7 +108,16 @@ function MainApp() {
   const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
 
   // Persistent Data States
+
   const [posts, setPosts] = useState([]);
+  const [appDataError, setAppDataError] = useState(null);
+  
+  // Prevent stale closures in real-time listeners
+  const selectedChatRef = useRef(selectedChat);
+  useEffect(() => {
+    selectedChatRef.current = selectedChat;
+  }, [selectedChat]);
+
   const [stories, setStories] = useState([]);
   const [matches, setMatches] = useState([]);
   const [chats, setChats] = useState([]);
@@ -218,10 +227,14 @@ function MainApp() {
 
       const loadInitialData = async () => {
         // Check cache version to force clean old formats
-        const CACHE_VERSION = 'v2'; // Bumped to force reset due to schema mismatches
+        const CACHE_VERSION = 'v4'; // Bumped to force complete reset for new users
         const storedVersion = localStorage.getItem('stagelink_cache_version');
         if (storedVersion !== CACHE_VERSION) {
           localStorage.removeItem(STORAGE_KEYS.CHATS);
+          localStorage.removeItem(STORAGE_KEYS.POSTS);
+          localStorage.removeItem(STORAGE_KEYS.STORIES);
+          localStorage.removeItem(STORAGE_KEYS.USERS);
+          localStorage.removeItem(STORAGE_KEYS.MATCHES);
           localStorage.setItem('stagelink_cache_version', CACHE_VERSION);
         }
 
@@ -234,7 +247,7 @@ function MainApp() {
         if (isSupabaseConfigured()) {
           try {
             // Fetch live profiles from Supabase
-            const { data: supaProfiles, error: supaProfilesErr } = await supabase.from('profiles').select('*');
+            const { data: supaProfiles, error: supaProfilesErr } = await supabase.from('profiles').select('*').limit(100);
             if (supaProfilesErr) {
               console.warn('Supabase live profiles fetch returned error:', supaProfilesErr.message);
             } else {
@@ -331,7 +344,7 @@ function MainApp() {
             if (supaMatches && supaMatches.length > 0) {
               loadedMatches = supaMatches;
             } else if (loadedUsers && loadedUsers.length > 0) {
-              const otherUsers = loadedUsers.filter(u => u.id !== currentUser.id && u.email !== currentUser.email);
+              const otherUsers = loadedUsers.filter(u => u.id !== currentUser?.id && u.email !== currentUser?.email);
               loadedMatches = otherUsers.map(u => ({
                 id: `match_${u.id}`,
                 userId: u.id,
@@ -459,11 +472,11 @@ function MainApp() {
             );
             if (target) setPublicProfileUser(target);
           }
-        } catch (e) {}
+        } catch (e) { console.error("Suppressed error:", e); }
 
         // Handle One-Time Welcome Onboarding & Welcome Chat for New Registrations
         const alreadyShown = localStorage.getItem(welcomeSeenKey);
-        if (currentUser.isNewRegistration && !alreadyShown) {
+        if (currentUser?.isNewRegistration && !alreadyShown) {
           localStorage.setItem(welcomeSeenKey, 'true');
           updateUserProfile({ isNewRegistration: false });
 
@@ -510,7 +523,7 @@ function MainApp() {
         if (!isSupabaseConfigured()) return;
         try {
           // Sync Live Profiles
-          const { data: supaProfiles } = await supabase.from('profiles').select('*');
+          const { data: supaProfiles } = await supabase.from('profiles').select('*').limit(100);
           if (supaProfiles && supaProfiles.length > 0) {
             const mappedSupa = supaProfiles.map(p => ({
               id: p.id,
@@ -603,7 +616,7 @@ function MainApp() {
             }));
             setStories(freshStories);
           }
-        } catch (e) {}
+        } catch (e) { console.error("Suppressed error:", e); }
       };
 
       const syncNotifications = async () => {
@@ -655,7 +668,7 @@ function MainApp() {
                   if (m.receiver_id !== currentUser.id) partnerIds.add(m.receiver_id);
                 });
 
-                const { data: profiles } = await supabase.from('profiles').select('*').in('id', Array.from(partnerIds));
+                const { data: profiles } = await supabase.from('profiles').select('*').limit(100).in('id', Array.from(partnerIds));
                 const profilesMap = {};
                 if (profiles) {
                   profiles.forEach(p => {
@@ -750,7 +763,7 @@ function MainApp() {
                   return prev;
                 });
               }
-            } catch(e) {}
+            } catch (e) { console.error("Suppressed error:", e); }
           };
           syncMessagesFallback = syncMessages;
           
@@ -794,7 +807,7 @@ function MainApp() {
                       callerId
                     });
                     setIsVideoCallActive(true);
-                  } catch(e) {}
+                  } catch (e) { console.error("Suppressed error:", e); }
                   return; // Do not push native notification or regular sync for calls
                 }
 
@@ -809,7 +822,7 @@ function MainApp() {
                   else body = `Nouvelle notification de ${actorName}.`;
                   
                   sendNativeNotification('StageLink', body);
-                } catch(e) {}
+                } catch (e) { console.error("Suppressed error:", e); }
               }
               syncNotifications();
             })
@@ -834,7 +847,7 @@ function MainApp() {
               if (msgRecord.metadata?.deleted_for?.includes(currentUser.id)) return;
 
               const senderId = msgRecord.sender_id;
-              const { data: senderProfile } = await supabase.from('profiles').select('*').eq('id', senderId).single();
+              const { data: senderProfile } = await supabase.from('profiles').select('*').limit(100).eq('id', senderId).single();
 
               const formattedMsg = {
                 id: msgRecord.id,
@@ -858,7 +871,7 @@ function MainApp() {
               setChats(prevChats => {
                 let shouldToast = true;
                 
-                if (selectedChat && selectedChat.participant.id === senderId) {
+                if (selectedChatRef.current && selectedChatRef.current.participant.id === senderId) {
                   shouldToast = false;
                 }
 
@@ -945,7 +958,7 @@ function MainApp() {
       try {
         await supabase.from('notifications').update({ is_read: true }).eq('user_id', currentUser.id).eq('is_read', false);
         setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      } catch (e) {}
+      } catch (e) { console.error("Suppressed error:", e); }
     }
   };
 
@@ -1595,7 +1608,7 @@ function MainApp() {
     if (activeCallNotificationId && isSupabaseConfigured()) {
       try {
         await supabase.from('notifications').delete().eq('id', activeCallNotificationId);
-      } catch(e) {}
+      } catch (e) { console.error("Suppressed error:", e); }
       setActiveCallNotificationId(null);
     }
     setIncomingCallData(null);
@@ -1702,6 +1715,20 @@ function MainApp() {
   const handleUpgradeSuccess = () => {
     updateUserProfile({ verified: true, badgeType: 'gold' });
   };
+
+
+  if (appDataError) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: '#fff', background: '#0f172a', height: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+        <h1 style={{ color: '#ef4444', marginBottom: '16px' }}>Erreur de Synchronisation</h1>
+        <p style={{ color: '#94A3B8', maxWidth: '400px', lineHeight: '1.6' }}>{appDataError}</p>
+        <p style={{ color: '#64748B', fontSize: '0.85rem', marginTop: '10px' }}>Veuillez v&eacute;rifier votre connexion ou rafra&icirc;chir l'application.</p>
+        <button onClick={() => window.location.reload()} style={{ padding: '12px 24px', background: '#0066FF', color: '#fff', border: 'none', borderRadius: '12px', marginTop: '30px', cursor: 'pointer', fontWeight: 'bold' }}>
+          Rafra&icirc;chir l'application
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -1935,7 +1962,7 @@ function MainApp() {
                   type: 'incoming_call_audio'
                 }).select('id').single();
                 if (data) setActiveCallNotificationId(data.id);
-              } catch(e) {}
+              } catch (e) { console.error("Suppressed error:", e); }
             }
           }}
           onStartVideoCall={async () => {
@@ -1950,7 +1977,7 @@ function MainApp() {
                   type: 'incoming_call_video'
                 }).select('id').single();
                 if (data) setActiveCallNotificationId(data.id);
-              } catch(e) {}
+              } catch (e) { console.error("Suppressed error:", e); }
             }
           }}
           onOpenEphemeralModal={() => setIsEphemeralOpen(true)}
@@ -2042,7 +2069,7 @@ function MainApp() {
       <EphemeralModal
         isOpen={isEphemeralOpen}
         onClose={() => setIsEphemeralOpen(false)}
-        participantName={selectedChat ? selectedChat.participant.name.split(' ')[0] : 'Sarah'}
+        participantName={selectedChat?.participant?.name ? selectedChat.participant.name.split(' ')[0] : 'Artiste'}
       />
 
       {/* Live Video / Audio Call Screen */}
@@ -2115,14 +2142,14 @@ export default function App() {
       } else if (window.performance && window.performance.navigation) {
         isExplicitReload = window.performance.navigation.type === 1;
       }
-    } catch (e) {}
+    } catch (e) { console.error("Suppressed error:", e); }
 
     let lastActiveTime = 0;
     let hasSeenSession = false;
     try {
       hasSeenSession = sessionStorage.getItem('hasSeenSplashSession');
       lastActiveTime = parseInt(localStorage.getItem('stagelink_last_active') || '0', 10);
-    } catch (e) {}
+    } catch (e) { console.error("Suppressed error:", e); }
 
     const now = Date.now();
     const isRecentBackgroundResume = lastActiveTime > 0 && (now - lastActiveTime) < (12 * 60 * 60 * 1000);
@@ -2146,7 +2173,7 @@ export default function App() {
       try {
         localStorage.setItem('stagelink_last_active', Date.now().toString());
         sessionStorage.setItem('hasSeenSplashSession', 'true');
-      } catch (e) {}
+      } catch (e) { console.error("Suppressed error:", e); }
     };
 
     updateActiveTime();
@@ -2173,7 +2200,7 @@ export default function App() {
     try {
       sessionStorage.setItem('hasSeenSplashSession', 'true');
       localStorage.setItem('stagelink_last_active', Date.now().toString());
-    } catch (e) {}
+    } catch (e) { console.error("Suppressed error:", e); }
     setShowSplash(false);
   };
 

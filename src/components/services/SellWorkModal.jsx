@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, DollarSign, Music, Upload, Check, ShieldCheck, Disc, FileAudio } from 'lucide-react';
+import { X, DollarSign, FileAudio } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 
 export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMode }) {

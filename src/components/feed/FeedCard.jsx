@@ -70,7 +70,7 @@ export default function FeedCard({ post, onLike, onFollowUser, onAddComment, onD
         spread: 60,
         origin: { y: 0.65 }
       });
-    } catch (err) {}
+    } catch (err) { console.error("Suppressed error", err); }
 
     setTimeout(() => {
       setShowDoubleTapHeart(false);

@@ -8,7 +8,7 @@ import ProfileQRCodeModal from './ProfileQRCodeModal';
 import MusicalCVModal from './MusicalCVModal';
 import SocialBrandLogo from '../common/SocialBrandLogo';
 
-export default function PublicProfileModal({ isOpen, onClose, user, onStartChat, onFollowUser }) {
+export default function PublicProfileModal({ isOpen, onClose, user, onStartChat, onConnectUser }) {
   const { currentUser } = useAuth();
   const [isFollowing, setIsFollowing] = useState(false);
   const [playingTrackId, setPlayingTrackId] = useState(null);
@@ -25,7 +25,7 @@ export default function PublicProfileModal({ isOpen, onClose, user, onStartChat,
     if (!isFollowing) {
       confetti({ particleCount: 40, spread: 60, origin: { y: 0.6 } });
       setIsFollowing(true);
-      if (onFollowUser) onFollowUser(user);
+      if (onConnectUser) onConnectUser(user.id);
     } else {
       setIsFollowing(false);
     }

@@ -21,7 +21,7 @@ export default function PaywallModal({ isOpen, onClose, onUpgradeSuccess }) {
           spread: 80,
           origin: { y: 0.5 }
         });
-      } catch (e) {}
+      } catch (e) { console.error("Suppressed error", e); }
       if (onUpgradeSuccess) onUpgradeSuccess();
       onClose();
     }, 1200);

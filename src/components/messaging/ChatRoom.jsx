@@ -121,7 +121,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
   const handleSelectMessageToQuote = (msg) => {
     try {
       if (navigator.vibrate) navigator.vibrate(25);
-    } catch (err) {}
+    } catch (err) { console.error("Suppressed error", err); }
     soundEngine.playPopSound();
     setReplyingToMessage(msg);
   };
@@ -135,7 +135,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
       setHighlightedMsgId(targetMsgId);
       try {
         if (navigator.vibrate) navigator.vibrate(25);
-      } catch (e) {}
+      } catch (e) { console.error("Suppressed error", e); }
       soundEngine.playPopSound();
       setTimeout(() => {
         setHighlightedMsgId(null);
@@ -154,7 +154,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
         text: textVal,
         quotedMessage: {
           id: replyingToMessage.id,
-          senderName: replyingToMessage.sender === 'current' ? 'Vous' : chat.participant.name,
+          senderName: replyingToMessage.sender === 'current' ? 'Vous' : (chat?.participant?.name || 'Artiste'),
           text: replyingToMessage.text,
           mediaUrl: replyingToMessage.mediaUrl,
           isAudio: replyingToMessage.isAudio,
@@ -176,7 +176,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
     e.preventDefault();
     try {
       if (navigator.vibrate) navigator.vibrate(35);
-    } catch (err) {}
+    } catch (err) { console.error("Suppressed error", err); }
     soundEngine.playPopSound();
     setAudioPreviewData(null);
     setIsPlayingAudioPreview(false);
@@ -230,7 +230,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
     soundEngine.playPopSound();
     try {
       if (navigator.vibrate) navigator.vibrate(20);
-    } catch (err) {}
+    } catch (err) { console.error("Suppressed error", err); }
 
     clearInterval(recordingTimerRef.current);
     setIsRecordingAudio(false);
@@ -312,7 +312,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
       if (navigator.vibrate) {
         navigator.vibrate(40);
       }
-    } catch (e) {}
+    } catch (e) { console.error("Suppressed error", e); }
     soundEngine.playPopSound();
     setSelectedMessageForAction(msg);
   };
@@ -347,7 +347,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
   const handleAddReaction = (msgId, emoji) => {
     try {
       if (navigator.vibrate) navigator.vibrate(25);
-    } catch (e) {}
+    } catch (e) { console.error("Suppressed error", e); }
     soundEngine.playPopSound();
     setReactions({
       ...reactions,
@@ -465,14 +465,14 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
             style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
           >
             <div style={{ position: 'relative' }}>
-              <UserAvatar user={{ avatar: chat.participant.avatar, name: chat.participant.name }} size={42} />
+              <UserAvatar user={{ avatar: chat?.participant?.avatar, name: chat?.participant?.name || 'Artiste' }} size={42} />
               {chat.participant.online && (
                 <span style={{ position: 'absolute', bottom: 0, right: 0, width: '12px', height: '12px', borderRadius: '50%', background: '#10B981', border: '2px solid #FFF' }} />
               )}
             </div>
 
             <div>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>{chat.participant.name}</h3>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>{chat?.participant?.name || 'Artiste'}</h3>
               <span style={{ fontSize: '0.75rem', color: isPartnerTyping ? '#0066FF' : '#64748B', fontWeight: isPartnerTyping ? 700 : 400 }}>
                 {typingStatusText}
               </span>
@@ -1203,7 +1203,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
         }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0066FF', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Reply size={14} /> En réponse à {replyingToMessage.sender === 'current' ? 'Vous-même' : chat.participant.name}
+              <Reply size={14} /> En réponse à {replyingToMessage.sender === 'current' ? 'Vous-même' : (chat?.participant?.name || 'Artiste')}
             </div>
             <div style={{ fontSize: '0.78rem', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {replyingToMessage.isAudio ? `🎙️ Message vocal` : replyingToMessage.text || 'Pièce jointe'}
@@ -1413,7 +1413,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
 
           <input
             type="text"
-            placeholder={replyingToMessage ? `Répondre à ${replyingToMessage.sender === 'current' ? 'votre message' : chat.participant.name.split(' ')[0]}...` : "Écrire un message..."}
+            placeholder={replyingToMessage ? `Répondre à ${replyingToMessage.sender === 'current' ? 'votre message' : (chat?.participant?.name || 'Artiste').split(' ')[0]}...` : "Écrire un message..."}
             value={inputText}
             onChange={handleInputChange}
             onKeyDown={(e) => {

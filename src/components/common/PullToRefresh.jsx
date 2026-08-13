@@ -40,7 +40,7 @@ export default function PullToRefresh({ children, onRefresh, isDarkMode }) {
         soundEngine.playPopSound();
         try {
           if (navigator.vibrate) navigator.vibrate(25);
-        } catch (err) {}
+        } catch (err) { console.error("Suppressed error", err); }
       }
     }
   };
