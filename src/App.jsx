@@ -911,48 +911,100 @@ function MainApp() {
                 mediaUrl: msgRecord.media_url || null,
                 audioUrl: msgRecord.audio_url || msgRecord.audio_note_url || null,
                 isAudio: msgRecord.metadata?.isAudio || Boolean(msgRecord.audio_url || msgRecord.audio_note_url),
+                isVideo: msgRecord.metadata?.isVideo || Boolean(msgRecord.metadata?.videoUrl),
+                videoUrl: msgRecord.metadata?.videoUrl || msgRecord.media_url,
+                fileName: msgRecord.metadata?.fileName || null,
                 audioDuration: msgRecord.metadata?.audioDuration || null,
                 quotedMessage: msgRecord.metadata?.quotedMessage || null,
                 documentName: msgRecord.metadata?.documentName || null,
+                isCallNotice: msgRecord.metadata?.isCallNotice || Boolean(msgRecord.content && (msgRecord.content.includes('Appel') || msgRecord.content.includes('📞') || msgRecord.content.includes('📹'))),
+                callStatus: msgRecord.metadata?.callStatus || null,
+                isAudioOnly: msgRecord.metadata?.isAudioOnly || false,
                 timestamp: new Date(msgRecord.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                 createdAtTimestamp: new Date(msgRecord.created_at).getTime(),
                 isRead: false
               };
 
-              soundEngine.playMessageReceivedSound();
-              
-              // Show Toast Notification if we are not actively in this chat
-              setChats(prevChats => {
-                let shouldToast = true;
-                
-                if (selectedChatRef.current && selectedChatRef.current.participant.id === senderId) {
-                  shouldToast = false;
-                }
+              // Smart check: Is recipient ALREADY in this specific chat room?
+              const activeChat = selectedChatRef.current;
+              const isInCurrentChat = activeChat && (
+                activeChat.participant?.id === senderId || 
+                activeChat.id === `chat_${senderId}`
+              );
 
-                if (shouldToast) {
-                  setToastNotification({
-                    title: senderProfile?.full_name || 'Nouveau message',
-                    message: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Message audio' : '📷 Média'),
-                    avatar: senderProfile?.avatar_url
+              if (isInCurrentChat) {
+                // User is ALREADY in the chat!
+                // 1. Instantly mark message as read in database
+                try {
+                  supabase.from('messages').update({ is_read: true }).eq('id', msgRecord.id);
+                } catch (e) {}
+
+                // 2. Play subtle pop sound instead of notification alarm
+                soundEngine.playPopSound();
+
+                // 3. Append message directly to active discussion without showing Toast Notification
+                formattedMsg.isRead = true;
+
+                setChats(prevChats => {
+                  const chatId = `chat_${senderId}`;
+                  return prevChats.map(c => {
+                    if (c.id === chatId) {
+                      const msgs = c.messages || [];
+                      if (!msgs.some(m => m.id === formattedMsg.id)) {
+                        return {
+                          ...c,
+                          messages: [...msgs, formattedMsg],
+                          lastMessage: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Audio' : '📷 Média'),
+                          lastMessageTime: formattedMsg.timestamp,
+                          unreadCount: 0
+                        };
+                      }
+                    }
+                    return c;
                   });
-                  setTimeout(() => setToastNotification(null), 4000);
-                }
-                
-                // Add message to chat list
-                const chatId = `chat_${senderId}`;
-                const chatExists = prevChats.find(c => c.id === chatId);
-                
-                if (chatExists) {
-                  return prevChats.map(c => c.id === chatId ? { ...c, messages: [...c.messages, formattedMsg] } : c);
-                } else {
-                  return [{
-                    id: chatId,
-                    participant: { id: senderId, name: senderProfile?.full_name || 'Utilisateur', avatar: senderProfile?.avatar_url },
-                    messages: [formattedMsg],
-                    unreadCount: 1
-                  }, ...prevChats];
-                }
-              });
+                });
+
+                setSelectedChat(prev => {
+                  if (prev && (prev.participant?.id === senderId || prev.id === `chat_${senderId}`)) {
+                    const msgs = prev.messages || [];
+                    if (!msgs.some(m => m.id === formattedMsg.id)) {
+                      return {
+                        ...prev,
+                        messages: [...msgs, formattedMsg],
+                        lastMessage: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Audio' : '📷 Média'),
+                        lastMessageTime: formattedMsg.timestamp,
+                        unreadCount: 0
+                      };
+                    }
+                  }
+                  return prev;
+                });
+              } else {
+                // User is NOT in this chat! Play notification sound & show Toast banner
+                soundEngine.playMessageReceivedSound();
+                setToastNotification({
+                  title: senderProfile?.full_name || 'Nouveau message',
+                  message: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Message audio' : '📷 Média'),
+                  avatar: senderProfile?.avatar_url
+                });
+                setTimeout(() => setToastNotification(null), 4000);
+
+                setChats(prevChats => {
+                  const chatId = `chat_${senderId}`;
+                  const chatExists = prevChats.find(c => c.id === chatId);
+                  
+                  if (chatExists) {
+                    return prevChats.map(c => c.id === chatId ? { ...c, unreadCount: (c.unreadCount || 0) + 1, messages: [...c.messages, formattedMsg] } : c);
+                  } else {
+                    return [{
+                      id: chatId,
+                      participant: { id: senderId, name: senderProfile?.full_name || 'Utilisateur', avatar: senderProfile?.avatar_url },
+                      messages: [formattedMsg],
+                      unreadCount: 1
+                    }, ...prevChats];
+                  }
+                });
+              }
             })
             .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, async (payload) => {
               const oldMsg = payload.old;
