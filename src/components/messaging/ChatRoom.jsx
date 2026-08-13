@@ -498,7 +498,10 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
   return (
     <div style={{
       position: 'fixed',
-      inset: 0,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
       height: '100dvh',
       maxHeight: '100dvh',
       zIndex: 100,
@@ -510,10 +513,13 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
       userSelect: 'none',
       WebkitTouchCallout: 'none'
     }}>
-      {/* Header with Safe Area Top Framing */}
+      {/* FIXED TOPBAR HEADER (Frozen at Top, Never Scrolls) */}
       <div style={{
+        flexShrink: 0,
+        position: 'relative',
+        zIndex: 100,
         background: 'var(--card-bg)',
-        paddingTop: 'calc(14px + env(safe-area-inset-top, 14px))',
+        paddingTop: 'calc(12px + env(safe-area-inset-top, 12px))',
         paddingBottom: '12px',
         paddingLeft: 'max(16px, env(safe-area-inset-left, 16px))',
         paddingRight: 'max(16px, env(safe-area-inset-right, 16px))',
@@ -575,7 +581,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
         </div>
       </div>
 
-      {/* Messages List Area with Click-to-Dismiss Keyboard */}
+      {/* SCROLLABLE MESSAGES LIST (Isolated Scroll Container) */}
       <div
         onClick={() => {
           if (document.activeElement && typeof document.activeElement.blur === 'function') {
@@ -586,9 +592,11 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
         }}
         style={{
           flex: 1,
-          padding: '16px',
+          minHeight: 0,
           overflowY: 'auto',
+          overflowX: 'hidden',
           WebkitOverflowScrolling: 'touch',
+          padding: '16px',
           display: 'flex',
           flexDirection: 'column',
           gap: '14px'
