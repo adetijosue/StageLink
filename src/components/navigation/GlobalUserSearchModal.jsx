@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { X, Search, Check, Sparkles, MapPin, Music, ChevronRight, UserPlus, UserCheck } from 'lucide-react';
+import { X, Search, Check, Sparkles, MapPin, Music, ChevronRight, UserPlus, UserCheck, User } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
 
-export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPublicProfile, onStartChat, isDarkMode }) {
+export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPublicProfile, onStartChat, onConnectUser, isDarkMode }) {
   const { currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('All');
@@ -269,6 +269,9 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
                       e.stopPropagation();
                       soundEngine.playPopSound();
                       setFollowedUsers(prev => ({ ...prev, [usr.id]: !prev[usr.id] }));
+                      if (!followedUsers[usr.id] && onConnectUser) {
+                        onConnectUser(usr.id);
+                      }
                     }}
                     title={followedUsers[usr.id] ? "Membre Suivi" : "Se connecter / Suivre"}
                     style={{

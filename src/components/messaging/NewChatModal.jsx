@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Search, Check, MapPin, Music } from 'lucide-react';
+import { X, Search, Check, MapPin, Music, MessageSquare } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 import Logo from '../common/Logo';
 import { useAuth } from '../../context/AuthContext';

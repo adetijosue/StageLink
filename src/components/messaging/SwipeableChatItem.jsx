@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Trash2, Archive, MessageSquare, MessageCircle } from 'lucide-react';
+import { Trash2, Archive, MessageSquare, MessageCircle, Trash } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 
 export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDelete, onToggleUnread, onOpenPublicProfile }) {
