@@ -683,7 +683,17 @@ function MainApp() {
             .order('created_at', { ascending: false });
             
           if (supaNotifs) {
-            const mappedNotifs = supaNotifs.map(n => ({
+            const activePartnerId = selectedChatRef.current?.participant?.id;
+            
+            // Filter out message notifications if user is currently inside active discussion with that sender
+            const filteredNotifs = supaNotifs.filter(n => {
+              if (n.type === 'message' && activePartnerId && n.actor_id === activePartnerId) {
+                return false;
+              }
+              return true;
+            });
+
+            const mappedNotifs = filteredNotifs.map(n => ({
               id: n.id,
               actorName: n.profiles?.full_name || 'Utilisateur',
               actorAvatar: n.profiles?.avatar_url || '',
