@@ -392,10 +392,16 @@ function MainApp() {
                     mediaUrl: msg.media_url || null,
                     audioUrl: msg.audio_url || null,
                     isAudio: msg.metadata?.isAudio || Boolean(msg.audio_url),
+                    isVideo: msg.metadata?.isVideo || Boolean(msg.metadata?.videoUrl),
+                    videoUrl: msg.metadata?.videoUrl || msg.media_url,
+                    fileName: msg.metadata?.fileName || null,
                     audioDuration: msg.metadata?.audioDuration || null,
                     quotedMessage: msg.metadata?.quotedMessage || null,
                     documentName: msg.metadata?.documentName || null,
-                    timestamp: 'Récemment',
+                    isCallNotice: msg.metadata?.isCallNotice || Boolean(msg.content && (msg.content.includes('Appel') || msg.content.includes('📞') || msg.content.includes('📹'))),
+                    callStatus: msg.metadata?.callStatus || null,
+                    isAudioOnly: msg.metadata?.isAudioOnly || false,
+                    timestamp: new Date(msg.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     createdAtTimestamp: new Date(msg.created_at || Date.now()).getTime(),
                     isRead: msg.is_read !== false
                   };
@@ -460,7 +466,31 @@ function MainApp() {
         setPosts(loadedPosts);
         setStories(loadedStories);
         setMatches(loadedMatches);
-        setChats(loadedChats);
+        setChats(prevChats => {
+          const mergedChats = [...loadedChats];
+          prevChats.forEach(pc => {
+            const matchingLoaded = mergedChats.find(lc => lc.id === pc.id);
+            if (!matchingLoaded) {
+              mergedChats.push(pc);
+            } else {
+              const existingMsgs = pc.messages || [];
+              const loadedMsgs = matchingLoaded.messages || [];
+              const combined = [...loadedMsgs];
+              existingMsgs.forEach(em => {
+                if (!combined.some(lm => lm.id === em.id)) {
+                  combined.push(em);
+                }
+              });
+              combined.sort((a, b) => (a.createdAtTimestamp || 0) - (b.createdAtTimestamp || 0));
+              matchingLoaded.messages = combined;
+              if (combined.length > 0) {
+                matchingLoaded.lastMessage = combined[combined.length - 1].text || matchingLoaded.lastMessage;
+              }
+            }
+          });
+          setStoredItem(STORAGE_KEYS.CHATS, mergedChats);
+          return mergedChats;
+        });
 
         // Open target profile if query params exist
         try {
@@ -511,7 +541,31 @@ function MainApp() {
               ]
             };
             loadedChats = [welcomeChat, ...loadedChats];
-            setChats(loadedChats);
+            setChats(prevChats => {
+          const mergedChats = [...loadedChats];
+          prevChats.forEach(pc => {
+            const matchingLoaded = mergedChats.find(lc => lc.id === pc.id);
+            if (!matchingLoaded) {
+              mergedChats.push(pc);
+            } else {
+              const existingMsgs = pc.messages || [];
+              const loadedMsgs = matchingLoaded.messages || [];
+              const combined = [...loadedMsgs];
+              existingMsgs.forEach(em => {
+                if (!combined.some(lm => lm.id === em.id)) {
+                  combined.push(em);
+                }
+              });
+              combined.sort((a, b) => (a.createdAtTimestamp || 0) - (b.createdAtTimestamp || 0));
+              matchingLoaded.messages = combined;
+              if (combined.length > 0) {
+                matchingLoaded.lastMessage = combined[combined.length - 1].text || matchingLoaded.lastMessage;
+              }
+            }
+          });
+          setStoredItem(STORAGE_KEYS.CHATS, mergedChats);
+          return mergedChats;
+        });
           }
         }
       };
@@ -1476,6 +1530,9 @@ function MainApp() {
             metadata: {
               quotedMessage: newMsg.quotedMessage || null,
               isAudio: newMsg.isAudio || false,
+              isVideo: newMsg.isVideo || false,
+              videoUrl: newMsg.videoUrl || null,
+              fileName: newMsg.fileName || null,
               audioDuration: newMsg.audioDuration || null,
               documentName: newMsg.documentName || null
             }

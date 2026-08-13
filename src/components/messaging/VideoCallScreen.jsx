@@ -79,13 +79,17 @@ export default function VideoCallScreen({
 
     // Handle receiving remote tracks
     pc.ontrack = (event) => {
-      if (!remoteStreamRef.current) {
-        remoteStreamRef.current = new MediaStream();
-      }
-      remoteStreamRef.current.addTrack(event.track);
+      const stream = event.streams[0] || new MediaStream([event.track]);
+      remoteStreamRef.current = stream;
       
-      if (remoteVideoMainRef.current) remoteVideoMainRef.current.srcObject = remoteStreamRef.current;
-      if (remoteVideoPipRef.current) remoteVideoPipRef.current.srcObject = remoteStreamRef.current;
+      if (remoteVideoMainRef.current) {
+        remoteVideoMainRef.current.srcObject = stream;
+        remoteVideoMainRef.current.play().catch(e => console.warn(e));
+      }
+      if (remoteVideoPipRef.current) {
+        remoteVideoPipRef.current.srcObject = stream;
+        remoteVideoPipRef.current.play().catch(e => console.warn(e));
+      }
       
       setIsConnected(true);
       soundEngine.stopRingtone();
