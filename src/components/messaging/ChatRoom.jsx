@@ -45,48 +45,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
     }
   };
 
-  const handleGenericFileAttach = (e, fileTypeCategory) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result;
-      if (fileTypeCategory === 'image' || file.type.startsWith('image/')) {
-        handleSendMessageWithQuote({
-          text: '',
-          mediaUrl: result,
-          isImage: true,
-          fileName: file.name
-        });
-      } else if (fileTypeCategory === 'video' || file.type.startsWith('video/')) {
-        handleSendMessageWithQuote({
-          text: '',
-          mediaUrl: result,
-          isVideo: true,
-          videoUrl: result,
-          fileName: file.name
-        });
-      } else if (fileTypeCategory === 'audio' || file.type.startsWith('audio/') || file.name.match(/\.(mp3|wav|ogg|m4a|flac)$/i)) {
-        handleSendMessageWithQuote({
-          text: file.name,
-          audioUrl: result,
-          isAudio: true,
-          audioTitle: file.name,
-          fileName: file.name
-        });
-      } else {
-        handleSendMessageWithQuote({
-          text: `📄 Document : ${file.name}`,
-          documentName: file.name,
-          fileUrl: result,
-          fileName: file.name
-        });
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
 
 
   // Recorded Audio Preview State (Hold to record -> Release to Preview & Listen before sending)
@@ -383,27 +342,51 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
     setSelectedMessageForAction(msg);
   };
 
-  const handleFileAttach = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const isImg = file.type.startsWith('image/');
-        if (isImg) {
-          handleSendMessageWithQuote({
-            text: '',
-            mediaUrl: reader.result,
-            isImage: true
-          });
-        } else {
-          handleSendMessageWithQuote({
-            text: `📄 Document : ${file.name}`,
-            documentName: file.name
-          });
-        }
-      };
-      reader.readAsDataURL(file);
-    }
+  const handleGenericFileAttach = (e, fileTypeCategory) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result;
+      const mime = file.type || '';
+      const name = file.name || 'Fichier';
+
+      if (fileTypeCategory === 'video' || mime.startsWith('video/') || name.match(/\.(mp4|mov|webm|mkv|avi|3gp)$/i)) {
+        handleSendMessageWithQuote({
+          text: '',
+          mediaUrl: result,
+          isVideo: true,
+          videoUrl: result,
+          fileName: name
+        });
+      } else if (fileTypeCategory === 'image' || mime.startsWith('image/') || name.match(/\.(jpg|jpeg|png|gif|webp|heic)$/i)) {
+        handleSendMessageWithQuote({
+          text: '',
+          mediaUrl: result,
+          isImage: true,
+          fileName: name
+        });
+      } else if (fileTypeCategory === 'audio' || mime.startsWith('audio/') || name.match(/\.(mp3|wav|ogg|m4a|flac|aac)$/i)) {
+        handleSendMessageWithQuote({
+          text: name,
+          audioUrl: result,
+          isAudio: true,
+          audioTitle: name,
+          fileName: name
+        });
+      } else {
+        handleSendMessageWithQuote({
+          text: `📄 Document : ${name}`,
+          documentName: name,
+          fileUrl: result,
+          mediaUrl: result,
+          fileName: name
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const handleAddEmoji = (emoji) => {
@@ -920,6 +903,67 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
                           </button>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* Document Attachment Display Card */}
+                  {(msg.documentName || msg.fileUrl || (msg.text && msg.text.includes('Document :'))) && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      background: isCurrent ? 'rgba(0,0,0,0.2)' : '#F1F5F9',
+                      borderRadius: '12px',
+                      padding: '10px 14px',
+                      marginTop: '6px',
+                      border: '1px solid rgba(255,255,255,0.2)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                        <div style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '8px',
+                          background: '#0066FF',
+                          color: '#FFF',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          <FileText size={20} />
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <h5 style={{ fontSize: '0.84rem', fontWeight: 700, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: isCurrent ? '#FFF' : '#0F172A' }}>
+                            {msg.documentName || msg.fileName || 'Fichier Document'}
+                          </h5>
+                          <span style={{ fontSize: '0.72rem', opacity: 0.8, color: isCurrent ? 'rgba(255,255,255,0.8)' : '#64748B' }}>Cliquer pour ouvrir & télécharger</span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadMedia(msg.fileUrl || msg.mediaUrl, msg.documentName || msg.fileName || 'document.pdf');
+                        }}
+                        title="Ouvrir et télécharger le document"
+                        style={{
+                          background: isCurrent ? '#FFFFFF' : '#0066FF',
+                          color: isCurrent ? '#0066FF' : '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '34px',
+                          height: '34px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                          flexShrink: 0
+                        }}
+                      >
+                        <Download size={16} />
+                      </button>
                     </div>
                   )}
 
@@ -1556,30 +1600,43 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
               }}>
                 <button 
                   onClick={() => {
-                    fileInputRef.current?.click();
+                    imageInputRef.current?.click();
                     setShowAttachmentMenu(false);
                   }}
                   style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', padding: '10px', cursor: 'pointer', color: '#0F172A', fontWeight: 600, fontSize: '0.9rem', borderRadius: '8px' }}
                 >
                   <div style={{ background: '#EFF6FF', padding: '8px', borderRadius: '50%' }}><Image size={18} color="#0066FF" /></div>
-                  Galerie
+                  Photo & Galerie
                 </button>
                 <button 
                   onClick={() => {
-                    fileInputRef.current?.click(); // Normally this would have capture="environment" for camera
+                    videoInputRef.current?.click();
                     setShowAttachmentMenu(false);
                   }}
                   style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', padding: '10px', cursor: 'pointer', color: '#0F172A', fontWeight: 600, fontSize: '0.9rem', borderRadius: '8px' }}
                 >
-                  <div style={{ background: '#FEF2F2', padding: '8px', borderRadius: '50%' }}><Camera size={18} color="#EF4444" /></div>
-                  Appareil Photo
+                  <div style={{ background: '#F0FDF4', padding: '8px', borderRadius: '50%' }}><Film size={18} color="#16A34A" /></div>
+                  Vidéo de l'appareil
                 </button>
                 <button 
-                  onClick={() => setShowAttachmentMenu(false)}
+                  onClick={() => {
+                    audioInputRef.current?.click();
+                    setShowAttachmentMenu(false);
+                  }}
                   style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', padding: '10px', cursor: 'pointer', color: '#0F172A', fontWeight: 600, fontSize: '0.9rem', borderRadius: '8px' }}
                 >
-                  <div style={{ background: '#F5F3FF', padding: '8px', borderRadius: '50%' }}><FileText size={18} color="#8B5CF6" /></div>
-                  Document
+                  <div style={{ background: '#FAF5FF', padding: '8px', borderRadius: '50%' }}><FileAudio size={18} color="#9333EA" /></div>
+                  Musique & Audio MP3/WAV
+                </button>
+                <button 
+                  onClick={() => {
+                    docInputRef.current?.click();
+                    setShowAttachmentMenu(false);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'transparent', border: 'none', padding: '10px', cursor: 'pointer', color: '#0F172A', fontWeight: 600, fontSize: '0.9rem', borderRadius: '8px' }}
+                >
+                  <div style={{ background: '#FFFBEB', padding: '8px', borderRadius: '50%' }}><FileText size={18} color="#D97706" /></div>
+                  Document & Fichier
                 </button>
               </div>
             )}
