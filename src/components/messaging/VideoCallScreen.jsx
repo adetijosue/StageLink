@@ -26,9 +26,17 @@ export default function VideoCallScreen({
   const [isConnected, setIsConnected] = useState(false); // WebRTC will set this to true when connected
   const [isBlurActive, setIsBlurActive] = useState(false);
 
+
   // Screen Swap State
   const [isLocalMain, setIsLocalMain] = useState(false);
   const [swapFeedback, setSwapFeedback] = useState(false);
+
+  // Upgrade state (only used for displaying wait messages locally, no remote confirm prompt anymore)
+  const [isUpgradePending, setIsUpgradePending] = useState(false);
+  const [upgradeMessage, setUpgradeMessage] = useState('');
+  const [showVideoUpgradePrompt, setShowVideoUpgradePrompt] = useState(false);
+  const upgradeTimerRef = useRef(null);
+
 
   const localVideoRef = useRef(null);
   const pipVideoRef = useRef(null);
@@ -137,7 +145,18 @@ export default function VideoCallScreen({
       }
     });
 
+
+    channel.on('broadcast', { event: 'video_upgrade' }, async () => {
+      // The other person activated their camera. 
+      // We automatically activate ours and switch to video mode without prompting.
+      soundEngine.playPopSound();
+      setCurrentIsAudioOnly(false);
+      setIsVideoOff(false);
+      initStream(facingMode, true);
+    });
+
     channel.subscribe(async (status) => {
+
       if (status === 'SUBSCRIBED') {
          if (isIncoming) {
             // Callee tells Caller they are ready to receive offer
@@ -272,7 +291,31 @@ export default function VideoCallScreen({
     onCallEnded({ status: 'completed', duration: callDuration, isAudioOnly: currentIsAudioOnly, isIncoming });
   };
 
+
+  const handlePartnerAcceptedUpgrade = () => {
+    setIsUpgradePending(false);
+    setUpgradeMessage('');
+  };
+
+  const handlePartnerRejectedUpgrade = () => {
+    setIsUpgradePending(false);
+    setUpgradeMessage('');
+    setIsVideoOff(true); // Revert to audio only
+    stopMediaStream();
+    initStream(facingMode, false);
+  };
+
+  const handleAcceptVideoUpgrade = () => {
+    setShowVideoUpgradePrompt(false);
+    // User wants it AUTOMATIC. We shouldn't even show the prompt!
+  };
+
+  const handleRejectVideoUpgrade = () => {
+    setShowVideoUpgradePrompt(false);
+  };
+
   // Toggle Screen Swapping between Main Full Screen and Floating PiP Frame
+
   const handleSwapScreens = () => {
     soundEngine.playPopSound();
     setIsLocalMain(prev => !prev);
@@ -280,28 +323,23 @@ export default function VideoCallScreen({
     setTimeout(() => setSwapFeedback(false), 1200);
   };
 
+
   const handleToggleVideo = () => {
     soundEngine.playPopSound();
 
     if (currentIsAudioOnly) {
-      // INITIATOR clicks camera during audio call:
-      // 1. Activate their own camera immediately
-      // 2. Show waiting overlay (NOT accept/reject modal)
-      // 3. Send notification to remote partner (simulated)
-      setIsUpgradePending(true);
-      setUpgradeMessage(`En attente de ${callerName || 'l\'interlocuteur'}...`);
-      
-      // Activate local camera stream immediately for the initiator
+      // 1. Activate local camera stream immediately
       initStream(facingMode, true);
       setIsVideoOff(false);
+      setCurrentIsAudioOnly(false);
 
-      // Simulate remote partner receiving notification and accepting after delay
-      // In real implementation, this would be via WebSocket/signaling
-      clearTimeout(upgradeTimerRef.current);
-      upgradeTimerRef.current = setTimeout(() => {
-        // Simulate partner accepting the video upgrade
-        handlePartnerAcceptedUpgrade();
-      }, 4000);
+      // 2. Notify partner to automatically upgrade
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'video_upgrade'
+        });
+      }
     } else {
       // Normal Video Toggle during Video Call
       setIsVideoOff(prev => !prev);
