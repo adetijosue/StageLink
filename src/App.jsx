@@ -95,6 +95,9 @@ function MainApp() {
   const [isIncomingCall, setIsIncomingCall] = useState(false); // New state for incoming call
   const [incomingCallData, setIncomingCallData] = useState(null);
   const incomingCallDataRef = useRef(null);
+
+
+
   useEffect(() => {
     incomingCallDataRef.current = incomingCallData;
   }, [incomingCallData]);
@@ -110,6 +113,16 @@ function MainApp() {
   const [matches, setMatches] = useState([]);
   const [chats, setChats] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
+
+  // Automatically sync selectedChat when chats array updates
+  useEffect(() => {
+    if (selectedChat) {
+      const active = chats.find(c => c.id === selectedChat.id);
+      if (active && active !== selectedChat) {
+        setSelectedChat(active);
+      }
+    }
+  }, [chats, selectedChat]);
 
   // Native Notifications Setup
   useEffect(() => {
@@ -1381,7 +1394,7 @@ function MainApp() {
     }
   };
 
-  const handleSendMessage = async (chatId, messageInput) => {
+  const handleSendMessage = async (chatId, messageInput, explicitParticipant = null) => {
     const isObj = typeof messageInput === 'object';
     const msgUuid = generateUUID();
 
@@ -1399,38 +1412,40 @@ function MainApp() {
       isRead: true
     };
 
-    const targetChat = chats.find(c => c.id === chatId) || (selectedChat?.id === chatId ? selectedChat : null);
-    const recipientId = targetChat?.participant?.id;
+    let recipientId = null;
 
-    let chatFound = false;
-    const updatedChats = chats.map((c) => {
-      if (c.id === chatId) {
-        chatFound = true;
-        return {
-          ...c,
+    setChats((prevChats) => {
+      const targetChat = prevChats.find(c => c.id === chatId) || (selectedChat?.id === chatId ? selectedChat : null);
+      recipientId = targetChat?.participant?.id || explicitParticipant?.id;
+
+      let chatFound = false;
+      const updatedChats = prevChats.map((c) => {
+        if (c.id === chatId) {
+          chatFound = true;
+          return {
+            ...c,
+            unreadCount: 0,
+            lastMessageTime: 'À l\'instant',
+            messages: [...(c.messages || []), newMsg]
+          };
+        }
+        return c;
+      });
+
+      if (!chatFound && (targetChat || explicitParticipant)) {
+        updatedChats.unshift({
+          id: chatId,
+          participant: targetChat ? targetChat.participant : explicitParticipant,
           unreadCount: 0,
           lastMessageTime: 'À l\'instant',
-          messages: [...c.messages, newMsg]
-        };
+          messages: [newMsg]
+        });
       }
-      return c;
+
+      setStoredItem(STORAGE_KEYS.CHATS, updatedChats);
+
+      return updatedChats;
     });
-
-    if (!chatFound && targetChat) {
-      updatedChats.unshift({
-        id: chatId,
-        participant: targetChat.participant,
-        unreadCount: 0,
-        lastMessageTime: 'À l\'instant',
-        messages: [newMsg]
-      });
-    }
-
-    setChats(updatedChats);
-    setStoredItem(STORAGE_KEYS.CHATS, updatedChats);
-
-    const active = updatedChats.find((c) => c.id === chatId);
-    if (active) setSelectedChat(active);
 
     // Save message directly to Supabase Database for instant delivery to recipient
     if (isSupabaseConfigured() && recipientId) {
@@ -1631,6 +1646,18 @@ function MainApp() {
     setStoredItem(STORAGE_KEYS.CHATS, updatedChats);
   };
 
+  const handleConnectUser = async (targetUserId) => {
+    if (!isSupabaseConfigured() || !currentUser?.id) return;
+    try {
+      await supabase.from('followers').insert({
+        follower_id: currentUser.id,
+        following_id: targetUserId
+      });
+    } catch (e) {
+      console.warn("Connection error", e);
+    }
+  };
+
   const handleApplyMatch = async (matchCard) => {
     if (!currentUser || !matchCard) return;
 
@@ -1643,9 +1670,9 @@ function MainApp() {
     if (isSupabaseConfigured() && targetUserId) {
       try {
         await supabase.from('matches').insert({
-          user_id: currentUser.id,
-          target_user_id: targetUserId,
-          status: 'applied'
+          candidate_id: currentUser.id,
+          target_id: targetUserId,
+          status: 'pending'
         });
       } catch (me) {
         console.warn('Supabase match insert note:', me?.message || me);
@@ -1662,7 +1689,14 @@ function MainApp() {
 
     // 3. Send initial intro message in chat
     const chatId = `chat_${targetUserId}`;
-    handleSendMessage(chatId, `Bonjour ${targetUserName} ! Je suis intéressé(e) par votre opportunité "${matchCard.title}" sur StageLink.`);
+    setTimeout(() => {
+      handleSendMessage(chatId, `Bonjour ${targetUserName} ! Je suis intéressé(e) par votre opportunité "${matchCard.title}" sur StageLink.`, {
+        id: targetUserId,
+        name: targetUserName,
+        avatar: targetAvatar,
+        role: targetRole
+      });
+    }, 100);
   };
 
   const handleUpgradeSuccess = () => {
@@ -1934,6 +1968,7 @@ function MainApp() {
           user={publicProfileUser}
           onClose={() => setPublicProfileUser(null)}
           onStartChat={handleStartChatWithUser}
+          onConnectUser={handleConnectUser}
         />
       )}
 
@@ -1965,6 +2000,7 @@ function MainApp() {
         users={allUsers}
         onOpenPublicProfile={handleOpenPublicProfile}
         onStartChat={handleStartChatWithUser}
+        onConnectUser={handleConnectUser}
         isDarkMode={isDarkMode}
       />
 
