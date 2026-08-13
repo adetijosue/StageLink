@@ -499,10 +499,13 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
     <div style={{
       position: 'fixed',
       inset: 0,
+      height: '100dvh',
+      maxHeight: '100dvh',
       zIndex: 100,
       background: 'var(--bg-light)',
       display: 'flex',
       flexDirection: 'column',
+      overflow: 'hidden',
       WebkitUserSelect: 'none',
       userSelect: 'none',
       WebkitTouchCallout: 'none'
@@ -572,8 +575,25 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
         </div>
       </div>
 
-      {/* Messages List Area */}
-      <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      {/* Messages List Area with Click-to-Dismiss Keyboard */}
+      <div
+        onClick={() => {
+          if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+          }
+          setShowEmojiPicker(false);
+          setShowAttachmentMenu(false);
+        }}
+        style={{
+          flex: 1,
+          padding: '16px',
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '14px'
+        }}
+      >
         {/* Encryption Banner */}
         <div style={{ textAlign: 'center', margin: '4px 0' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#FEF3C7', color: '#D97706', padding: '6px 14px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: 600 }}>
@@ -1566,6 +1586,13 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
             placeholder={replyingToMessage ? `Répondre à ${replyingToMessage.sender === 'current' ? 'votre message' : (chat?.participant?.name || 'Artiste').split(' ')[0]}...` : "Écrire un message..."}
             value={inputText}
             onChange={handleInputChange}
+            onFocus={() => {
+              setShowEmojiPicker(false);
+              setShowAttachmentMenu(false);
+              setTimeout(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+              }, 250);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && inputText.trim()) {
                 handleSendMessageWithQuote(inputText);
