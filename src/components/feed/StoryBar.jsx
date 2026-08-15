@@ -384,10 +384,11 @@ export default function StoryBar({
         {groupedOtherStories.map((story) => {
           const isUnread = story.hasUnread !== false;
           const authorStories = story.userStories && story.userStories.length > 0 ? story.userStories : [story];
+          const cardKey = story.groupId || (authorStories[0] && authorStories[0].id) || story.id;
 
           return (
             <div
-              key={getCreatorKey(story) || story.id}
+              key={cardKey}
               onClick={() => onSelectStory(authorStories[0] || story, authorStories)}
               style={{
                 width: '114px',
