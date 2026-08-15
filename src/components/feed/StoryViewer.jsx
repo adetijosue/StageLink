@@ -48,6 +48,17 @@ export default function StoryViewer({
   const [currentIndex, setCurrentIndex] = useState(initialIndex >= 0 ? initialIndex : 0);
   const [progress, setProgress] = useState(0);
 
+  // Sync index when story prop changes
+  useEffect(() => {
+    if (story) {
+      const idx = playlist.findIndex(s => s.id === story.id);
+      if (idx >= 0) {
+        setCurrentIndex(idx);
+        setProgress(0);
+      }
+    }
+  }, [story?.id]);
+
   const currentStory = playlist[currentIndex] || story;
 
   const [isLiked, setIsLiked] = useState(currentStory?.isLiked || false);
@@ -88,26 +99,32 @@ export default function StoryViewer({
 
   const isPaused = showViewersModal || showConfirmDeleteStory || isHoldingPress || isTypingReply || replyText.trim().length > 0;
 
-  // Next and Previous Story Navigation
+  // Next and Previous Story Navigation using functional state updates
   const goToNextStory = () => {
-    if (currentIndex < playlist.length - 1) {
-      setCurrentIndex(prev => prev + 1);
-      setProgress(0);
-    } else {
-      if (onClose) onClose();
-    }
+    setCurrentIndex((prev) => {
+      if (prev < playlist.length - 1) {
+        setProgress(0);
+        return prev + 1;
+      } else {
+        if (onClose) setTimeout(() => onClose(), 0);
+        return prev;
+      }
+    });
   };
 
   const goToPrevStory = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(prev => prev - 1);
-      setProgress(0);
-    } else {
-      setProgress(0);
-    }
+    setCurrentIndex((prev) => {
+      if (prev > 0) {
+        setProgress(0);
+        return prev - 1;
+      } else {
+        setProgress(0);
+        return 0;
+      }
+    });
   };
 
-  // Progress Timer
+  // Progress Timer with auto-advance
   useEffect(() => {
     if (isPaused) {
       if (videoRef.current) videoRef.current.pause();
@@ -118,17 +135,18 @@ export default function StoryViewer({
     }
 
     const intervalStep = 50; // update every 50ms
-    const totalDuration = isVideoMedia ? 8000 : 5000; // 5s for image, 8s for video fallback
+    const totalDuration = isVideoMedia ? 8000 : 5000; // 5s for image, 8s for video
     const increment = (intervalStep / totalDuration) * 100;
 
     const timer = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= 100) {
+        const next = prev + increment;
+        if (next >= 100) {
           clearInterval(timer);
           goToNextStory();
           return 100;
         }
-        return prev + increment;
+        return next;
       });
     }, intervalStep);
 
