@@ -36,6 +36,11 @@ export function AuthProvider({ children }) {
     let authListener;
     if (isSupabaseConfigured()) {
       const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT') {
+          setCurrentUser(null);
+          localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+          return;
+        }
         if (session?.user && (!currentUser || currentUser.id !== session.user.id)) {
           supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle().then(({ data: profile }) => {
             if (profile) {

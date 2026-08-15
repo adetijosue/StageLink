@@ -1266,6 +1266,7 @@ function MainApp() {
         if (profilesSub) supabase.removeChannel(profilesSub);
         if (postsSub) supabase.removeChannel(postsSub);
         if (storiesSub) supabase.removeChannel(storiesSub);
+        if (notificationsSub) supabase.removeChannel(notificationsSub);
         if (messagesSub) supabase.removeChannel(messagesSub);
       };
     }

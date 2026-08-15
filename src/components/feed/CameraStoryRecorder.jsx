@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Check, RotateCcw, Mic, Type, Camera, Play, Pause, Trash2, Repeat, Image as ImageIcon, Zap, ZapOff, Grid, Video as VideoIcon, Sparkles, Shield, Settings, CheckSquare, Square } from 'lucide-react';
+import { X, Check, RotateCcw, Mic, Play, Pause, Trash2, Repeat, Image as ImageIcon, Zap, ZapOff, Grid, Shield, CheckSquare, Square } from 'lucide-react';
 import Logo from '../common/Logo';
 import { soundEngine } from '../../services/audioService';
 import UserAvatar from '../common/UserAvatar';
