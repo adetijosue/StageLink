@@ -1920,6 +1920,18 @@ function MainApp() {
     setUnreadNotificationsCount(prev => Math.max(0, prev - 1));
   };
 
+  const handleClearAllNotifications = async () => {
+    if (isSupabaseConfigured() && currentUser?.id) {
+      try {
+        await supabase.from('notifications').delete().eq('user_id', currentUser.id);
+      } catch (e) {
+        console.error("Erreur suppression all notifications:", e);
+      }
+    }
+    setNotifications([]);
+    setUnreadNotificationsCount(0);
+  };
+
   const handleDeleteMessageForEveryone = async (chatId, messageId) => {
     const updatedChats = chats.map((c) => {
       if (c.id === chatId) {
@@ -2456,6 +2468,7 @@ function MainApp() {
         notifications={notifications}
         chats={chats}
         onDeleteNotification={handleDeleteNotification}
+        onClearAllNotifications={handleClearAllNotifications}
         onSelectChat={(chat) => {
           setIsNotificationsOpen(false);
           handleSelectChat(chat);
