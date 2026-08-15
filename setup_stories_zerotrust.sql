@@ -82,8 +82,31 @@ CREATE POLICY "Tout le monde peut enregistrer une vue" ON public.story_views FOR
 DROP POLICY IF EXISTS "Tout le monde peut liker une story" ON public.story_likes;
 CREATE POLICY "Tout le monde peut liker une story" ON public.story_likes FOR ALL USING (true);
 
--- 9. ACTIVATE SUPABASE REALTIME REPLICATION
+-- 9. REALTIME CHAT MESSAGES RLS POLICIES
+DROP POLICY IF EXISTS "Les utilisateurs voient leurs conversations" ON public.messages;
+DROP POLICY IF EXISTS "Les utilisateurs peuvent envoyer des messages" ON public.messages;
+DROP POLICY IF EXISTS "Les utilisateurs peuvent supprimer leurs messages" ON public.messages;
+DROP POLICY IF EXISTS "Les destinataires peuvent marquer comme lu" ON public.messages;
+DROP POLICY IF EXISTS "Allow read messages" ON public.messages;
+DROP POLICY IF EXISTS "Allow insert messages" ON public.messages;
+DROP POLICY IF EXISTS "Allow update messages" ON public.messages;
+DROP POLICY IF EXISTS "Allow delete messages" ON public.messages;
+
+CREATE POLICY "Allow read messages" ON public.messages FOR SELECT USING (true);
+CREATE POLICY "Allow insert messages" ON public.messages FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow update messages" ON public.messages FOR UPDATE USING (true);
+CREATE POLICY "Allow delete messages" ON public.messages FOR DELETE USING (true);
+
+-- 10. CHAT STATES RLS
+DROP POLICY IF EXISTS "Les utilisateurs gèrent leurs états" ON public.chat_states;
+DROP POLICY IF EXISTS "Allow all chat_states" ON public.chat_states;
+CREATE POLICY "Allow all chat_states" ON public.chat_states FOR ALL USING (true);
+
+-- 11. ACTIVATE SUPABASE REALTIME REPLICATION
 ALTER PUBLICATION supabase_realtime ADD TABLE public.stories;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_states;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.story_views;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.story_likes;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
 

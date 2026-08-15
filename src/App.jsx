@@ -1147,85 +1147,67 @@ function MainApp() {
             })
             .subscribe();
 
-          messagesSub = supabase
-            .channel('realtime:messages')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
-              const msgRecord = payload.new;
-              if (!msgRecord || msgRecord.receiver_id !== currentUser.id) return;
-              
-              // Filter out messages deleted for me
-              if (msgRecord.metadata?.deleted_for?.includes(currentUser.id)) return;
+          const handleIncomingMessageRecord = async (msgRecord, fallbackSenderProfile) => {
+            if (!msgRecord || msgRecord.receiver_id !== currentUser.id) return;
+            
+            // Filter out messages deleted for me
+            if (msgRecord.metadata?.deleted_for?.includes(currentUser.id)) return;
 
-              const senderId = msgRecord.sender_id;
-              const { data: senderProfile } = await supabase.from('profiles').select('*').limit(100).eq('id', senderId).single();
+            const senderId = msgRecord.sender_id;
+            let senderProfile = fallbackSenderProfile;
+            if (!senderProfile) {
+              try {
+                const { data } = await supabase.from('profiles').select('*').eq('id', senderId).maybeSingle();
+                senderProfile = data;
+              } catch (pe) {}
+            }
 
-              const formattedMsg = {
-                id: msgRecord.id,
-                sender: 'other',
-                senderId: msgRecord.sender_id,
-                text: msgRecord.content || '',
-                mediaUrl: msgRecord.media_url || null,
-                audioUrl: msgRecord.audio_url || msgRecord.audio_note_url || null,
-                isAudio: msgRecord.metadata?.isAudio || Boolean(msgRecord.audio_url || msgRecord.audio_note_url),
-                isVideo: msgRecord.metadata?.isVideo || Boolean(msgRecord.metadata?.videoUrl),
-                videoUrl: msgRecord.metadata?.videoUrl || msgRecord.media_url,
-                fileName: msgRecord.metadata?.fileName || null,
-                audioDuration: msgRecord.metadata?.audioDuration || null,
-                quotedMessage: msgRecord.metadata?.quotedMessage || null,
-                documentName: msgRecord.metadata?.documentName || null,
-                isCallNotice: msgRecord.metadata?.isCallNotice || Boolean(msgRecord.content && (msgRecord.content.includes('Appel') || msgRecord.content.includes('📞') || msgRecord.content.includes('📹'))),
-                callStatus: msgRecord.metadata?.callStatus || null,
-                isAudioOnly: msgRecord.metadata?.isAudioOnly || false,
-                timestamp: new Date(msgRecord.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-                createdAtTimestamp: new Date(msgRecord.created_at).getTime(),
-                isRead: false
-              };
+            const formattedMsg = {
+              id: msgRecord.id,
+              sender: 'other',
+              senderId: msgRecord.sender_id,
+              text: msgRecord.content || '',
+              mediaUrl: msgRecord.media_url || null,
+              audioUrl: msgRecord.audio_url || msgRecord.audio_note_url || null,
+              isAudio: msgRecord.metadata?.isAudio || Boolean(msgRecord.audio_url || msgRecord.audio_note_url),
+              isVideo: msgRecord.metadata?.isVideo || Boolean(msgRecord.metadata?.videoUrl),
+              videoUrl: msgRecord.metadata?.videoUrl || msgRecord.media_url,
+              fileName: msgRecord.metadata?.fileName || null,
+              audioDuration: msgRecord.metadata?.audioDuration || null,
+              quotedMessage: msgRecord.metadata?.quotedMessage || null,
+              documentName: msgRecord.metadata?.documentName || null,
+              isCallNotice: msgRecord.metadata?.isCallNotice || Boolean(msgRecord.content && (msgRecord.content.includes('Appel') || msgRecord.content.includes('📞') || msgRecord.content.includes('📹'))),
+              callStatus: msgRecord.metadata?.callStatus || null,
+              isAudioOnly: msgRecord.metadata?.isAudioOnly || false,
+              timestamp: new Date(msgRecord.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              createdAtTimestamp: new Date(msgRecord.created_at || Date.now()).getTime(),
+              isRead: false
+            };
 
-              // Smart check: Is recipient ALREADY in this specific chat room?
-              const activeChat = selectedChatRef.current;
-              const isInCurrentChat = activeChat && (
-                activeChat.participant?.id === senderId || 
-                activeChat.id === `chat_${senderId}`
-              );
+            const activeChat = selectedChatRef.current;
+            const isInCurrentChat = activeChat && (
+              activeChat.participant?.id === senderId || 
+              activeChat.id === `chat_${senderId}`
+            );
 
-              if (isInCurrentChat) {
-                // User is ALREADY in the chat!
-                // 1. Instantly mark message as read in database
-                try {
-                  supabase.from('messages').update({ is_read: true }).eq('id', msgRecord.id);
-                } catch (e) {}
+            if (isInCurrentChat) {
+              try {
+                supabase.from('messages').update({ is_read: true }).eq('id', msgRecord.id);
+              } catch (e) {}
 
-                // 2. Play subtle pop sound instead of notification alarm
-                soundEngine.playPopSound();
+              soundEngine.playPopSound();
+              formattedMsg.isRead = true;
 
-                // 3. Append message directly to active discussion without showing Toast Notification
-                formattedMsg.isRead = true;
-
-                setChats(prevChats => {
-                  const chatId = `chat_${senderId}`;
-                  return prevChats.map(c => {
-                    if (c.id === chatId) {
-                      const msgs = c.messages || [];
-                      if (!msgs.some(m => m.id === formattedMsg.id)) {
-                        return {
-                          ...c,
-                          messages: [...msgs, formattedMsg],
-                          lastMessage: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Audio' : '📷 Média'),
-                          lastMessageTime: formattedMsg.timestamp,
-                          unreadCount: 0
-                        };
-                      }
-                    }
-                    return c;
-                  });
-                });
-
-                setSelectedChat(prev => {
-                  if (prev && (prev.participant?.id === senderId || prev.id === `chat_${senderId}`)) {
-                    const msgs = prev.messages || [];
+              setChats(prevChats => {
+                const chatId = `chat_${senderId}`;
+                let found = false;
+                const updated = prevChats.map(c => {
+                  if (c.id === chatId || c.participant?.id === senderId) {
+                    found = true;
+                    const msgs = c.messages || [];
                     if (!msgs.some(m => m.id === formattedMsg.id)) {
                       return {
-                        ...prev,
+                        ...c,
                         messages: [...msgs, formattedMsg],
                         lastMessage: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Audio' : '📷 Média'),
                         lastMessageTime: formattedMsg.timestamp,
@@ -1233,33 +1215,99 @@ function MainApp() {
                       };
                     }
                   }
-                  return prev;
+                  return c;
                 });
-              } else {
-                // User is NOT in this chat! Play notification sound & show Toast banner
-                soundEngine.playMessageReceivedSound();
-                setToastNotification({
-                  title: senderProfile?.full_name || 'Nouveau message',
-                  message: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Message audio' : '📷 Média'),
-                  avatar: senderProfile?.avatar_url
-                });
-                setTimeout(() => setToastNotification(null), 4000);
+                if (!found) {
+                  updated.unshift({
+                    id: chatId,
+                    participant: {
+                      id: senderId,
+                      name: senderProfile?.full_name || 'Utilisateur',
+                      avatar: senderProfile?.avatar_url || '',
+                      role: senderProfile?.role || 'Artiste'
+                    },
+                    unreadCount: 0,
+                    lastMessageTime: formattedMsg.timestamp,
+                    messages: [formattedMsg]
+                  });
+                }
+                setStoredItem(STORAGE_KEYS.CHATS, updated);
+                return updated;
+              });
 
-                setChats(prevChats => {
-                  const chatId = `chat_${senderId}`;
-                  const chatExists = prevChats.find(c => c.id === chatId);
-                  
-                  if (chatExists) {
-                    return prevChats.map(c => c.id === chatId ? { ...c, unreadCount: (c.unreadCount || 0) + 1, messages: [...c.messages, formattedMsg] } : c);
-                  } else {
-                    return [{
-                      id: chatId,
-                      participant: { id: senderId, name: senderProfile?.full_name || 'Utilisateur', avatar: senderProfile?.avatar_url },
-                      messages: [formattedMsg],
-                      unreadCount: 1
-                    }, ...prevChats];
+              setSelectedChat(prev => {
+                if (prev && (prev.participant?.id === senderId || prev.id === `chat_${senderId}`)) {
+                  const msgs = prev.messages || [];
+                  if (!msgs.some(m => m.id === formattedMsg.id)) {
+                    return {
+                      ...prev,
+                      messages: [...msgs, formattedMsg],
+                      lastMessage: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Audio' : '📷 Média'),
+                      lastMessageTime: formattedMsg.timestamp,
+                      unreadCount: 0
+                    };
                   }
+                }
+                return prev;
+              });
+            } else {
+              soundEngine.playMessageReceivedSound();
+              setToastNotification({
+                title: senderProfile?.full_name || 'Nouveau message',
+                message: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Message audio' : '📷 Média'),
+                avatar: senderProfile?.avatar_url
+              });
+              setTimeout(() => setToastNotification(null), 4000);
+
+              setChats(prevChats => {
+                const chatId = `chat_${senderId}`;
+                let found = false;
+                const updated = prevChats.map(c => {
+                  if (c.id === chatId || c.participant?.id === senderId) {
+                    found = true;
+                    const msgs = c.messages || [];
+                    if (!msgs.some(m => m.id === formattedMsg.id)) {
+                      return {
+                        ...c,
+                        messages: [...msgs, formattedMsg],
+                        lastMessage: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Audio' : '📷 Média'),
+                        lastMessageTime: formattedMsg.timestamp,
+                        unreadCount: (c.unreadCount || 0) + 1
+                      };
+                    }
+                  }
+                  return c;
                 });
+                if (!found) {
+                  updated.unshift({
+                    id: chatId,
+                    participant: {
+                      id: senderId,
+                      name: senderProfile?.full_name || 'Utilisateur',
+                      avatar: senderProfile?.avatar_url || '',
+                      role: senderProfile?.role || 'Artiste'
+                    },
+                    unreadCount: 1,
+                    lastMessageTime: formattedMsg.timestamp,
+                    messages: [formattedMsg]
+                  });
+                }
+                setStoredItem(STORAGE_KEYS.CHATS, updated);
+                return updated;
+              });
+            }
+          };
+
+          messagesSub = supabase
+            .channel('realtime:messages')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
+              if (payload.new) {
+                handleIncomingMessageRecord(payload.new);
+              }
+            })
+            .on('broadcast', { event: 'new_chat_message' }, (payload) => {
+              if (payload.payload && payload.payload.msgRecord) {
+                handleIncomingMessageRecord(payload.payload.msgRecord, payload.payload.senderProfile);
               }
             })
             .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, async (payload) => {
@@ -1267,23 +1315,23 @@ function MainApp() {
               if (!oldMsg || !oldMsg.id) return;
               
               setChats(prevChats => {
-                return prevChats.map(c => ({
+                const updated = prevChats.map(c => ({
                   ...c,
-                  messages: c.messages.filter(m => m.id !== oldMsg.id)
+                  messages: (c.messages || []).filter(m => m.id !== oldMsg.id)
                 }));
+                setStoredItem(STORAGE_KEYS.CHATS, updated);
+                return updated;
               });
 
-              setSelectedChat(prevSelected => {
-                if (prevSelected) {
-                  return {
-                    ...prevSelected,
-                    messages: prevSelected.messages.filter(m => m.id !== oldMsg.id)
-                  };
-                }
-                return prevSelected;
+              setSelectedChat(prev => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  messages: (prev.messages || []).filter(m => m.id !== oldMsg.id)
+                };
               });
             })
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, async (payload) => {
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, async () => {
               syncMessages();
             })
             .subscribe();
@@ -1932,13 +1980,18 @@ function MainApp() {
     const newMsg = {
       id: msgUuid,
       sender: 'current',
-      text: isObj ? messageInput.text : messageInput,
+      senderId: currentUser?.id,
+      text: isObj ? (messageInput.text || '') : messageInput,
       quotedMessage: isObj ? messageInput.quotedMessage : null,
       mediaUrl: isObj ? messageInput.mediaUrl : null,
       audioUrl: isObj ? messageInput.audioUrl : null,
-      isAudio: isObj ? messageInput.isAudio : false,
+      isAudio: isObj ? Boolean(messageInput.isAudio || messageInput.audioUrl) : false,
+      isVideo: isObj ? Boolean(messageInput.isVideo || messageInput.videoUrl) : false,
+      videoUrl: isObj ? messageInput.videoUrl : null,
+      fileName: isObj ? messageInput.fileName : null,
+      documentName: isObj ? messageInput.documentName : null,
       audioDuration: isObj ? messageInput.audioDuration : null,
-      timestamp: 'À l\'instant',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       createdAtTimestamp: Date.now(),
       isRead: true
     };
@@ -1980,10 +2033,54 @@ function MainApp() {
 
     // Save message directly to Supabase Database for instant delivery to recipient
     if (isSupabaseConfigured() && recipientId) {
-        // Play send sound
         soundEngine.playMessageSentSound();
 
+        // 1. Instant Realtime Broadcast to recipient
         try {
+          supabase.channel('realtime:messages').send({
+            type: 'broadcast',
+            event: 'new_chat_message',
+            payload: {
+              msgRecord: {
+                id: msgUuid,
+                sender_id: currentUser.id,
+                receiver_id: recipientId,
+                content: newMsg.text || '',
+                media_url: newMsg.mediaUrl || null,
+                audio_url: newMsg.audioUrl || null,
+                metadata: {
+                  quotedMessage: newMsg.quotedMessage || null,
+                  isAudio: newMsg.isAudio || false,
+                  isVideo: newMsg.isVideo || false,
+                  videoUrl: newMsg.videoUrl || null,
+                  fileName: newMsg.fileName || null,
+                  audioDuration: newMsg.audioDuration || null,
+                  documentName: newMsg.documentName || null
+                },
+                created_at: new Date().toISOString()
+              },
+              senderProfile: {
+                id: currentUser.id,
+                full_name: currentUser.name || 'Artiste StageLink',
+                avatar_url: currentUser.avatar || '',
+                role: currentUser.role || 'Artiste'
+              }
+            }
+          });
+        } catch (be) {}
+
+        // 2. Persist in Supabase Database
+        try {
+          // Ensure sender profile exists
+          try {
+            await supabase.from('profiles').upsert({
+              id: currentUser.id,
+              full_name: currentUser.name || 'Artiste StageLink',
+              avatar_url: currentUser.avatar || '',
+              role: currentUser.role || 'Artiste'
+            }, { onConflict: 'id' });
+          } catch (pe) {}
+
           const { error: insertErr } = await supabase.from('messages').insert({
             id: msgUuid,
             sender_id: currentUser.id,
@@ -2025,12 +2122,11 @@ function MainApp() {
               });
               if (bareFallbackErr) {
                 console.error('All message insert fallbacks failed:', bareFallbackErr);
-                return; // Stop if everything failed
               }
             }
           }
           
-          // Push a notification for the message
+          // Push notification for the message
           try {
             await supabase.from('notifications').insert({
               user_id: recipientId,
@@ -2042,7 +2138,7 @@ function MainApp() {
             console.warn('Supabase message notification note:', ne);
           }
         } catch (me) {
-          console.error('Network or unexpected error during insert:', me);
+          console.error('Network or unexpected error during message insert:', me);
         }
     }
   };
