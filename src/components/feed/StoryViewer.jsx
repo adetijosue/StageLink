@@ -21,24 +21,20 @@ export default function StoryViewer({
 }) {
   const { currentUser } = useAuth();
 
-  // Helper to extract keys for author matching
-  const extractStoryKeys = (s) => {
-    if (!s) return [];
-    const keys = [];
-    if (s.userId) keys.push(`id:${String(s.userId).toLowerCase().trim()}`);
-    if (s.user_id) keys.push(`id:${String(s.user_id).toLowerCase().trim()}`);
-    if (s.userName) keys.push(`name:${String(s.userName).toLowerCase().trim()}`);
-    if (s.user_name) keys.push(`name:${String(s.user_name).toLowerCase().trim()}`);
-    return keys;
+  // Extract canonical author ID
+  const getAuthorId = (s) => {
+    if (!s) return null;
+    const id = s.userId || s.user_id || s.authorId || s.author_id;
+    return id ? String(id).toLowerCase().trim() : null;
   };
 
-  const activeStoryKeys = new Set(extractStoryKeys(story));
+  const activeAuthorId = getAuthorId(story);
 
   const currentAuthorStories = (userStories && userStories.length > 0)
     ? userStories
     : (allStories || []).filter(s => {
-        const sKeys = extractStoryKeys(s);
-        return sKeys.some(k => activeStoryKeys.has(k));
+        const sAuthorId = getAuthorId(s);
+        return activeAuthorId && sAuthorId && activeAuthorId === sAuthorId;
       });
 
   const playlist = currentAuthorStories.length > 0 ? currentAuthorStories : (story ? [story] : []);

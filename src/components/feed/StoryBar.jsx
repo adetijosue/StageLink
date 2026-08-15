@@ -12,92 +12,77 @@ export default function StoryBar({
 }) {
   const { currentUser } = useAuth();
 
-  // Helper to extract all identifier keys from a story
-  const extractStoryKeys = (s) => {
-    if (!s) return [];
-    const keys = [];
-    if (s.userId) keys.push(`id:${String(s.userId).toLowerCase().trim()}`);
-    if (s.user_id) keys.push(`id:${String(s.user_id).toLowerCase().trim()}`);
-    if (s.authorId) keys.push(`id:${String(s.authorId).toLowerCase().trim()}`);
-    if (s.author_id) keys.push(`id:${String(s.author_id).toLowerCase().trim()}`);
-    if (s.userName) keys.push(`name:${String(s.userName).toLowerCase().trim()}`);
-    if (s.user_name) keys.push(`name:${String(s.user_name).toLowerCase().trim()}`);
-    if (s.authorName) keys.push(`name:${String(s.authorName).toLowerCase().trim()}`);
-    if (s.author_name) keys.push(`name:${String(s.author_name).toLowerCase().trim()}`);
-    return keys;
+  // Extract the canonical author ID from a story object
+  const getAuthorId = (s) => {
+    if (!s) return null;
+    const id = s.userId || s.user_id || s.authorId || s.author_id;
+    return id ? String(id).toLowerCase().trim() : null;
   };
 
   const isCurrentUserStory = (s) => {
     if (!s || !currentUser) return false;
-    const currentKeys = new Set();
-    if (currentUser.id) currentKeys.add(`id:${String(currentUser.id).toLowerCase().trim()}`);
-    if (currentUser.name) currentKeys.add(`name:${String(currentUser.name).toLowerCase().trim()}`);
+    const currentId = currentUser.id ? String(currentUser.id).toLowerCase().trim() : null;
+    const storyAuthorId = getAuthorId(s);
 
-    const storyKeys = extractStoryKeys(s);
-    return storyKeys.some(k => currentKeys.has(k));
-  };
+    // Primary match: by user ID (always reliable from Supabase)
+    if (currentId && storyAuthorId && currentId === storyAuthorId) return true;
 
-  // 1. Separate current user's stories from other users
-  const myStories = (stories || []).filter(isCurrentUserStory);
-  const otherStories = (stories || []).filter(s => !isCurrentUserStory(s));
-  const myLatestStory = myStories.length > 0 ? myStories[0] : null;
-
-  // 2. Strict Union-Find Grouping for other users' stories (1 card per creator)
-  // If Story A and Story B share ANY key (same userId OR same userName), they merge into the SAME group!
-  const creatorGroups = []; // Array of { keys: Set, stories: [] }
-
-  otherStories.forEach(story => {
-    const sKeys = extractStoryKeys(story);
-    if (sKeys.length === 0) {
-      sKeys.push(`story:${story.id}`);
+    // Fallback match: by name (only if no ID available on the story)
+    if (!storyAuthorId && currentUser.name) {
+      const sName = (s.userName || s.user_name || s.authorName || s.author_name || '').toLowerCase().trim();
+      if (sName && sName === currentUser.name.toLowerCase().trim()) return true;
     }
 
-    // Find all existing groups that match at least one key of this story
-    const matchingGroupIndices = [];
-    creatorGroups.forEach((group, idx) => {
-      const hasMatch = sKeys.some(k => group.keys.has(k));
-      if (hasMatch) {
-        matchingGroupIndices.push(idx);
-      }
-    });
+    return false;
+  };
 
-    if (matchingGroupIndices.length === 0) {
-      // Create new group
-      creatorGroups.push({
-        keys: new Set(sKeys),
-        stories: [story]
-      });
-    } else {
-      // Merge all matching groups into the first matching group
-      const firstIdx = matchingGroupIndices[0];
-      const targetGroup = creatorGroups[firstIdx];
-
-      // Add story to target group
-      targetGroup.stories.push(story);
-      sKeys.forEach(k => targetGroup.keys.add(k));
-
-      // If multiple groups matched (e.g. one had name, one had id), merge them into target
-      for (let i = matchingGroupIndices.length - 1; i > 0; i--) {
-        const mergeIdx = matchingGroupIndices[i];
-        const otherGroup = creatorGroups[mergeIdx];
-        otherGroup.stories.forEach(st => targetGroup.stories.push(st));
-        otherGroup.keys.forEach(k => targetGroup.keys.add(k));
-        creatorGroups.splice(mergeIdx, 1);
-      }
+  // ── STEP 1: Deduplicate stories by ID (prevents race-condition duplicates) ──
+  const deduped = [];
+  const seenIds = new Set();
+  (stories || []).forEach(s => {
+    if (!s || !s.id) return;
+    const sid = String(s.id);
+    if (!seenIds.has(sid)) {
+      seenIds.add(sid);
+      deduped.push(s);
     }
   });
 
-  // Convert merged groups to final card items
-  const groupedOtherStories = creatorGroups.map(group => {
-    const userStoriesList = group.stories;
+  // ── STEP 2: Separate current user vs other users ──
+  const myStories = deduped.filter(isCurrentUserStory);
+  const otherStories = deduped.filter(s => !isCurrentUserStory(s));
+  const myLatestStory = myStories.length > 0 ? myStories[0] : null;
+
+  // ── STEP 3: Group other users' stories by author (1 card per author) ──
+  // Primary grouping key: userId (Supabase user_id), always consistent.
+  // Fallback for edge cases: userName (lowercased).
+  const authorGroupMap = new Map(); // key → { stories: [], displayName, avatar, ... }
+
+  otherStories.forEach(story => {
+    const authorId = getAuthorId(story);
+    const authorName = (story.userName || story.user_name || story.authorName || 'Artiste').toLowerCase().trim();
+
+    // Use authorId as key when available (reliable), otherwise fall back to name
+    const groupKey = authorId || `fallback_name:${authorName}`;
+
+    if (!authorGroupMap.has(groupKey)) {
+      authorGroupMap.set(groupKey, []);
+    }
+    authorGroupMap.get(groupKey).push(story);
+  });
+
+  // Convert map to final grouped array
+  const groupedOtherStories = [];
+  authorGroupMap.forEach((userStoriesList) => {
+    if (!userStoriesList || userStoriesList.length === 0) return;
     const latestStory = userStoriesList[0];
     const hasUnread = userStoriesList.some(s => s.hasUnread !== false);
-    return {
+    groupedOtherStories.push({
       ...latestStory,
       storiesCount: userStoriesList.length,
       userStories: userStoriesList,
       hasUnread
-    };
+    });
   });
 
   const renderCardMedia = (s) => {

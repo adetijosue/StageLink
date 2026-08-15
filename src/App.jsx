@@ -821,8 +821,17 @@ function MainApp() {
                 time: 'Récemment'
               };
             });
-            setStories(freshStories);
-            setStoredItem(STORAGE_KEYS.STORIES, freshStories);
+            // Deduplicate by story ID to prevent race-condition duplicates
+            const deduped = [];
+            const seenIds = new Set();
+            freshStories.forEach(s => {
+              if (!seenIds.has(s.id)) {
+                seenIds.add(s.id);
+                deduped.push(s);
+              }
+            });
+            setStories(deduped);
+            setStoredItem(STORAGE_KEYS.STORIES, deduped);
           }
         } catch (e) { console.error("Suppressed error:", e); }
       };
