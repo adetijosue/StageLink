@@ -1776,7 +1776,8 @@ function MainApp() {
       if (isSupabaseConfigured()) {
         try {
           const isVideo = storyData.mediaType === 'video' || storyData.isVideo || (typeof finalMediaUrl === 'string' && (finalMediaUrl.includes('.mp4') || finalMediaUrl.includes('.webm') || finalMediaUrl.includes('.mov') || finalMediaUrl.startsWith('data:video')));
-          const { error: insertErr } = await supabase.from('stories').insert({
+          
+          const storyPayload = {
             id: storyUuid,
             user_id: currentUser.id,
             media_url: finalMediaUrl,
@@ -1784,18 +1785,35 @@ function MainApp() {
             is_video: isVideo || false,
             privacy_type: privacyType,
             expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-          });
+          };
+
+          let { error: insertErr } = await supabase.from('stories').insert(storyPayload);
           
+          // Graceful fallback if the SQL migration hasn't been run yet
+          if (insertErr) {
+             console.warn('Initial story insert failed, attempting legacy fallback...', insertErr);
+             delete storyPayload.privacy_type;
+             const fallback = await supabase.from('stories').insert(storyPayload);
+             if (!fallback.error) {
+                insertErr = null; // Fallback succeeded
+             } else {
+                insertErr = fallback.error; // Fallback also failed
+             }
+          }
+
           if (insertErr) {
             console.error('Supabase story insert error:', insertErr);
-          } else if (storyData.audienceRules && storyData.audienceRules.length > 0 && privacyType !== 'all_contacts') {
-             // Insert Audience Rules
+            throw new Error(`Erreur d'insertion: ${insertErr.message}`);
+          } 
+          
+          if (storyData.audienceRules && storyData.audienceRules.length > 0 && privacyType !== 'all_contacts') {
+             // Insert Audience Rules (will also fail gracefully if table missing)
              const rulesToInsert = storyData.audienceRules.map(targetId => ({
                  story_id: storyUuid,
                  target_user_id: targetId
              }));
              const { error: rulesErr } = await supabase.from('story_audience_rules').insert(rulesToInsert);
-             if (rulesErr) console.error('Error saving story audience rules:', rulesErr);
+             if (rulesErr) console.warn('Note: story_audience_rules table might not exist yet:', rulesErr.message);
           }
         } catch (se) {
           console.warn('Supabase story creation note:', se?.message || se);
