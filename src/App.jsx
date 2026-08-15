@@ -37,6 +37,7 @@ import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 
 const INITIAL_COMMUNITY_USERS = [];
 import { generateUUID } from './utils/uuid';
+import { compressImage } from './utils/imageCompressor';
 
 // Helper to convert Data URL to File for Supabase Storage Upload
 const dataURLtoFile = (dataurl, filename = 'media_upload') => {
@@ -50,7 +51,7 @@ const dataURLtoFile = (dataurl, filename = 'media_upload') => {
     while (n--) {
       u8arr[n] = bstr.charCodeAt(n);
     }
-    const ext = mime.split('/')[1] || 'png';
+    const ext = mime.split('/')[1] || 'jpg';
     return new File([u8arr], `${filename}.${ext}`, { type: mime });
   } catch (e) {
     return null;
@@ -62,32 +63,53 @@ const uploadChatMediaToSupabase = async (dataUrl, fileName) => {
   if (!dataUrl.startsWith('data:')) return dataUrl; // Already an HTTP URL
 
   try {
-    const file = dataURLtoFile(dataUrl, fileName || `media_${Date.now()}`);
-    if (!file) return dataUrl;
+    // 1. Client-side compression for images
+    let optimizedDataUrl = dataUrl;
+    if (dataUrl.startsWith('data:image')) {
+      optimizedDataUrl = await compressImage(dataUrl, 1080, 1920, 0.78);
+    }
 
-    const fileExt = (file.name && file.name.includes('.')) ? file.name.split('.').pop() : 'png';
+    const file = dataURLtoFile(optimizedDataUrl, fileName || `media_${Date.now()}`);
+    if (!file) return optimizedDataUrl;
+
+    const fileExt = (file.name && file.name.includes('.')) ? file.name.split('.').pop() : 'jpg';
     const filePath = `chat_uploads/${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
 
     let bucketName = 'chat_media';
-    let { error: uploadErr } = await supabase.storage.from(bucketName).upload(filePath, file, { upsert: true });
+    let uploadedSuccessfully = false;
 
-    if (uploadErr) {
+    // Try chat_media bucket
+    const { error: uploadErr } = await supabase.storage.from(bucketName).upload(filePath, file, { upsert: true });
+    if (!uploadErr) {
+      uploadedSuccessfully = true;
+    } else {
+      // Try media bucket
       bucketName = 'media';
       const { error: err2 } = await supabase.storage.from(bucketName).upload(filePath, file, { upsert: true });
-      if (err2) {
+      if (!err2) {
+        uploadedSuccessfully = true;
+      } else {
+        // Try public bucket
         bucketName = 'public';
-        await supabase.storage.from(bucketName).upload(filePath, file, { upsert: true });
+        const { error: err3 } = await supabase.storage.from(bucketName).upload(filePath, file, { upsert: true });
+        if (!err3) uploadedSuccessfully = true;
       }
     }
 
-    const { data: publicUrlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
-    if (publicUrlData && publicUrlData.publicUrl) {
-      return publicUrlData.publicUrl;
+    // ONLY return public URL if upload ACTUALLY succeeded on storage!
+    if (uploadedSuccessfully) {
+      const { data: publicUrlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
+      if (publicUrlData && publicUrlData.publicUrl) {
+        return publicUrlData.publicUrl;
+      }
     }
+    
+    // If storage upload failed, return lightweight compressed dataUrl (which stores & renders reliably)
+    return optimizedDataUrl;
   } catch (e) {
     console.warn('Storage upload fallback note:', e?.message || e);
+    return dataUrl;
   }
-  return dataUrl;
 };
 
 
@@ -1045,6 +1067,7 @@ function MainApp() {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'stories' }, () => syncPostsStoriesAndProfiles())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'story_likes' }, () => syncPostsStoriesAndProfiles())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'story_views' }, () => syncPostsStoriesAndProfiles())
+            .on('broadcast', { event: 'new_story' }, () => syncPostsStoriesAndProfiles())
             .subscribe();
             
           notificationsSub = supabase
@@ -1737,11 +1760,11 @@ function MainApp() {
       const rawMedia = storyData.storyMedia || storyData.mediaUrl || storyData.media || null;
       let finalMediaUrl = rawMedia;
 
-      // Safe Media Upload with 15s timeout
+      // Safe Media Upload with fast 4s timeout
       if (rawMedia && typeof rawMedia === 'string' && rawMedia.startsWith('data:')) {
         try {
           const uploadPromise = uploadChatMediaToSupabase(rawMedia, `story_${Date.now()}`);
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Upload timeout')), 15000));
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Upload timeout')), 4000));
           finalMediaUrl = await Promise.race([uploadPromise, timeoutPromise]);
         } catch (uploadError) {
           console.warn('Story upload media fallback to raw data:', uploadError?.message || uploadError);
@@ -1822,6 +1845,16 @@ function MainApp() {
              const { error: rulesErr } = await supabase.from('story_audience_rules').insert(rulesToInsert);
              if (rulesErr) console.warn('story_audience_rules note:', rulesErr.message);
           }
+
+          // Broadcast instant realtime notification to other connected clients
+          try {
+            supabase.channel('realtime:stories_interactions').send({
+              type: 'broadcast',
+              event: 'new_story',
+              payload: { storyId: storyUuid, userId: currentUser.id }
+            });
+          } catch (be) {}
+
         } catch (se) {
           console.warn('Supabase story creation note:', se?.message || se);
         }

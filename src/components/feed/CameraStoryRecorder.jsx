@@ -3,6 +3,7 @@ import { X, Check, RotateCcw, Mic, Play, Pause, Trash2, Repeat, Image as ImageIc
 import Logo from '../common/Logo';
 import { soundEngine } from '../../services/audioService';
 import UserAvatar from '../common/UserAvatar';
+import { compressImage } from '../../utils/imageCompressor';
 
 export default function CameraStoryRecorder({ isOpen, onClose, onStoryCreated, resharedStoryData, users = [] }) {
   const [creationMode, setCreationMode] = useState('camera'); // 'camera' | 'video' | 'text' | 'audio'
@@ -273,16 +274,22 @@ export default function CameraStoryRecorder({ isOpen, onClose, onStoryCreated, r
     }
   };
 
-  const handleMediaUpload = (e) => {
+  const handleMediaUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
       soundEngine.playPopSound();
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setCapturedImage(reader.result);
+      if (file.type && file.type.startsWith('video/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setCapturedImage(reader.result);
+          stopCamera();
+        };
+        reader.readAsDataURL(file);
+      } else {
+        const compressed = await compressImage(file, 1080, 1920, 0.78);
+        setCapturedImage(compressed);
         stopCamera();
-      };
-      reader.readAsDataURL(file);
+      }
     }
   };
 
