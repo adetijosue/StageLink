@@ -6,13 +6,26 @@ import UserAvatar from '../common/UserAvatar';
 export default function StoryBar({ stories = [], onSelectStory, onAddStory, isUploadingStory = false }) {
   const { currentUser } = useAuth();
 
+  const getCreatorKey = (s) => {
+    if (!s) return '';
+    const id = s.userId || s.user_id || s.authorId || s.author_id;
+    if (id) return String(id).toLowerCase().trim();
+    const name = s.userName || s.user_name || s.authorName || s.author_name;
+    if (name) return String(name).toLowerCase().trim();
+    return String(s.id || '');
+  };
+
   const isCurrentUserStory = (s) => {
     if (!s || !currentUser) return false;
-    return (
-      (s.userId && currentUser.id && s.userId === currentUser.id) ||
-      (s.user_id && currentUser.id && s.user_id === currentUser.id) ||
-      (s.userName && currentUser.name && s.userName.toLowerCase() === currentUser.name.toLowerCase())
-    );
+    const currentId = currentUser.id ? String(currentUser.id).toLowerCase().trim() : '';
+    const currentName = currentUser.name ? String(currentUser.name).toLowerCase().trim() : '';
+
+    const sUserId = (s.userId || s.user_id || s.authorId || s.author_id) ? String(s.userId || s.user_id || s.authorId || s.author_id).toLowerCase().trim() : '';
+    const sUserName = (s.userName || s.user_name || s.authorName || s.author_name) ? String(s.userName || s.user_name || s.authorName || s.author_name).toLowerCase().trim() : '';
+
+    if (currentId && sUserId && currentId === sUserId) return true;
+    if (currentName && sUserName && currentName === sUserName) return true;
+    return false;
   };
 
   // Separate current user's stories from other users
@@ -20,21 +33,28 @@ export default function StoryBar({ stories = [], onSelectStory, onAddStory, isUp
   const otherStories = (stories || []).filter(s => !isCurrentUserStory(s));
   const myLatestStory = myStories.length > 0 ? myStories[0] : null;
 
-  // Group other users' stories by creator (1 card per user)
-  const groupedOtherStories = [];
-  const seenCreators = new Set();
+  // Group other users' stories strictly by creator (guaranteed 1 card per creator)
+  const otherCreatorsMap = new Map();
   otherStories.forEach(s => {
-    const creatorKey = s.userId || s.user_id || s.userName;
-    if (creatorKey && !seenCreators.has(creatorKey)) {
-      seenCreators.add(creatorKey);
-      const userStoriesList = otherStories.filter(cs => (cs.userId || cs.user_id || cs.userName) === creatorKey);
-      const hasUnread = userStoriesList.some(cs => cs.hasUnread !== false);
-      groupedOtherStories.push({
-        ...s,
-        storiesCount: userStoriesList.length,
-        hasUnread
-      });
+    const key = getCreatorKey(s);
+    if (!key) return;
+    if (!otherCreatorsMap.has(key)) {
+      otherCreatorsMap.set(key, []);
     }
+    otherCreatorsMap.get(key).push(s);
+  });
+
+  const groupedOtherStories = [];
+  otherCreatorsMap.forEach((userStoriesList) => {
+    if (!userStoriesList || userStoriesList.length === 0) return;
+    const latestStory = userStoriesList[0];
+    const hasUnread = userStoriesList.some(s => s.hasUnread !== false);
+    groupedOtherStories.push({
+      ...latestStory,
+      storiesCount: userStoriesList.length,
+      userStories: userStoriesList,
+      hasUnread
+    });
   });
 
   const renderCardMedia = (s) => {
@@ -257,16 +277,12 @@ export default function StoryBar({ stories = [], onSelectStory, onAddStory, isUp
       {/* 2. OTHER USERS' STORIES: WhatsApp Business Rectangular Cards */}
       {groupedOtherStories.map((story) => {
         const isUnread = story.hasUnread !== false;
-        const authorStories = otherStories.filter(s => 
-          (s.userId && story.userId && s.userId === story.userId) ||
-          (s.user_id && story.user_id && s.user_id === story.user_id) ||
-          (s.userName && story.userName && s.userName.toLowerCase() === story.userName.toLowerCase())
-        );
+        const authorStories = story.userStories && story.userStories.length > 0 ? story.userStories : [story];
 
         return (
           <div
-            key={story.id}
-            onClick={() => onSelectStory(story, authorStories.length > 0 ? authorStories : [story])}
+            key={getCreatorKey(story) || story.id}
+            onClick={() => onSelectStory(authorStories[0] || story, authorStories)}
             style={{
               width: '108px',
               height: '168px',
