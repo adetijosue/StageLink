@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Heart, Send, Repeat, Trash2, Eye, MessageCircle, Check, Volume2, VolumeX } from 'lucide-react';
+import { X, Heart, Send, Repeat, Trash2, Eye, Check, Volume2, VolumeX, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { soundEngine } from '../../services/audioService';
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
@@ -8,6 +8,8 @@ import confetti from 'canvas-confetti';
 
 export default function StoryViewer({
   story,
+  userStories = [],
+  allStories = [],
   onClose,
   onReplyToInbox,
   onSendReply,
@@ -18,20 +20,29 @@ export default function StoryViewer({
   onViewStory
 }) {
   const { currentUser } = useAuth();
+
+  // Find all stories belonging to this creator
+  const activeCreatorId = story?.userId || story?.user_id;
+  const activeCreatorName = story?.userName;
+
+  const currentAuthorStories = (userStories && userStories.length > 0)
+    ? userStories
+    : (allStories || []).filter(s => 
+        (activeCreatorId && (s.userId === activeCreatorId || s.user_id === activeCreatorId)) ||
+        (activeCreatorName && s.userName && s.userName.toLowerCase() === activeCreatorName.toLowerCase())
+      );
+
+  const playlist = currentAuthorStories.length > 0 ? currentAuthorStories : (story ? [story] : []);
+
+  // Find initial index
+  const initialIndex = story ? Math.max(0, playlist.findIndex(s => s.id === story.id)) : 0;
+  const [currentIndex, setCurrentIndex] = useState(initialIndex >= 0 ? initialIndex : 0);
   const [progress, setProgress] = useState(0);
-  const [isLiked, setIsLiked] = useState(story?.isLiked || false);
-  const [likesCount, setLikesCount] = useState(story?.likesCount || 0);
 
-  useEffect(() => {
-    setIsLiked(story?.isLiked || false);
-    setLikesCount(story?.likesCount || 0);
-  }, [story?.isLiked, story?.likesCount]);
+  const currentStory = playlist[currentIndex] || story;
 
-  useEffect(() => {
-    if (story?.id && onViewStory) {
-      onViewStory(story.id, story.userId);
-    }
-  }, [story?.id, story?.userId, onViewStory]);
+  const [isLiked, setIsLiked] = useState(currentStory?.isLiked || false);
+  const [likesCount, setLikesCount] = useState(currentStory?.likesCount || 0);
   const [isMuted, setIsMuted] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [replySent, setReplySent] = useState(false);
@@ -42,42 +53,80 @@ export default function StoryViewer({
 
   const videoRef = useRef(null);
 
-  const isOwner = currentUser && (
-    currentUser.id === story?.userId ||
-    currentUser.name === story?.userName ||
-    story?.isOwner === true
+  // Sync likes and reset progress on story index change
+  useEffect(() => {
+    if (currentStory) {
+      setIsLiked(currentStory.isLiked || false);
+      setLikesCount(currentStory.likesCount || 0);
+      setProgress(0);
+      if (currentStory.id && onViewStory) {
+        onViewStory(currentStory.id, currentStory.userId);
+      }
+    }
+  }, [currentIndex, currentStory?.id]);
+
+  const isOwner = currentUser && currentStory && (
+    currentUser.id === currentStory.userId ||
+    currentUser.id === currentStory.user_id ||
+    currentUser.name === currentStory.userName ||
+    currentStory.isOwner === true
   );
 
-  const activeMediaUrl = story?.mediaUrl || story?.storyMedia || story?.media || story?.image || story?.video || story?.url;
-  const isVideoMedia = story?.mediaType === 'video' || story?.isVideo || (typeof activeMediaUrl === 'string' && (activeMediaUrl.includes('.mp4') || activeMediaUrl.startsWith('data:video')));
-  const canReshare = story?.allowReshare !== false;
-
-  const viewersList = Array.isArray(story?.viewers) ? story.viewers : [];
+  const activeMediaUrl = currentStory?.mediaUrl || currentStory?.storyMedia || currentStory?.media || currentStory?.media_url || currentStory?.image || currentStory?.videoUrl || currentStory?.video_url || currentStory?.video || currentStory?.url;
+  const isVideoMedia = currentStory?.mediaType === 'video' || currentStory?.isVideo || currentStory?.is_video || (typeof activeMediaUrl === 'string' && (activeMediaUrl.includes('.mp4') || activeMediaUrl.includes('.webm') || activeMediaUrl.includes('.mov') || activeMediaUrl.startsWith('data:video')));
+  const canReshare = currentStory?.allowReshare !== false;
+  const viewersList = Array.isArray(currentStory?.viewers) ? currentStory.viewers : [];
 
   const isPaused = showViewersModal || showConfirmDeleteStory || isHoldingPress || isTypingReply || replyText.trim().length > 0;
 
+  // Next and Previous Story Navigation
+  const goToNextStory = () => {
+    if (currentIndex < playlist.length - 1) {
+      setCurrentIndex(prev => prev + 1);
+      setProgress(0);
+    } else {
+      if (onClose) onClose();
+    }
+  };
+
+  const goToPrevStory = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1);
+      setProgress(0);
+    } else {
+      setProgress(0);
+    }
+  };
+
+  // Progress Timer
   useEffect(() => {
     if (isPaused) {
       if (videoRef.current) videoRef.current.pause();
       return;
     }
-    if (videoRef.current) videoRef.current.play();
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
+
+    const intervalStep = 50; // update every 50ms
+    const totalDuration = isVideoMedia ? 8000 : 5000; // 5s for image, 8s for video fallback
+    const increment = (intervalStep / totalDuration) * 100;
 
     const timer = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(timer);
-          setTimeout(() => onClose && onClose(), 0);
+          goToNextStory();
           return 100;
         }
-        return prev + (isVideoMedia ? 0.8 : 1.5);
+        return prev + increment;
       });
-    }, 100);
+    }, intervalStep);
 
     return () => clearInterval(timer);
-  }, [onClose, isPaused, isVideoMedia]);
+  }, [currentIndex, isPaused, isVideoMedia, playlist.length]);
 
-  if (!story) return null;
+  if (!currentStory) return null;
 
   const filtersList = [
     { id: 'none', css: 'none' },
@@ -86,7 +135,7 @@ export default function StoryViewer({
     { id: 'vintage', css: 'brightness(1.1) contrast(1.1) saturate(0.8)' },
     { id: 'neon', css: 'hue-rotate(90deg) brightness(1.2)' }
   ];
-  const filterCss = filtersList.find(f => f.id === story.filter)?.css || 'none';
+  const filterCss = filtersList.find(f => f.id === currentStory.filter)?.css || 'none';
 
   const handleToggleLike = () => {
     soundEngine.playLikePopSound();
@@ -99,7 +148,7 @@ export default function StoryViewer({
     }
     setIsLiked(newIsLiked);
     if (onLikeStory) {
-      onLikeStory(story.id, story.userId, newIsLiked);
+      onLikeStory(currentStory.id, currentStory.userId, newIsLiked);
     }
   };
 
@@ -111,7 +160,7 @@ export default function StoryViewer({
 
     const replyHandler = onSendReply || onReplyToInbox;
     if (replyHandler) {
-      replyHandler(story, replyText.trim());
+      replyHandler(currentStory, replyText.trim());
     }
 
     setReplySent(true);
@@ -126,24 +175,53 @@ export default function StoryViewer({
   const handleReshare = () => {
     soundEngine.playPopSound();
     if (onReshareStory) {
-      onReshareStory(story);
+      onReshareStory(currentStory);
+    }
+  };
+
+  const handleDeleteCurrentStory = () => {
+    if (onDeleteStory) {
+      onDeleteStory(currentStory.id);
+    }
+    if (playlist.length <= 1) {
+      if (onClose) onClose();
+    } else {
+      goToNextStory();
     }
   };
 
   return (
     <div
-      onPointerDown={(e) => { if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') setIsHoldingPress(true); }}
+      onPointerDown={(e) => {
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON' && !e.target.closest('button') && !e.target.closest('form')) {
+          setIsHoldingPress(true);
+        }
+      }}
       onPointerUp={() => setIsHoldingPress(false)}
-      style={{ position: 'fixed', inset: 0, zIndex: 200, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 200,
+        background: '#000000',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        userSelect: 'none'
+      }}
     >
       <div style={{
-        position: 'relative', width: '100%', maxWidth: '480px', height: '100%',
-        background: story.bgGradient || 'linear-gradient(135deg, #0066FF, #0047FF)',
-        display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+        position: 'relative',
+        width: '100%',
+        maxWidth: '480px',
+        height: '100%',
+        background: currentStory.bgGradient || 'linear-gradient(135deg, #0066FF, #0047FF)',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
         padding: 'env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 16px)',
         overflow: 'hidden'
       }}>
-        {/* Background Media Render with Smart Framing (Contain + Blur Backdrop) */}
+        {/* Background Media Render */}
         {activeMediaUrl ? (
           <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {isVideoMedia ? (
@@ -159,7 +237,7 @@ export default function StoryViewer({
                   }}
                 />
 
-                {/* Main Crisp Video (Full Uncropped Frame + Original Audio) */}
+                {/* Main Video */}
                 <video
                   ref={videoRef}
                   src={activeMediaUrl}
@@ -186,7 +264,7 @@ export default function StoryViewer({
                   }}
                 />
 
-                {/* Main Crisp Image (Full Uncropped Frame) */}
+                {/* Main Image */}
                 <img
                   src={activeMediaUrl}
                   alt="Story Content"
@@ -200,7 +278,7 @@ export default function StoryViewer({
             )}
 
             {/* Stickers Overlay */}
-            {story.stickers?.map(s => (
+            {currentStory.stickers?.map(s => (
               <div key={s.id} style={{ position: 'absolute', zIndex: 5, left: s.x, top: s.y, color: s.color, fontSize: '1.5rem', fontWeight: 900, textShadow: '0 2px 10px rgba(0,0,0,0.6)' }}>
                 {s.text}
               </div>
@@ -213,10 +291,38 @@ export default function StoryViewer({
             textAlign: 'center'
           }}>
             <p style={{ color: '#FFFFFF', fontSize: '1.4rem', fontWeight: 800, textShadow: '0 4px 15px rgba(0,0,0,0.5)', lineHeight: 1.4 }}>
-              {story.caption || 'Story StageLink 🎵'}
+              {currentStory.caption || 'Statut StageLink 🎵'}
             </p>
           </div>
         )}
+
+        {/* Tap-To-Navigate Left & Right Touch Areas */}
+        <div
+          onClick={goToPrevStory}
+          style={{
+            position: 'absolute',
+            top: '80px',
+            bottom: '100px',
+            left: 0,
+            width: '35%',
+            zIndex: 6,
+            cursor: 'pointer'
+          }}
+          title="Statut précédent"
+        />
+        <div
+          onClick={goToNextStory}
+          style={{
+            position: 'absolute',
+            top: '80px',
+            bottom: '100px',
+            right: 0,
+            width: '65%',
+            zIndex: 6,
+            cursor: 'pointer'
+          }}
+          title="Statut suivant"
+        />
 
         {/* Dark Overlay Gradient for Legibility */}
         <div style={{ position: 'absolute', inset: 0, zIndex: 3, background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 25%, transparent 75%, rgba(0,0,0,0.7) 100%)', pointerEvents: 'none' }} />
@@ -243,26 +349,63 @@ export default function StoryViewer({
             animation: 'fadeIn 0.3s ease'
           }}>
             <Check size={18} strokeWidth={3} />
-            <span>Message envoyé à {story.userName} dans son chat privé !</span>
+            <span>Message envoyé à {currentStory.userName} dans son chat privé !</span>
           </div>
         )}
 
-        {/* Top Header & Progress Indicator */}
+        {/* Top Header & Segmented WhatsApp Progress Indicators */}
         <div style={{ position: 'relative', zIndex: 10 }}>
-          <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.3)', borderRadius: '2px', overflow: 'hidden', marginBottom: '12px' }}>
-            <div style={{ width: `${progress}%`, height: '100%', background: '#FFF', transition: isPaused ? 'none' : 'width 0.1s linear' }} />
+          {/* Segmented Progress Bars (1 segment per story of this author) */}
+          <div style={{
+            display: 'flex',
+            gap: '4px',
+            width: '100%',
+            marginBottom: '12px'
+          }}>
+            {playlist.map((item, idx) => {
+              let segmentWidth = '0%';
+              if (idx < currentIndex) segmentWidth = '100%';
+              else if (idx === currentIndex) segmentWidth = `${progress}%`;
+
+              return (
+                <div
+                  key={item.id || idx}
+                  style={{
+                    flex: 1,
+                    height: '3px',
+                    background: 'rgba(255,255,255,0.3)',
+                    borderRadius: '2px',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <div style={{
+                    width: segmentWidth,
+                    height: '100%',
+                    background: '#FFFFFF',
+                    transition: (idx === currentIndex && !isPaused) ? 'width 0.05s linear' : 'none'
+                  }} />
+                </div>
+              );
+            })}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <UserAvatar user={{ name: story.userName, avatar: story.userAvatar || story.avatar, gender: story.gender }} size={38} border="2px solid #FFF" />
+              <UserAvatar user={{ name: currentStory.userName, avatar: currentStory.userAvatar || currentStory.avatar, gender: currentStory.gender }} size={38} border="2px solid #FFF" />
               <div>
-                <h4 style={{ color: '#FFF', margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>{story.userName}</h4>
-                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>{story.time}</span>
+                <h4 style={{ color: '#FFF', margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>
+                  {currentStory.userName}
+                  {playlist.length > 1 && (
+                    <span style={{ fontSize: '0.72rem', fontWeight: 500, opacity: 0.8, marginLeft: '6px' }}>
+                      ({currentIndex + 1}/{playlist.length})
+                    </span>
+                  )}
+                </h4>
+                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>{currentStory.time || 'Récemment'}</span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', zIndex: 12 }}>
               {isVideoMedia && (
                 <button
                   onClick={(e) => {
@@ -274,22 +417,42 @@ export default function StoryViewer({
                     color: '#FFF', width: '36px', height: '36px', borderRadius: '50%',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
                   }}
-                  title={isMuted ? 'Activer le son de la vidéo' : 'Désactiver le son'}
+                  title={isMuted ? 'Activer le son' : 'Désactiver le son'}
                 >
                   {isMuted ? <VolumeX size={18} color="#FF4D4D" /> : <Volume2 size={18} color="#FFF" />}
                 </button>
               )}
 
-              <button onClick={onClose} style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #FCA5A5', color: '#EF4444', width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} title="Fermer"><X size={18} color="#EF4444" /></button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onClose) onClose();
+                }}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.25)',
+                  border: '1px solid #FCA5A5',
+                  color: '#EF4444',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+                title="Fermer"
+              >
+                <X size={18} color="#EF4444" />
+              </button>
             </div>
           </div>
         </div>
 
         {/* Bottom Bar: Caption & Actions */}
         <div style={{ position: 'relative', zIndex: 10 }}>
-          {story.caption && activeMediaUrl && (
+          {currentStory.caption && activeMediaUrl && (
             <p style={{ color: '#FFF', fontWeight: 600, fontSize: '0.95rem', marginBottom: '16px', textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>
-              {story.caption}
+              {currentStory.caption}
             </p>
           )}
 
@@ -309,7 +472,7 @@ export default function StoryViewer({
             <form onSubmit={handleSendReplyToInbox} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <input
                 type="text"
-                placeholder={`Envoyer un message à ${story.userName.split(' ')[0]}...`}
+                placeholder={`Envoyer un message à ${currentStory.userName.split(' ')[0]}...`}
                 value={replyText}
                 onChange={e => setReplyText(e.target.value)}
                 onFocus={() => setIsTypingReply(true)}
@@ -369,7 +532,7 @@ export default function StoryViewer({
                 <Heart size={20} fill={isLiked ? '#FFFFFF' : 'none'} />
               </button>
 
-              {/* Repartager / Reshare Story Button (If author permits) */}
+              {/* Repartager / Reshare Story Button */}
               {canReshare && (
                 <button
                   type="button"
@@ -414,7 +577,16 @@ export default function StoryViewer({
           </div>
         )}
 
-        <ConfirmDeleteModal isOpen={showConfirmDeleteStory} onClose={() => setShowConfirmDeleteStory(false)} onConfirm={() => { onDeleteStory(story.id); onClose(); }} title="Supprimer ?" message="Voulez-vous supprimer cette story ?" />
+        <ConfirmDeleteModal
+          isOpen={showConfirmDeleteStory}
+          onClose={() => setShowConfirmDeleteStory(false)}
+          onConfirm={() => {
+            handleDeleteCurrentStory();
+            setShowConfirmDeleteStory(false);
+          }}
+          title="Supprimer cette story ?"
+          message="Cette action est irréversible."
+        />
       </div>
     </div>
   );

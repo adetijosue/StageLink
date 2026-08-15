@@ -118,7 +118,7 @@ export default function StoryBar({ stories = [], onSelectStory, onAddStory, isUp
         }}
         onClick={() => {
           if (myLatestStory) {
-            onSelectStory(myLatestStory);
+            onSelectStory(myLatestStory, myStories);
           } else {
             onAddStory();
           }
@@ -257,11 +257,16 @@ export default function StoryBar({ stories = [], onSelectStory, onAddStory, isUp
       {/* 2. OTHER USERS' STORIES: WhatsApp Business Rectangular Cards */}
       {groupedOtherStories.map((story) => {
         const isUnread = story.hasUnread !== false;
+        const authorStories = otherStories.filter(s => 
+          (s.userId && story.userId && s.userId === story.userId) ||
+          (s.user_id && story.user_id && s.user_id === story.user_id) ||
+          (s.userName && story.userName && s.userName.toLowerCase() === story.userName.toLowerCase())
+        );
 
         return (
           <div
             key={story.id}
-            onClick={() => onSelectStory(story)}
+            onClick={() => onSelectStory(story, authorStories.length > 0 ? authorStories : [story])}
             style={{
               width: '108px',
               height: '168px',

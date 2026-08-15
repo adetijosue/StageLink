@@ -122,6 +122,7 @@ function MainApp() {
   const [activeTab, setActiveTab] = useState('feed');
   const [activeStoryView, setActiveStoryView] = useState(null);
   const [activeStory, setActiveStory] = useState(null);
+  const [activeStoryUserList, setActiveStoryUserList] = useState([]);
   
   // Toast Notification State
   const [toastNotification, setToastNotification] = useState(null);
@@ -2102,11 +2103,14 @@ function MainApp() {
               <StoryBar
                 stories={stories}
                 isUploadingStory={isUploadingStory}
-                onSelectStory={(st) => {
-                  const updated = stories.map((s) => s.id === st.id ? { ...s, hasUnread: false } : s);
+                onSelectStory={(st, userStoriesList) => {
+                  const targetList = userStoriesList && userStoriesList.length > 0 ? userStoriesList : [st];
+                  const targetIds = new Set(targetList.map(s => s.id));
+                  const updated = stories.map((s) => targetIds.has(s.id) ? { ...s, hasUnread: false } : s);
                   setStories(updated);
                   setStoredItem(STORAGE_KEYS.STORIES, updated);
                   setActiveStory({ ...st, hasUnread: false });
+                  setActiveStoryUserList(targetList);
                 }}
                 onAddStory={() => {
                   setResharedStoryData(null);
@@ -2259,10 +2263,12 @@ function MainApp() {
       {activeStory && (
         <StoryViewer
           story={activeStory}
+          userStories={activeStoryUserList}
           allStories={stories}
           initialShowViewers={savedStoryContext ? savedStoryContext.showViewers : false}
           onClose={() => {
             setActiveStory(null);
+            setActiveStoryUserList([]);
             setSavedStoryContext(null);
           }}
           onDeleteStory={async (storyId) => {
