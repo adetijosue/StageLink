@@ -1019,14 +1019,14 @@ function MainApp() {
                 }
                 
                 setChats(prevChats => {
-                  const merged = [...reconstructedChats];
+                  let finalMerged = [...reconstructedChats];
                   
                   prevChats.forEach(pc => {
-                    const existingIndex = merged.findIndex(mc => mc.id === pc.id);
+                    const existingIndex = finalMerged.findIndex(mc => mc.id === pc.id || (pc.participant?.id && mc.participant?.id === pc.participant.id));
                     if (existingIndex === -1) {
-                      merged.push(pc);
+                      finalMerged.push(pc);
                     } else {
-                      const targetChat = merged[existingIndex];
+                      const targetChat = finalMerged[existingIndex];
                       const localMsgs = pc.messages || [];
                       const remoteMsgs = targetChat.messages || [];
                       const combined = [...remoteMsgs];
@@ -1047,18 +1047,25 @@ function MainApp() {
 
                       combined.sort((a, b) => (a.createdAtTimestamp || 0) - (b.createdAtTimestamp || 0));
                       targetChat.messages = combined;
+                      if (combined.length > 0) {
+                        const lastM = combined[combined.length - 1];
+                        targetChat.lastMessageTime = lastM.timestamp || targetChat.lastMessageTime;
+                        targetChat.lastMessage = lastM.text || (lastM.isAudio ? '🎤 Audio' : (lastM.mediaUrl ? '📷 Média' : ''));
+                      }
                     }
                   });
 
-                  setStoredItem(STORAGE_KEYS.CHATS, merged);
-                  return merged;
-                });
-                setSelectedChat(prev => {
-                  if (prev) {
-                    const updatedActive = reconstructedChats.find(c => c.id === prev.id);
-                    if (updatedActive) return updatedActive;
-                  }
-                  return prev;
+                  setStoredItem(STORAGE_KEYS.CHATS, finalMerged);
+
+                  setSelectedChat(prev => {
+                    if (prev) {
+                      const updatedActive = finalMerged.find(c => c.id === prev.id || (prev.participant?.id && c.participant?.id === prev.participant.id));
+                      if (updatedActive) return updatedActive;
+                    }
+                    return prev;
+                  });
+
+                  return finalMerged;
                 });
               }
             } catch (e) { console.error("Suppressed error:", e); }
@@ -1421,28 +1428,43 @@ function MainApp() {
   };
 
   const handleStartChatWithUser = (targetUser) => {
+    if (!targetUser) return;
     window.history.pushState({ page: 'chat' }, '');
-    const existing = chats.find((c) => c.participant.id === targetUser.id || c.participant.name === targetUser.name || c.participant.name === targetUser.userName);
+    const targetId = targetUser.id;
+    const targetName = targetUser.name || targetUser.userName || targetUser.full_name;
+
+    const existing = (chats || []).find((c) => {
+      if (targetId && c.participant?.id) {
+        return String(c.participant.id).toLowerCase() === String(targetId).toLowerCase();
+      }
+      if (targetName && c.participant?.name && targetName !== 'Artiste StageLink' && targetName !== 'Artiste') {
+        return String(c.participant.name).toLowerCase() === String(targetName).toLowerCase();
+      }
+      return false;
+    });
+
     if (existing) {
       handleSelectChat(existing);
       setActiveTab('discussions');
     } else {
       const newChat = {
-        id: `chat_${targetUser.id}`,
+        id: `chat_${targetId || Date.now()}`,
         participant: {
-          id: targetUser.id,
-          name: targetUser.name || targetUser.userName || targetUser.full_name,
-          avatar: targetUser.avatar || targetUser.avatar_url,
-          role: targetUser.role || 'Artiste'
+          id: targetId || `usr_${Date.now()}`,
+          name: targetName || 'Artiste StageLink',
+          avatar: targetUser.avatar || targetUser.avatar_url || '',
+          role: targetUser.role || targetUser.userRole || 'Artiste'
         },
         unreadCount: 0,
         lastMessageTime: 'À l\'instant',
         messages: []
       };
 
-      const updatedChats = [newChat, ...chats];
-      setChats(updatedChats);
-      setStoredItem(STORAGE_KEYS.CHATS, updatedChats);
+      setChats(prevChats => {
+        const updated = [newChat, ...(prevChats || []).filter(c => c.id !== newChat.id)];
+        setStoredItem(STORAGE_KEYS.CHATS, updated);
+        return updated;
+      });
       setSelectedChat(newChat);
       setActiveTab('discussions');
     }

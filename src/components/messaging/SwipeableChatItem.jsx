@@ -56,6 +56,13 @@ export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDel
   }, []);
 
   const lastMsg = chat.messages && chat.messages.length > 0 ? chat.messages[chat.messages.length - 1] : null;
+  const lastMsgPreview = lastMsg 
+    ? (lastMsg.text || (lastMsg.isAudio ? '🎤 Message audio' : (lastMsg.isVideo ? '📹 Vidéo' : (lastMsg.mediaUrl ? '📷 Photo' : (lastMsg.isCallNotice ? '📞 Appel' : 'Message')))))
+    : (chat.lastMessage || 'Aucun message');
+
+  const partnerName = chat.participant?.name || chat.participant?.fullName || 'Artiste StageLink';
+  const partnerAvatar = chat.participant?.avatar || chat.participant?.avatarUrl || '';
+  const isOnline = Boolean(chat.participant?.online);
 
   return (
     <div 
@@ -83,7 +90,7 @@ export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDel
       }}>
         {/* Toggle Unread */}
         <button
-          onClick={(e) => { e.stopPropagation(); setCurrentX(0); onToggleUnread(chat); }}
+          onClick={(e) => { e.stopPropagation(); setCurrentX(0); onToggleUnread && onToggleUnread(chat); }}
           style={{ width: `${ACTION_WIDTH}px`, border: 'none', background: '#3B82F6', color: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
         >
           <MessageCircle size={18} />
@@ -91,7 +98,7 @@ export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDel
         </button>
         {/* Archive */}
         <button
-          onClick={(e) => { e.stopPropagation(); setCurrentX(0); onArchive(chat); }}
+          onClick={(e) => { e.stopPropagation(); setCurrentX(0); onArchive && onArchive(chat); }}
           style={{ width: `${ACTION_WIDTH}px`, border: 'none', background: '#F59E0B', color: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
         >
           <Archive size={18} />
@@ -99,7 +106,7 @@ export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDel
         </button>
         {/* Delete */}
         <button
-          onClick={(e) => { e.stopPropagation(); setCurrentX(0); onDelete(chat); }}
+          onClick={(e) => { e.stopPropagation(); setCurrentX(0); onDelete && onDelete(chat); }}
           style={{ width: `${ACTION_WIDTH}px`, border: 'none', background: '#EF4444', color: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
         >
           <Trash2 size={18} />
@@ -113,7 +120,7 @@ export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDel
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onClick={() => {
-          if (currentX === 0) onSelectChat(chat);
+          if (currentX === 0) onSelectChat && onSelectChat(chat);
           else setCurrentX(0); // Close swipe on tap
         }}
         style={{
@@ -135,14 +142,14 @@ export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDel
         {/* Avatar with Online indicator */}
         <div style={{ position: 'relative' }}>
           <UserAvatar 
-            user={{ avatar: chat.participant.avatar, name: chat.participant.name }} 
+            user={{ avatar: partnerAvatar, name: partnerName }} 
             size={48} 
             onClick={(e) => {
               e.stopPropagation();
-              if (onOpenPublicProfile) onOpenPublicProfile(chat.participant);
+              if (onOpenPublicProfile && chat.participant) onOpenPublicProfile(chat.participant);
             }}
           />
-          {chat.participant.online && (
+          {isOnline && (
             <span style={{
               position: 'absolute',
               bottom: '2px',
@@ -160,10 +167,10 @@ export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDel
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
             <h4 style={{ fontSize: '0.92rem', fontWeight: chat.unreadCount > 0 ? 800 : 700, color: 'var(--text-dark)' }}>
-              {chat.participant.name}
+              {partnerName}
             </h4>
             <span style={{ fontSize: '0.72rem', color: chat.unreadCount > 0 ? '#0066FF' : 'var(--text-muted)' }}>
-              {chat.lastMessageTime}
+              {chat.lastMessageTime || 'Récemment'}
             </span>
           </div>
           <p style={{
@@ -174,7 +181,7 @@ export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDel
             overflow: 'hidden',
             textOverflow: 'ellipsis'
           }}>
-            {lastMsg ? lastMsg.text : 'Aucun message'}
+            {lastMsgPreview}
           </p>
         </div>
 
