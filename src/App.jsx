@@ -465,9 +465,15 @@ function MainApp() {
                 };
               });
 
-              // Merge local stories that might still be active
+              // Merge all active local stories (from all users) less than 24h old
               const freshIds = new Set(mappedSupa.map(s => s.id));
-              const localUnsynced = (loadedStories || []).filter(ls => !freshIds.has(ls.id) && (ls.userId === currentUser?.id || ls.user_id === currentUser?.id));
+              const now = Date.now();
+              const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+              const localUnsynced = (loadedStories || []).filter(ls => {
+                if (freshIds.has(ls.id)) return false;
+                const storyTimestamp = ls.createdAtTimestamp || (ls.created_at ? new Date(ls.created_at).getTime() : (ls.expires_at ? new Date(ls.expires_at).getTime() - ONE_DAY_MS : now));
+                return (now - storyTimestamp) < ONE_DAY_MS;
+              });
               loadedStories = [...localUnsynced, ...mappedSupa];
               setStoredItem(STORAGE_KEYS.STORIES, loadedStories);
             }
@@ -853,12 +859,16 @@ function MainApp() {
               };
             });
 
-            // Smart Merge: Preserve any recent locally created stories not yet returned by Supabase
+            // Smart Merge: Preserve all active stories from all users within 24 hours
             setStories(prevStories => {
               const freshIds = new Set(freshStories.map(s => s.id));
-              const localUnsynced = (prevStories || []).filter(localS => 
-                !freshIds.has(localS.id) && (localS.userId === currentUser?.id || localS.user_id === currentUser?.id)
-              );
+              const now = Date.now();
+              const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+              const localUnsynced = (prevStories || []).filter(localS => {
+                if (freshIds.has(localS.id)) return false;
+                const storyTimestamp = localS.createdAtTimestamp || (localS.created_at ? new Date(localS.created_at).getTime() : (localS.expires_at ? new Date(localS.expires_at).getTime() - ONE_DAY_MS : now));
+                return (now - storyTimestamp) < ONE_DAY_MS;
+              });
               const merged = [...localUnsynced, ...freshStories];
               setStoredItem(STORAGE_KEYS.STORIES, merged);
               return merged;
@@ -1820,6 +1830,7 @@ function MainApp() {
         isReshared: storyData.isReshared || false,
         resharedFrom: storyData.resharedFrom || null,
         privacyType: privacyType,
+        createdAtTimestamp: Date.now(),
         time: 'À l\'instant'
       };
 
