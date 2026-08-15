@@ -12,29 +12,17 @@ export default function StoryBar({
 }) {
   const { currentUser } = useAuth();
 
-  // Helper to extract all identifier keys from a story
-  const extractStoryKeys = (s) => {
-    if (!s) return [];
-    const keys = [];
-    if (s.userId) keys.push(`id:${String(s.userId).toLowerCase().trim()}`);
-    if (s.user_id) keys.push(`id:${String(s.user_id).toLowerCase().trim()}`);
-    if (s.authorId) keys.push(`id:${String(s.authorId).toLowerCase().trim()}`);
-    if (s.author_id) keys.push(`id:${String(s.author_id).toLowerCase().trim()}`);
-    if (s.userName) keys.push(`name:${String(s.userName).toLowerCase().trim()}`);
-    if (s.user_name) keys.push(`name:${String(s.user_name).toLowerCase().trim()}`);
-    if (s.authorName) keys.push(`name:${String(s.authorName).toLowerCase().trim()}`);
-    if (s.author_name) keys.push(`name:${String(s.author_name).toLowerCase().trim()}`);
-    return keys;
-  };
-
+  // Precise identification of current user stories (Strictly by userId to prevent name collision)
   const isCurrentUserStory = (s) => {
     if (!s || !currentUser) return false;
-    const currentKeys = new Set();
-    if (currentUser.id) currentKeys.add(`id:${String(currentUser.id).toLowerCase().trim()}`);
-    if (currentUser.name) currentKeys.add(`name:${String(currentUser.name).toLowerCase().trim()}`);
-
-    const storyKeys = extractStoryKeys(s);
-    return storyKeys.some(k => currentKeys.has(k));
+    const sUserId = s.userId || s.user_id || s.authorId || s.author_id;
+    if (sUserId && currentUser.id) {
+      return String(sUserId).toLowerCase().trim() === String(currentUser.id).toLowerCase().trim();
+    }
+    if (s.userName && currentUser.name && s.userName !== 'Artiste StageLink' && s.userName !== 'Artiste' && s.userName !== 'Moi') {
+      return String(s.userName).toLowerCase().trim() === String(currentUser.name).toLowerCase().trim();
+    }
+    return false;
   };
 
   // 1. Separate current user's stories from other users
@@ -42,58 +30,35 @@ export default function StoryBar({
   const otherStories = (stories || []).filter(s => !isCurrentUserStory(s));
   const myLatestStory = myStories.length > 0 ? myStories[0] : null;
 
-  // 2. Strict Union-Find Grouping for other users' stories (1 card per creator)
-  // If Story A and Story B share ANY key (same userId OR same userName), they merge into the SAME group!
-  const creatorGroups = []; // Array of { keys: Set, stories: [] }
+  // 2. Strict Per-Creator Grouping for other users' stories (1 card per creator with all their stories grouped)
+  const creatorGroupsMap = new Map();
 
   otherStories.forEach(story => {
-    const sKeys = extractStoryKeys(story);
-    if (sKeys.length === 0) {
-      sKeys.push(`story:${story.id}`);
-    }
+    const authorId = story.userId || story.user_id || story.authorId || story.author_id;
+    const authorKey = authorId
+      ? `uid_${String(authorId).toLowerCase().trim()}`
+      : (story.userName && story.userName !== 'Artiste StageLink' ? `name_${String(story.userName).toLowerCase().trim()}` : `story_${story.id}`);
 
-    // Find all existing groups that match at least one key of this story
-    const matchingGroupIndices = [];
-    creatorGroups.forEach((group, idx) => {
-      const hasMatch = sKeys.some(k => group.keys.has(k));
-      if (hasMatch) {
-        matchingGroupIndices.push(idx);
-      }
-    });
-
-    if (matchingGroupIndices.length === 0) {
-      // Create new group
-      creatorGroups.push({
-        keys: new Set(sKeys),
-        stories: [story]
+    if (!creatorGroupsMap.has(authorKey)) {
+      creatorGroupsMap.set(authorKey, {
+        ...story,
+        groupId: authorKey,
+        userStories: [story]
       });
     } else {
-      // Merge all matching groups into the first matching group
-      const firstIdx = matchingGroupIndices[0];
-      const targetGroup = creatorGroups[firstIdx];
-
-      // Add story to target group
-      targetGroup.stories.push(story);
-      sKeys.forEach(k => targetGroup.keys.add(k));
-
-      // If multiple groups matched (e.g. one had name, one had id), merge them into target
-      for (let i = matchingGroupIndices.length - 1; i > 0; i--) {
-        const mergeIdx = matchingGroupIndices[i];
-        const otherGroup = creatorGroups[mergeIdx];
-        otherGroup.stories.forEach(st => targetGroup.stories.push(st));
-        otherGroup.keys.forEach(k => targetGroup.keys.add(k));
-        creatorGroups.splice(mergeIdx, 1);
-      }
+      const existingGroup = creatorGroupsMap.get(authorKey);
+      existingGroup.userStories.push(story);
     }
   });
 
-  // Convert merged groups to final card items
-  const groupedOtherStories = creatorGroups.map(group => {
-    const userStoriesList = group.stories;
+  // Convert map to grouped other stories array
+  const groupedOtherStories = Array.from(creatorGroupsMap.values()).map(group => {
+    const userStoriesList = group.userStories || [group];
     const latestStory = userStoriesList[0];
     const hasUnread = userStoriesList.some(s => s.hasUnread !== false);
     return {
       ...latestStory,
+      groupId: group.groupId,
       storiesCount: userStoriesList.length,
       userStories: userStoriesList,
       hasUnread

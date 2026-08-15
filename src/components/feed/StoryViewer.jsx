@@ -21,14 +21,18 @@ export default function StoryViewer({
 }) {
   const { currentUser } = useAuth();
 
-  // Helper to extract keys for author matching
+  // Helper to extract keys for author matching (strictly by userId)
   const extractStoryKeys = (s) => {
     if (!s) return [];
     const keys = [];
-    if (s.userId) keys.push(`id:${String(s.userId).toLowerCase().trim()}`);
-    if (s.user_id) keys.push(`id:${String(s.user_id).toLowerCase().trim()}`);
-    if (s.userName) keys.push(`name:${String(s.userName).toLowerCase().trim()}`);
-    if (s.user_name) keys.push(`name:${String(s.user_name).toLowerCase().trim()}`);
+    const uid = s.userId || s.user_id || s.authorId || s.author_id;
+    if (uid) {
+      keys.push(`id:${String(uid).toLowerCase().trim()}`);
+    } else if (s.userName && s.userName !== 'Artiste StageLink' && s.userName !== 'Artiste' && s.userName !== 'Moi') {
+      keys.push(`name:${String(s.userName).toLowerCase().trim()}`);
+    } else if (s.id) {
+      keys.push(`story:${String(s.id).toLowerCase().trim()}`);
+    }
     return keys;
   };
 
@@ -86,10 +90,9 @@ export default function StoryViewer({
   }, [currentIndex, currentStory?.id]);
 
   const isOwner = currentUser && currentStory && (
-    currentUser.id === currentStory.userId ||
-    currentUser.id === currentStory.user_id ||
-    currentUser.name === currentStory.userName ||
-    currentStory.isOwner === true
+    (currentStory.userId && String(currentUser.id).toLowerCase().trim() === String(currentStory.userId).toLowerCase().trim()) ||
+    (currentStory.user_id && String(currentUser.id).toLowerCase().trim() === String(currentStory.user_id).toLowerCase().trim()) ||
+    (currentStory.isOwner === true)
   );
 
   const activeMediaUrl = currentStory?.mediaUrl || currentStory?.storyMedia || currentStory?.media || currentStory?.media_url || currentStory?.image || currentStory?.videoUrl || currentStory?.video_url || currentStory?.video || currentStory?.url;
