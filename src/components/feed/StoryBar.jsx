@@ -120,10 +120,20 @@ export default function StoryBar({
       return (
         <video
           src={videoSrc}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          autoPlay
+          loop
           muted
           playsInline
-          preload="metadata"
+          webkit-playsinline="true"
+          preload="auto"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
+          onError={(e) => {
+            // Graceful fallback if video fails to load on some devices
+            const parent = e.currentTarget.parentElement;
+            if (parent) {
+              e.currentTarget.style.display = 'none';
+            }
+          }}
         />
       );
     }
@@ -131,8 +141,14 @@ export default function StoryBar({
       <img
         src={media}
         alt={s.userName || 'Story'}
+        loading="eager"
+        decoding="async"
+        crossOrigin="anonymous"
         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-        loading="lazy"
+        onError={(e) => {
+          // Graceful fallback to gradient background if image URL fails
+          e.currentTarget.style.display = 'none';
+        }}
       />
     );
   };

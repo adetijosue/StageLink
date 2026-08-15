@@ -12,28 +12,30 @@ function SwipeableNotificationItem({ item, onClick, onDelete }) {
   const isHorizontalSwipeRef = useRef(false);
   const containerRef = useRef(null);
 
-  const DELETE_SNAP_WIDTH = 75; // Width of revealed delete button
-  const AUTO_DELETE_THRESHOLD = 130; // Threshold to auto delete on fling
+  const DELETE_SNAP_WIDTH = 80; // Width of revealed delete button
+  const AUTO_DELETE_THRESHOLD = 110; // Threshold to auto delete on fast fling
 
-  const handleTouchStart = (e) => {
-    const touch = e.touches ? e.touches[0] : e;
-    touchStartXRef.current = touch.clientX;
-    touchStartYRef.current = touch.clientY;
+  const handleStart = (e) => {
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    touchStartXRef.current = clientX;
+    touchStartYRef.current = clientY;
     isHorizontalSwipeRef.current = false;
     setIsSwiping(true);
   };
 
-  const handleTouchMove = (e) => {
+  const handleMove = (e) => {
     if (!isSwiping) return;
-    const touch = e.touches ? e.touches[0] : e;
-    const diffX = touch.clientX - touchStartXRef.current;
-    const diffY = touch.clientY - touchStartYRef.current;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const diffX = clientX - touchStartXRef.current;
+    const diffY = clientY - touchStartYRef.current;
 
-    // Detect if movement is primarily horizontal
+    // Detect if gesture is horizontal
     if (!isHorizontalSwipeRef.current) {
-      if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 8) {
+      if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 6) {
         isHorizontalSwipeRef.current = true;
-      } else if (Math.abs(diffY) > 10) {
+      } else if (Math.abs(diffY) > 8) {
         setIsSwiping(false);
         return;
       }
@@ -43,11 +45,11 @@ function SwipeableNotificationItem({ item, onClick, onDelete }) {
       if (e.cancelable && e.preventDefault) {
         e.preventDefault();
       }
-      // Only allow swiping to the left (negative diff)
+      // Swipe left (negative) or right resistance
       if (diffX < 0) {
-        setSwipeOffset(Math.max(diffX, -AUTO_DELETE_THRESHOLD - 30));
+        setSwipeOffset(Math.max(diffX, -AUTO_DELETE_THRESHOLD - 40));
       } else {
-        setSwipeOffset(Math.min(diffX * 0.2, 20)); // slight resistance on right swipe
+        setSwipeOffset(Math.min(diffX * 0.15, 15));
       }
     }
   };
@@ -60,17 +62,17 @@ function SwipeableNotificationItem({ item, onClick, onDelete }) {
     setIsDeleting(true);
     setTimeout(() => {
       onDelete(item.id);
-    }, 250);
+    }, 240);
   };
 
-  const handleTouchEnd = () => {
+  const handleEnd = () => {
     if (!isSwiping) return;
     setIsSwiping(false);
 
     if (Math.abs(swipeOffset) >= AUTO_DELETE_THRESHOLD) {
       triggerDelete();
-    } else if (swipeOffset < -DELETE_SNAP_WIDTH / 1.5) {
-      setSwipeOffset(-DELETE_SNAP_WIDTH); // snap open delete button
+    } else if (swipeOffset < -DELETE_SNAP_WIDTH / 1.6) {
+      setSwipeOffset(-DELETE_SNAP_WIDTH); // snap open
     } else {
       setSwipeOffset(0); // snap closed
     }
@@ -100,12 +102,13 @@ function SwipeableNotificationItem({ item, onClick, onDelete }) {
         position: 'relative',
         overflow: 'hidden',
         borderRadius: '16px',
-        maxHeight: isDeleting ? '0px' : '110px',
+        maxHeight: isDeleting ? '0px' : '120px',
         opacity: isDeleting ? 0 : 1,
         transform: isDeleting ? 'translateX(-100%)' : 'none',
-        transition: isDeleting ? 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)' : 'max-height 0.25s ease',
+        transition: isDeleting ? 'all 0.24s cubic-bezier(0.4, 0, 0.2, 1)' : 'max-height 0.24s ease',
         marginBottom: isDeleting ? '0px' : '8px',
-        userSelect: 'none'
+        userSelect: 'none',
+        touchAction: 'pan-y'
       }}
     >
       {/* Background Red Delete Action Container */}
@@ -139,12 +142,12 @@ function SwipeableNotificationItem({ item, onClick, onDelete }) {
 
       {/* Foreground Notification Content Card */}
       <div
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onMouseDown={handleTouchStart}
-        onMouseMove={(e) => { if (isSwiping) handleTouchMove(e); }}
-        onMouseUp={handleTouchEnd}
+        onTouchStart={handleStart}
+        onTouchMove={handleMove}
+        onTouchEnd={handleEnd}
+        onMouseDown={handleStart}
+        onMouseMove={(e) => { if (isSwiping) handleMove(e); }}
+        onMouseUp={handleEnd}
         onClick={() => {
           if (swipeOffset === 0) {
             onClick(item);
@@ -164,6 +167,7 @@ function SwipeableNotificationItem({ item, onClick, onDelete }) {
           alignItems: 'center',
           gap: '12px',
           cursor: 'pointer',
+          touchAction: 'pan-y',
           transform: `translateX(${swipeOffset}px)`,
           transition: isSwiping ? 'none' : 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), background-color 0.15s ease'
         }}

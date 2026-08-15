@@ -2334,12 +2334,20 @@ function MainApp() {
               setActiveStoryUserList([]);
             }
 
+            // Dispatch global event for multi-tab/realtime instant update
+            try {
+              window.dispatchEvent(new CustomEvent('storyDeleted', { detail: { storyId } }));
+            } catch (e) {}
+
             if (isSupabaseConfigured() && storyId) {
               try {
-                await supabase.from('stories').delete().eq('id', storyId);
+                const { error: delErr } = await supabase.from('stories').delete().eq('id', storyId);
+                if (delErr) console.warn('Supabase story delete note:', delErr);
               } catch (se) {
                 console.warn('Supabase story deletion note:', se?.message || se);
               }
+              // Immediately sync fresh stories list
+              syncPostsStoriesAndProfiles();
             }
           }}
           onLikeStory={handleLikeStory}
@@ -2540,76 +2548,9 @@ function MainApp() {
 }
 
 export default function App() {
-  const [showSplash, setShowSplash] = useState(() => {
-    let isExplicitReload = false;
-    try {
-      if (window.performance && window.performance.getEntriesByType) {
-        const navEntries = window.performance.getEntriesByType('navigation');
-        if (navEntries && navEntries.length > 0) {
-          isExplicitReload = navEntries[0].type === 'reload';
-        }
-      } else if (window.performance && window.performance.navigation) {
-        isExplicitReload = window.performance.navigation.type === 1;
-      }
-    } catch (e) { console.error("Suppressed error:", e); }
-
-    let lastActiveTime = 0;
-    let hasSeenSession = false;
-    try {
-      hasSeenSession = sessionStorage.getItem('hasSeenSplashSession');
-      lastActiveTime = parseInt(localStorage.getItem('stagelink_last_active') || '0', 10);
-    } catch (e) { console.error("Suppressed error:", e); }
-
-    const now = Date.now();
-    const isRecentBackgroundResume = lastActiveTime > 0 && (now - lastActiveTime) < (12 * 60 * 60 * 1000);
-
-    // If resuming from screen unlock or background multitasking, skip splash animation!
-    if (isRecentBackgroundResume && !isExplicitReload && hasSeenSession) {
-      return false;
-    }
-
-    // Play splash animation on cold start launch or explicit reload
-    if (!hasSeenSession || isExplicitReload) {
-      return true;
-    }
-
-    return false;
-  });
-
-  // Track app activity & screen lock/unlock to keep background session active
-  useEffect(() => {
-    const updateActiveTime = () => {
-      try {
-        localStorage.setItem('stagelink_last_active', Date.now().toString());
-        sessionStorage.setItem('hasSeenSplashSession', 'true');
-      } catch (e) { console.error("Suppressed error:", e); }
-    };
-
-    updateActiveTime();
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        updateActiveTime();
-        setShowSplash(false); // Never trigger splash animation when unlocking screen
-      } else {
-        updateActiveTime();
-      }
-    };
-
-    window.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('pagehide', updateActiveTime);
-
-    return () => {
-      window.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('pagehide', updateActiveTime);
-    };
-  }, []);
+  const [showSplash, setShowSplash] = useState(true);
 
   const handleFinishSplash = () => {
-    try {
-      sessionStorage.setItem('hasSeenSplashSession', 'true');
-      localStorage.setItem('stagelink_last_active', Date.now().toString());
-    } catch (e) { console.error("Suppressed error:", e); }
     setShowSplash(false);
   };
 

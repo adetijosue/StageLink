@@ -300,12 +300,7 @@ CREATE POLICY "Tout le monde peut publier des stories"
 DROP POLICY IF EXISTS "Les utilisateurs peuvent supprimer leurs stories" ON public.stories;
 DROP POLICY IF EXISTS "Tout le monde peut supprimer des stories" ON public.stories;
 CREATE POLICY "Tout le monde peut supprimer des stories"
-    ON public.stories FOR DELETE USING (auth.uid() = user_id OR true);
-
-DROP POLICY IF EXISTS "Les utilisateurs peuvent supprimer leurs stories" ON public.stories;
-DROP POLICY IF EXISTS "Les utilisateurs peuvent supprimer leurs stories" ON public.stories;
-CREATE POLICY "Les utilisateurs peuvent supprimer leurs stories"
-    ON public.stories FOR DELETE USING (auth.uid() = user_id);
+    ON public.stories FOR DELETE USING (true);
 
 -- ── MATCHES ──
 DROP POLICY IF EXISTS "Les utilisateurs voient leurs propres matches" ON public.matches;
