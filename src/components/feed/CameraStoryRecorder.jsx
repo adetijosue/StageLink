@@ -1,15 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Check, RotateCcw, Mic, Type, Camera, Play, Pause, Trash2, Repeat, Image as ImageIcon, Zap, ZapOff, Grid, Video as VideoIcon, Sparkles } from 'lucide-react';
+import { X, Check, RotateCcw, Mic, Type, Camera, Play, Pause, Trash2, Repeat, Image as ImageIcon, Zap, ZapOff, Grid, Video as VideoIcon, Sparkles, Shield, Settings, CheckSquare, Square } from 'lucide-react';
 import Logo from '../common/Logo';
 import { soundEngine } from '../../services/audioService';
+import UserAvatar from '../common/UserAvatar';
 
-export default function CameraStoryRecorder({ isOpen, onClose, onStoryCreated, resharedStoryData }) {
+export default function CameraStoryRecorder({ isOpen, onClose, onStoryCreated, resharedStoryData, users = [] }) {
   const [creationMode, setCreationMode] = useState('camera'); // 'camera' | 'video' | 'text' | 'audio'
   const [facingMode, setFacingMode] = useState('user'); // 'user' | 'environment'
   const [cameraActive, setCameraActive] = useState(false);
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [gridEnabled, setGridEnabled] = useState(false);
   const [allowReshare, setAllowReshare] = useState(true);
+
+  // Privacy / Zero-Trust Audience State
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+  const [privacyType, setPrivacyType] = useState('all_contacts'); // 'all_contacts' | 'include_only' | 'exclude'
+  const [audienceRules, setAudienceRules] = useState([]);
 
   // Text Story State
   const [textStoryContent, setTextStoryContent] = useState('');
@@ -284,37 +290,39 @@ export default function CameraStoryRecorder({ isOpen, onClose, onStoryCreated, r
     const isReshared = !!resharedStoryData;
     const resharedFrom = resharedStoryData ? (resharedStoryData.resharedFrom || resharedStoryData.userName) : null;
 
+    const basePayload = {
+      allowReshare: allowReshare,
+      isReshared: isReshared,
+      resharedFrom: resharedFrom,
+      privacyType: privacyType,
+      audienceRules: audienceRules
+    };
+
     if (creationMode === 'text') {
       if (!textStoryContent.trim()) return;
       onStoryCreated({
+        ...basePayload,
         caption: textStoryContent.trim(),
         storyMedia: null,
         bgGradient: textBgGradient,
-        isTextStory: true,
-        allowReshare: allowReshare,
-        isReshared: isReshared,
-        resharedFrom: resharedFrom
+        isTextStory: true
       });
     } else if (creationMode === 'audio') {
       if (!audioBlobUrl) return;
       onStoryCreated({
+        ...basePayload,
         caption: captionText.trim() || `🎙️ Story Vocal Audio (${recordingSeconds || 5}s)`,
         storyMedia: null,
         audioUrl: audioBlobUrl,
         hasAudio: true,
-        bgGradient: 'linear-gradient(135deg, #8B5CF6, #6D28D9)',
-        allowReshare: allowReshare,
-        isReshared: isReshared,
-        resharedFrom: resharedFrom
+        bgGradient: 'linear-gradient(135deg, #8B5CF6, #6D28D9)'
       });
     } else {
       if (!capturedImage) return;
       onStoryCreated({
+        ...basePayload,
         caption: captionText.trim() || (isReshared ? `Repartagé de ${resharedFrom}` : 'Ma story StageLink 🎤🔥'),
-        storyMedia: capturedImage,
-        allowReshare: allowReshare,
-        isReshared: isReshared,
-        resharedFrom: resharedFrom
+        storyMedia: capturedImage
       });
     }
     onClose();
@@ -567,6 +575,28 @@ export default function CameraStoryRecorder({ isOpen, onClose, onStoryCreated, r
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Logo size="small" variant="icon-only" />
+          
+          <button
+            onClick={() => setIsPrivacyModalOpen(true)}
+            style={{
+              background: 'rgba(255,255,255,0.15)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: '20px',
+              padding: '4px 10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: '#FFF',
+              fontSize: '0.75rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              backdropFilter: 'blur(10px)',
+              marginLeft: '8px'
+            }}
+          >
+            <Shield size={14} fill={privacyType === 'all_contacts' ? 'none' : '#22C55E'} color={privacyType === 'all_contacts' ? '#FFF' : '#22C55E'} />
+            {privacyType === 'all_contacts' ? 'Public' : (privacyType === 'include_only' ? 'Restreint' : 'Exclusif')}
+          </button>
         </div>
 
         {/* Quick Camera Utilities (Flash, Grid, Switch Camera) */}
@@ -943,6 +973,124 @@ export default function CameraStoryRecorder({ isOpen, onClose, onStoryCreated, r
           </>
         )}
       </div>
+
+      {/* Privacy Settings Modal Overlay */}
+      {isPrivacyModalOpen && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.85)',
+          backdropFilter: 'blur(10px)',
+          zIndex: 9999,
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          {/* Header */}
+          <div style={{ padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <h2 style={{ margin: 0, color: '#FFF', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Shield size={20} color="#22C55E" /> Confidentialité
+            </h2>
+            <button onClick={() => setIsPrivacyModalOpen(false)} style={{ background: 'none', border: 'none', color: '#FFF', cursor: 'pointer' }}>
+              <X size={24} />
+            </button>
+          </div>
+
+          {/* Privacy Type Selector */}
+          <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <p style={{ color: '#94A3B8', fontSize: '0.9rem', marginTop: 0, marginBottom: '16px' }}>Qui peut voir mon statut ?</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              
+              <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#FFF', cursor: 'pointer', background: privacyType === 'all_contacts' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '12px', border: privacyType === 'all_contacts' ? '1px solid #22C55E' : '1px solid transparent' }}>
+                <input type="radio" checked={privacyType === 'all_contacts'} onChange={() => { setPrivacyType('all_contacts'); setAudienceRules([]); }} style={{ display: 'none' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: '600' }}>Mes contacts (Abonnés)</div>
+                  <div style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Tous vos contacts actuels.</div>
+                </div>
+                {privacyType === 'all_contacts' && <Check size={18} color="#22C55E" />}
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#FFF', cursor: 'pointer', background: privacyType === 'exclude' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '12px', border: privacyType === 'exclude' ? '1px solid #22C55E' : '1px solid transparent' }}>
+                <input type="radio" checked={privacyType === 'exclude'} onChange={() => setPrivacyType('exclude')} style={{ display: 'none' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: '600' }}>Mes contacts sauf...</div>
+                  <div style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Masquer à certains abonnés.</div>
+                </div>
+                {privacyType === 'exclude' && <Check size={18} color="#22C55E" />}
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#FFF', cursor: 'pointer', background: privacyType === 'include_only' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '12px', border: privacyType === 'include_only' ? '1px solid #22C55E' : '1px solid transparent' }}>
+                <input type="radio" checked={privacyType === 'include_only'} onChange={() => setPrivacyType('include_only')} style={{ display: 'none' }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: '600' }}>Ne partager qu'avec...</div>
+                  <div style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Afficher à une sélection d'amis proches.</div>
+                </div>
+                {privacyType === 'include_only' && <Check size={18} color="#22C55E" />}
+              </label>
+            </div>
+          </div>
+
+          {/* User Selection List (Only if exclude or include) */}
+          {privacyType !== 'all_contacts' && (
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+              <h3 style={{ margin: '0 0 16px 0', color: '#FFF', fontSize: '0.95rem' }}>Sélectionner les utilisateurs</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {users.length > 0 ? users.map(user => {
+                  const isSelected = audienceRules.includes(user.id);
+                  return (
+                    <div 
+                      key={user.id} 
+                      onClick={() => {
+                        if (isSelected) {
+                          setAudienceRules(audienceRules.filter(id => id !== user.id));
+                        } else {
+                          setAudienceRules([...audienceRules, user.id]);
+                        }
+                      }}
+                      style={{ 
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px', 
+                        background: 'rgba(255,255,255,0.05)', borderRadius: '12px', cursor: 'pointer' 
+                      }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <UserAvatar user={user} size={36} />
+                        <div>
+                          <div style={{ color: '#FFF', fontWeight: '500', fontSize: '0.9rem' }}>{user.full_name || user.name}</div>
+                          <div style={{ color: '#94A3B8', fontSize: '0.75rem' }}>{user.role}</div>
+                        </div>
+                      </div>
+                      <div style={{ color: isSelected ? '#22C55E' : '#475569' }}>
+                        {isSelected ? <CheckSquare size={20} /> : <Square size={20} />}
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <p style={{ color: '#94A3B8', fontSize: '0.9rem', textAlign: 'center' }}>Aucun contact disponible pour le moment.</p>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* Action Bar */}
+          <div style={{ padding: '20px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <button 
+              onClick={() => setIsPrivacyModalOpen(false)}
+              style={{
+                width: '100%',
+                padding: '14px',
+                background: '#22C55E',
+                color: '#FFF',
+                border: 'none',
+                borderRadius: '16px',
+                fontWeight: 'bold',
+                fontSize: '1rem',
+                cursor: 'pointer'
+              }}
+            >
+              Appliquer la configuration
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

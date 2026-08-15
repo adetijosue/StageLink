@@ -21,20 +21,24 @@ export default function StoryViewer({
 }) {
   const { currentUser } = useAuth();
 
-  // Extract canonical author ID
-  const getAuthorId = (s) => {
-    if (!s) return null;
-    const id = s.userId || s.user_id || s.authorId || s.author_id;
-    return id ? String(id).toLowerCase().trim() : null;
+  // Helper to extract keys for author matching
+  const extractStoryKeys = (s) => {
+    if (!s) return [];
+    const keys = [];
+    if (s.userId) keys.push(`id:${String(s.userId).toLowerCase().trim()}`);
+    if (s.user_id) keys.push(`id:${String(s.user_id).toLowerCase().trim()}`);
+    if (s.userName) keys.push(`name:${String(s.userName).toLowerCase().trim()}`);
+    if (s.user_name) keys.push(`name:${String(s.user_name).toLowerCase().trim()}`);
+    return keys;
   };
 
-  const activeAuthorId = getAuthorId(story);
+  const activeStoryKeys = new Set(extractStoryKeys(story));
 
   const currentAuthorStories = (userStories && userStories.length > 0)
     ? userStories
     : (allStories || []).filter(s => {
-        const sAuthorId = getAuthorId(s);
-        return activeAuthorId && sAuthorId && activeAuthorId === sAuthorId;
+        const sKeys = extractStoryKeys(s);
+        return sKeys.some(k => activeStoryKeys.has(k));
       });
 
   const playlist = currentAuthorStories.length > 0 ? currentAuthorStories : (story ? [story] : []);
@@ -493,6 +497,50 @@ export default function StoryViewer({
             </div>
           ) : (
             <form onSubmit={handleSendReplyToInbox} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {/* Quick Emoji Reactions */}
+              {!isOwner && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '100%',
+                  left: 0,
+                  right: 0,
+                  display: 'flex',
+                  justifyContent: 'center',
+                  gap: '12px',
+                  padding: '8px 0',
+                  marginBottom: '10px'
+                }}>
+                  {['😂', '😮', '😍', '😢', '👏', '🔥'].map(emoji => (
+                    <button
+                      key={emoji}
+                      onClick={() => {
+                        const replyHandler = onSendReply || onReplyToInbox;
+                        if (replyHandler) replyHandler(currentStory, emoji);
+                        soundEngine.playPopSound();
+                        setReplySent(true);
+                        setTimeout(() => setReplySent(false), 2000);
+                      }}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        backdropFilter: 'blur(10px)',
+                        border: '1px solid rgba(255, 255, 255, 0.4)',
+                        fontSize: '1.4rem',
+                        padding: '6px 10px',
+                        borderRadius: '24px',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s',
+                        color: 'transparent',
+                        textShadow: '0 0 0 white' // Just visual trick for some emojis if needed, or normal:
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.2)'}
+                      onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <input
                 type="text"
                 placeholder={`Envoyer un message à ${currentStory.userName.split(' ')[0]}...`}
@@ -527,7 +575,8 @@ export default function StoryViewer({
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: replyText.trim() ? 'pointer' : 'default',
-                  transition: 'background-color 0.2s ease'
+                  transition: 'background-color 0.2s ease',
+                  flexShrink: 0
                 }}
               >
                 <Send size={18} />

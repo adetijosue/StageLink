@@ -821,17 +821,8 @@ function MainApp() {
                 time: 'Récemment'
               };
             });
-            // Deduplicate by story ID to prevent race-condition duplicates
-            const deduped = [];
-            const seenIds = new Set();
-            freshStories.forEach(s => {
-              if (!seenIds.has(s.id)) {
-                seenIds.add(s.id);
-                deduped.push(s);
-              }
-            });
-            setStories(deduped);
-            setStoredItem(STORAGE_KEYS.STORIES, deduped);
+            setStories(freshStories);
+            setStoredItem(STORAGE_KEYS.STORIES, freshStories);
           }
         } catch (e) { console.error("Suppressed error:", e); }
       };
@@ -1431,21 +1422,38 @@ function MainApp() {
       updatedChatsList = updatedChatsList.map((c) => (c.id === targetChat.id ? targetChat : c));
 
       // Save story reply directly to Supabase Database
-      if (isSupabaseConfigured() && targetUserId) {
+      if (isSupabaseConfigured() && targetUserId && !targetUserId.startsWith('usr_')) {
         try {
+          const messageMetadata = {
+            isStoryComment: true,
+            storyId: storyUser.id,
+            storyUserId: targetUserId,
+            storyUserName: targetUserName,
+            storyUserAvatar: targetAvatar,
+            storyThumbnail: rawMedia,
+            storyMedia: rawMedia,
+            storyCaption: storyUser.caption || null,
+            storyBgGradient: storyUser.bgGradient || 'linear-gradient(135deg, #0066FF, #0047FF)',
+            storyIsText: storyUser.isTextStory || false,
+            storyFilter: storyUser.filter || 'none',
+            storyStickers: storyUser.stickers || []
+          };
+
           const { error: storyMsgErr } = await supabase.from('messages').insert({
             id: msgUuid,
             sender_id: currentUser.id,
             receiver_id: targetUserId,
             content: replyText,
-            media_url: rawMedia || null
+            media_url: rawMedia || null,
+            metadata: messageMetadata
           });
           if (storyMsgErr) {
              const { error: bareStoryErr } = await supabase.from('messages').insert({
                id: msgUuid,
                sender_id: currentUser.id,
                receiver_id: targetUserId,
-               content: replyText
+               content: replyText,
+               metadata: messageMetadata
              });
              if (bareStoryErr) {
                 console.error('All story reply insert fallbacks failed:', bareStoryErr);
@@ -1717,11 +1725,26 @@ function MainApp() {
       const rawMedia = storyData.storyMedia || storyData.mediaUrl || storyData.media || null;
       let finalMediaUrl = rawMedia;
 
+      // Ensure we don't hang infinitely on upload
       if (rawMedia && typeof rawMedia === 'string' && rawMedia.startsWith('data:')) {
-        finalMediaUrl = await uploadChatMediaToSupabase(rawMedia, `story_${Date.now()}`);
+        try {
+          const uploadPromise = uploadChatMediaToSupabase(rawMedia, `story_${Date.now()}`);
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Upload timeout')), 15000));
+          finalMediaUrl = await Promise.race([uploadPromise, timeoutPromise]);
+        } catch (uploadError) {
+          console.warn('Story upload media failed or timed out, falling back to raw data:', uploadError);
+          finalMediaUrl = rawMedia; // Fallback to raw data if upload fails or times out
+        }
+      }
+
+      // Ensure finalMediaUrl is at least an empty string to satisfy database NOT NULL constraint
+      if (!finalMediaUrl) {
+        finalMediaUrl = '';
       }
 
       const storyUuid = generateUUID();
+      const privacyType = storyData.privacyType || 'all_contacts';
+      
       const newStory = {
         id: storyUuid,
         userId: currentUser.id,
@@ -1741,6 +1764,7 @@ function MainApp() {
         allowReshare: storyData.allowReshare !== false,
         isReshared: storyData.isReshared || false,
         resharedFrom: storyData.resharedFrom || null,
+        privacyType: privacyType,
         time: 'À l\'instant'
       };
 
@@ -1758,16 +1782,26 @@ function MainApp() {
             media_url: finalMediaUrl,
             caption: storyData.caption || '',
             is_video: isVideo || false,
+            privacy_type: privacyType,
             expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
           });
+          
           if (insertErr) {
             console.error('Supabase story insert error:', insertErr);
+          } else if (storyData.audienceRules && storyData.audienceRules.length > 0 && privacyType !== 'all_contacts') {
+             // Insert Audience Rules
+             const rulesToInsert = storyData.audienceRules.map(targetId => ({
+                 story_id: storyUuid,
+                 target_user_id: targetId
+             }));
+             const { error: rulesErr } = await supabase.from('story_audience_rules').insert(rulesToInsert);
+             if (rulesErr) console.error('Error saving story audience rules:', rulesErr);
           }
         } catch (se) {
           console.warn('Supabase story creation note:', se?.message || se);
         }
-        // Immediate silent sync
-        syncPostsStoriesAndProfiles();
+        // Immediate silent sync without awaiting to prevent freezing
+        syncPostsStoriesAndProfiles().catch(() => {});
       }
 
       // Success Notification Toast
@@ -1775,6 +1809,15 @@ function MainApp() {
         title: 'Story publiée avec succès ! 🎉',
         message: 'Votre statut est maintenant visible par vos contacts et artistes.',
         avatar: currentUser?.avatar
+      });
+      setTimeout(() => setToastNotification(null), 5000);
+
+    } catch (error) {
+      console.error('Critical error in handleCreateStory:', error);
+      setToastNotification({
+        title: 'Erreur de publication',
+        message: 'Impossible de publier la story. Veuillez réessayer.',
+        avatar: null
       });
       setTimeout(() => setToastNotification(null), 5000);
     } finally {
@@ -2161,10 +2204,6 @@ function MainApp() {
                   setResharedStoryData(null);
                   setIsCameraRecorderOpen(true);
                 }}
-                onAddTextStory={() => {
-                  setResharedStoryData(null);
-                  setIsCameraRecorderOpen(true);
-                }}
               />
 
               <div style={{ padding: '12px 14px 68px 14px' }}>
@@ -2324,30 +2363,14 @@ function MainApp() {
             const updated = stories.filter((s) => s.id !== storyId);
             setStories(updated);
             setStoredItem(STORAGE_KEYS.STORIES, updated);
-
-            const remainingUserStories = (activeStoryUserList || []).filter(s => s.id !== storyId);
-            if (remainingUserStories.length > 0) {
-              setActiveStoryUserList(remainingUserStories);
-              setActiveStory(remainingUserStories[0]);
-            } else {
-              setActiveStory(null);
-              setActiveStoryUserList([]);
-            }
-
-            // Dispatch global event for multi-tab/realtime instant update
-            try {
-              window.dispatchEvent(new CustomEvent('storyDeleted', { detail: { storyId } }));
-            } catch (e) {}
+            setActiveStory(null);
 
             if (isSupabaseConfigured() && storyId) {
               try {
-                const { error: delErr } = await supabase.from('stories').delete().eq('id', storyId);
-                if (delErr) console.warn('Supabase story delete note:', delErr);
+                await supabase.from('stories').delete().eq('id', storyId);
               } catch (se) {
                 console.warn('Supabase story deletion note:', se?.message || se);
               }
-              // Immediately sync fresh stories list
-              syncPostsStoriesAndProfiles();
             }
           }}
           onLikeStory={handleLikeStory}
@@ -2474,6 +2497,7 @@ function MainApp() {
       <CameraStoryRecorder
         isOpen={isCameraRecorderOpen}
         resharedStoryData={resharedStoryData}
+        users={allUsers}
         onClose={() => {
           setIsCameraRecorderOpen(false);
           setResharedStoryData(null);
@@ -2548,9 +2572,76 @@ function MainApp() {
 }
 
 export default function App() {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(() => {
+    let isExplicitReload = false;
+    try {
+      if (window.performance && window.performance.getEntriesByType) {
+        const navEntries = window.performance.getEntriesByType('navigation');
+        if (navEntries && navEntries.length > 0) {
+          isExplicitReload = navEntries[0].type === 'reload';
+        }
+      } else if (window.performance && window.performance.navigation) {
+        isExplicitReload = window.performance.navigation.type === 1;
+      }
+    } catch (e) { console.error("Suppressed error:", e); }
+
+    let lastActiveTime = 0;
+    let hasSeenSession = false;
+    try {
+      hasSeenSession = sessionStorage.getItem('hasSeenSplashSession');
+      lastActiveTime = parseInt(localStorage.getItem('stagelink_last_active') || '0', 10);
+    } catch (e) { console.error("Suppressed error:", e); }
+
+    const now = Date.now();
+    const isRecentBackgroundResume = lastActiveTime > 0 && (now - lastActiveTime) < (12 * 60 * 60 * 1000);
+
+    // If resuming from screen unlock or background multitasking, skip splash animation!
+    if (isRecentBackgroundResume && !isExplicitReload && hasSeenSession) {
+      return false;
+    }
+
+    // Play splash animation on cold start launch or explicit reload
+    if (!hasSeenSession || isExplicitReload) {
+      return true;
+    }
+
+    return false;
+  });
+
+  // Track app activity & screen lock/unlock to keep background session active
+  useEffect(() => {
+    const updateActiveTime = () => {
+      try {
+        localStorage.setItem('stagelink_last_active', Date.now().toString());
+        sessionStorage.setItem('hasSeenSplashSession', 'true');
+      } catch (e) { console.error("Suppressed error:", e); }
+    };
+
+    updateActiveTime();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateActiveTime();
+        setShowSplash(false); // Never trigger splash animation when unlocking screen
+      } else {
+        updateActiveTime();
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', updateActiveTime);
+
+    return () => {
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', updateActiveTime);
+    };
+  }, []);
 
   const handleFinishSplash = () => {
+    try {
+      sessionStorage.setItem('hasSeenSplashSession', 'true');
+      localStorage.setItem('stagelink_last_active', Date.now().toString());
+    } catch (e) { console.error("Suppressed error:", e); }
     setShowSplash(false);
   };
 
