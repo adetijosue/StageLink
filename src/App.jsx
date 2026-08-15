@@ -2161,6 +2161,10 @@ function MainApp() {
                   setResharedStoryData(null);
                   setIsCameraRecorderOpen(true);
                 }}
+                onAddTextStory={() => {
+                  setResharedStoryData(null);
+                  setIsCameraRecorderOpen(true);
+                }}
               />
 
               <div style={{ padding: '12px 14px 68px 14px' }}>
@@ -2320,7 +2324,15 @@ function MainApp() {
             const updated = stories.filter((s) => s.id !== storyId);
             setStories(updated);
             setStoredItem(STORAGE_KEYS.STORIES, updated);
-            setActiveStory(null);
+
+            const remainingUserStories = (activeStoryUserList || []).filter(s => s.id !== storyId);
+            if (remainingUserStories.length > 0) {
+              setActiveStoryUserList(remainingUserStories);
+              setActiveStory(remainingUserStories[0]);
+            } else {
+              setActiveStory(null);
+              setActiveStoryUserList([]);
+            }
 
             if (isSupabaseConfigured() && storyId) {
               try {
