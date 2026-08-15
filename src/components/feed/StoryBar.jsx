@@ -6,14 +6,41 @@ import UserAvatar from '../common/UserAvatar';
 export default function StoryBar({ stories = [], onSelectStory, onAddStory, isUploadingStory = false }) {
   const { currentUser } = useAuth();
 
+  const isCurrentUserStory = (s) => {
+    if (!s || !currentUser) return false;
+    return (
+      (s.userId && currentUser.id && s.userId === currentUser.id) ||
+      (s.user_id && currentUser.id && s.user_id === currentUser.id) ||
+      (s.userName && currentUser.name && s.userName.toLowerCase() === currentUser.name.toLowerCase())
+    );
+  };
+
   // Separate current user's stories from other users
-  const myStories = (stories || []).filter(s => s.userId === currentUser?.id);
-  const otherStories = (stories || []).filter(s => s.userId !== currentUser?.id);
+  const myStories = (stories || []).filter(isCurrentUserStory);
+  const otherStories = (stories || []).filter(s => !isCurrentUserStory(s));
   const myLatestStory = myStories.length > 0 ? myStories[0] : null;
+
+  // Group other users' stories by creator (1 card per user)
+  const groupedOtherStories = [];
+  const seenCreators = new Set();
+  otherStories.forEach(s => {
+    const creatorKey = s.userId || s.user_id || s.userName;
+    if (creatorKey && !seenCreators.has(creatorKey)) {
+      seenCreators.add(creatorKey);
+      const userStoriesList = otherStories.filter(cs => (cs.userId || cs.user_id || cs.userName) === creatorKey);
+      const hasUnread = userStoriesList.some(cs => cs.hasUnread !== false);
+      groupedOtherStories.push({
+        ...s,
+        storiesCount: userStoriesList.length,
+        hasUnread
+      });
+    }
+  });
 
   const renderCardMedia = (s) => {
     if (!s) return null;
-    const media = s.storyMedia || s.mediaUrl || s.media;
+    const media = s.storyMedia || s.mediaUrl || s.media || s.media_url || s.image || s.videoUrl || s.video_url || s.video || s.url || (s.mediaList && s.mediaList[0]?.url);
+    
     if (!media) {
       return (
         <div style={{
@@ -23,26 +50,29 @@ export default function StoryBar({ stories = [], onSelectStory, onAddStory, isUp
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '8px',
+          padding: '10px',
           color: '#FFFFFF',
           fontSize: '0.75rem',
-          fontWeight: 600,
-          textAlign: 'center'
+          fontWeight: 700,
+          textAlign: 'center',
+          lineHeight: '1.3'
         }}>
-          {s.caption ? (s.caption.length > 35 ? s.caption.slice(0, 35) + '...' : s.caption) : 'Statut Texte'}
+          {s.caption ? (s.caption.length > 40 ? s.caption.slice(0, 40) + '...' : s.caption) : 'Statut Texte'}
         </div>
       );
     }
 
-    const isVideo = s.mediaType === 'video' || s.isVideo || (typeof media === 'string' && (media.includes('.mp4') || media.includes('.webm') || media.includes('.mov') || media.startsWith('data:video')));
+    const isVideo = s.mediaType === 'video' || s.isVideo || s.is_video || (typeof media === 'string' && (media.includes('.mp4') || media.includes('.webm') || media.includes('.mov') || media.includes('.3gp') || media.startsWith('data:video')));
     
     if (isVideo) {
+      const videoSrc = (typeof media === 'string' && !media.startsWith('data:') && !media.includes('#t=')) ? `${media}#t=0.001` : media;
       return (
         <video
-          src={media}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          src={videoSrc}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           muted
           playsInline
+          preload="metadata"
         />
       );
     }
@@ -50,7 +80,8 @@ export default function StoryBar({ stories = [], onSelectStory, onAddStory, isUp
       <img
         src={media}
         alt={s.userName || 'Story'}
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        loading="lazy"
       />
     );
   };
@@ -224,7 +255,7 @@ export default function StoryBar({ stories = [], onSelectStory, onAddStory, isUp
       </div>
 
       {/* 2. OTHER USERS' STORIES: WhatsApp Business Rectangular Cards */}
-      {otherStories.map((story) => {
+      {groupedOtherStories.map((story) => {
         const isUnread = story.hasUnread !== false;
 
         return (
@@ -300,7 +331,7 @@ export default function StoryBar({ stories = [], onSelectStory, onAddStory, isUp
                 color: isUnread ? '#38BDF8' : 'rgba(255, 255, 255, 0.75)',
                 fontWeight: 600
               }}>
-                {isUnread ? 'Nouveau' : (story.time || 'Récent')}
+                {story.storiesCount > 1 ? `${story.storiesCount} statuts` : (isUnread ? 'Nouveau' : (story.time || 'Récent'))}
               </span>
             </div>
           </div>
