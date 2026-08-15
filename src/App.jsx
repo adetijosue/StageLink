@@ -175,6 +175,8 @@ function MainApp() {
   const [matches, setMatches] = useState([]);
   const [chats, setChats] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
+  const [isUploadingStory, setIsUploadingStory] = useState(false);
+  const [isUploadingPost, setIsUploadingPost] = useState(false);
 
   // Automatically sync selectedChat when chats array updates
   useEffect(() => {
@@ -330,66 +332,112 @@ function MainApp() {
           }
 
           try {
-            // Fetch live posts
-            const { data: supaPosts } = await supabase
-              .from('posts')
-              .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge), post_likes(user_id), post_comments(id, user_id, content, created_at, profiles:user_id(full_name))')
-              .order('created_at', { ascending: false });
-
-            if (supaPosts) {
-              loadedPosts = supaPosts.map(p => ({
-                id: p.id,
-                userId: p.user_id,
-                userName: p.profiles?.full_name || 'Artiste StageLink',
-                userRole: p.profiles?.role || 'Membre StageLink',
-                userAvatar: p.profiles?.avatar_url || '',
-                isVerified: p.profiles?.verified_badge === 'gold' || p.profiles?.verified_badge === 'blue',
-                badgeType: p.profiles?.verified_badge || 'none',
-                text: p.content || '',
-                image: p.media_url || null,
-                hasAudio: Boolean(p.audio_url),
-                audioTitle: p.audio_title || 'Extrait Audio',
-                audioUrl: p.audio_url || null,
-                likesCount: p.post_likes ? p.post_likes.length : (p.likes_count || 0),
-                isLiked: p.post_likes ? p.post_likes.some(l => l.user_id === currentUser?.id) : false,
-                commentsCount: p.post_comments ? p.post_comments.length : (p.comments_count || 0),
-                comments: p.post_comments ? p.post_comments.map(c => ({
-                  id: c.id,
-                  userId: c.user_id,
-                  userName: c.profiles?.full_name || 'Artiste',
-                  text: c.content,
-                  time: new Date(c.created_at).toLocaleDateString()
-                })) : [],
-                timeAgo: 'Récemment'
-              }));
+            // 1. Fetch live posts with resilient join & fallback
+            let supaPosts = null;
+            try {
+              const res = await supabase
+                .from('posts')
+                .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge), post_likes(user_id), post_comments(id, user_id, content, created_at, profiles:user_id(full_name))')
+                .order('created_at', { ascending: false });
+              if (res.data && !res.error) {
+                supaPosts = res.data;
+              } else {
+                const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false });
+                if (simpleRes.data) supaPosts = simpleRes.data;
+              }
+            } catch (pe) {
+              const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false });
+              if (simpleRes.data) supaPosts = simpleRes.data;
             }
 
-            // Fetch live active stories (unexpired)
-            const { data: supaStories } = await supabase
-              .from('stories')
-              .select('*, profiles:user_id(full_name, avatar_url), story_views(viewer_id, profiles:viewer_id(full_name, avatar_url, role)), story_likes(user_id)')
-              .gte('expires_at', new Date().toISOString())
-              .order('created_at', { ascending: false });
+            if (supaPosts && supaPosts.length > 0) {
+              const userLookup = new Map((loadedUsers || []).map(u => [u.id, u]));
+              loadedPosts = supaPosts.map(p => {
+                const authorProfile = userLookup.get(p.user_id) || p.profiles || {};
+                const isCurrentUser = p.user_id === currentUser?.id;
+                const authorName = isCurrentUser ? currentUser.name : (authorProfile.name || authorProfile.full_name || p.profiles?.full_name || 'Artiste StageLink');
+                const authorAvatar = isCurrentUser ? currentUser.avatar : (authorProfile.avatar || authorProfile.avatar_url || p.profiles?.avatar_url || '');
+                const authorRole = isCurrentUser ? (currentUser.role || 'Artiste') : (authorProfile.role || p.profiles?.role || 'Membre StageLink');
+                const isVerified = isCurrentUser ? currentUser.verified : (authorProfile.verified || authorProfile.verified_badge === 'gold' || authorProfile.verified_badge === 'blue' || p.profiles?.verified_badge === 'gold');
+                const badgeType = isCurrentUser ? currentUser.badgeType : (authorProfile.badgeType || authorProfile.verified_badge || p.profiles?.verified_badge || 'none');
 
-            if (supaStories) {
-              loadedStories = supaStories.map(s => ({
-                id: s.id,
-                userId: s.user_id,
-                userName: s.profiles?.full_name || 'Artiste StageLink',
-                avatar: s.profiles?.avatar_url || '',
-                hasUnread: s.story_views ? !s.story_views.some(v => v.viewer_id === currentUser?.id) : true,
-                storyMedia: s.media_url,
-                caption: s.caption || '',
-                likesCount: s.story_likes ? s.story_likes.length : 0,
-                isLiked: s.story_likes ? s.story_likes.some(l => l.user_id === currentUser?.id) : false,
-                viewers: s.story_views ? s.story_views.map(v => ({
-                  id: v.viewer_id,
-                  name: v.profiles?.full_name || 'Artiste',
-                  avatar: v.profiles?.avatar_url || '',
-                  role: v.profiles?.role || 'Artiste'
-                })) : [],
-                time: 'Récemment'
-              }));
+                return {
+                  id: p.id,
+                  userId: p.user_id,
+                  userName: authorName,
+                  userRole: authorRole,
+                  userAvatar: authorAvatar,
+                  isVerified: isVerified,
+                  badgeType: badgeType,
+                  text: p.content || '',
+                  image: p.media_url || null,
+                  hasAudio: Boolean(p.audio_url),
+                  audioTitle: p.audio_title || 'Extrait Audio',
+                  audioUrl: p.audio_url || null,
+                  likesCount: p.post_likes ? p.post_likes.length : (p.likes_count || 0),
+                  isLiked: p.post_likes ? p.post_likes.some(l => l.user_id === currentUser?.id) : false,
+                  commentsCount: p.post_comments ? p.post_comments.length : (p.comments_count || (p.comments ? p.comments.length : 0)),
+                  comments: p.post_comments ? p.post_comments.map(c => ({
+                    id: c.id,
+                    userId: c.user_id,
+                    userName: c.profiles?.full_name || userLookup.get(c.user_id)?.name || 'Artiste',
+                    text: c.content,
+                    time: new Date(c.created_at).toLocaleDateString()
+                  })) : [],
+                  timeAgo: 'Récemment'
+                };
+              });
+              setStoredItem(STORAGE_KEYS.POSTS, loadedPosts);
+            }
+
+            // 2. Fetch live active stories with resilient join & fallback
+            let supaStories = null;
+            try {
+              const res = await supabase
+                .from('stories')
+                .select('*, profiles:user_id(full_name, avatar_url), story_views(viewer_id, profiles:viewer_id(full_name, avatar_url, role)), story_likes(user_id)')
+                .order('created_at', { ascending: false });
+              if (res.data && !res.error) {
+                supaStories = res.data;
+              } else {
+                const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false });
+                if (simpleRes.data) supaStories = simpleRes.data;
+              }
+            } catch (se) {
+              const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false });
+              if (simpleRes.data) supaStories = simpleRes.data;
+            }
+
+            if (supaStories && supaStories.length > 0) {
+              const userLookup = new Map((loadedUsers || []).map(u => [u.id, u]));
+              loadedStories = supaStories.map(s => {
+                const authorProfile = userLookup.get(s.user_id) || s.profiles || {};
+                const isCurrentUser = s.user_id === currentUser?.id;
+                const authorName = isCurrentUser ? currentUser.name : (authorProfile.name || authorProfile.full_name || s.profiles?.full_name || 'Artiste StageLink');
+                const authorAvatar = isCurrentUser ? currentUser.avatar : (authorProfile.avatar || authorProfile.avatar_url || s.profiles?.avatar_url || '');
+
+                return {
+                  id: s.id,
+                  userId: s.user_id,
+                  userName: authorName,
+                  avatar: authorAvatar,
+                  userAvatar: authorAvatar,
+                  hasUnread: s.story_views ? !s.story_views.some(v => v.viewer_id === currentUser?.id) : true,
+                  storyMedia: s.media_url,
+                  mediaUrl: s.media_url,
+                  caption: s.caption || '',
+                  likesCount: s.story_likes ? s.story_likes.length : 0,
+                  isLiked: s.story_likes ? s.story_likes.some(l => l.user_id === currentUser?.id) : false,
+                  viewers: s.story_views ? s.story_views.map(v => ({
+                    id: v.viewer_id,
+                    name: v.profiles?.full_name || userLookup.get(v.viewer_id)?.name || 'Artiste',
+                    avatar: v.profiles?.avatar_url || userLookup.get(v.viewer_id)?.avatar || '',
+                    role: v.profiles?.role || 'Artiste'
+                  })) : [],
+                  time: 'Récemment'
+                };
+              });
+              setStoredItem(STORAGE_KEYS.STORIES, loadedStories);
             }
 
             // Fetch live matches or generate collaboration cards from real Supabase members
@@ -629,8 +677,9 @@ function MainApp() {
       const syncPostsStoriesAndProfiles = async () => {
         if (!isSupabaseConfigured()) return;
         try {
-          // Sync Live Profiles
-          const { data: supaProfiles } = await supabase.from('profiles').select('*').limit(100);
+          // 1. Sync Live Profiles
+          let currentUsersList = allUsers;
+          const { data: supaProfiles } = await supabase.from('profiles').select('*').limit(150);
           if (supaProfiles && supaProfiles.length > 0) {
             const mappedSupa = supaProfiles.map(p => ({
               id: p.id,
@@ -656,72 +705,119 @@ function MainApp() {
                   uMap.set(u.id, u);
                 }
               });
-              return Array.from(uMap.values());
+              currentUsersList = Array.from(uMap.values());
+              return currentUsersList;
             });
           }
 
-          // Sync Live Posts
-          const { data: supaPosts } = await supabase
-            .from('posts')
-            .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge), post_likes(user_id), post_comments(id, user_id, content, created_at, profiles:user_id(full_name))')
-            .order('created_at', { ascending: false });
+          const userLookup = new Map(currentUsersList.map(u => [u.id, u]));
 
-          if (supaPosts) {
-            const freshPosts = supaPosts.map(p => ({
-              id: p.id,
-              userId: p.user_id,
-              userName: p.profiles?.full_name || 'Artiste StageLink',
-              userRole: p.profiles?.role || 'Membre StageLink',
-              userAvatar: p.profiles?.avatar_url || '',
-              isVerified: p.profiles?.verified_badge === 'gold' || p.profiles?.verified_badge === 'blue',
-              badgeType: p.profiles?.verified_badge || 'none',
-              text: p.content || '',
-              image: p.media_url || null,
-              hasAudio: Boolean(p.audio_url),
-              audioTitle: p.audio_title || 'Extrait Audio',
-              audioUrl: p.audio_url || null,
-              likesCount: p.post_likes ? p.post_likes.length : (p.likes_count || 0),
-              isLiked: p.post_likes ? p.post_likes.some(l => l.user_id === currentUser?.id) : false,
-              commentsCount: p.post_comments ? p.post_comments.length : (p.comments_count || 0),
-              comments: p.post_comments ? p.post_comments.map(c => ({
-                id: c.id,
-                userId: c.user_id,
-                userName: c.profiles?.full_name || 'Artiste',
-                text: c.content,
-                time: new Date(c.created_at).toLocaleDateString()
-              })) : [],
-              timeAgo: 'Récemment'
-            }));
-            setPosts(freshPosts);
+          // 2. Sync Live Posts with resilient fallback
+          let supaPosts = null;
+          try {
+            const res = await supabase
+              .from('posts')
+              .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge), post_likes(user_id), post_comments(id, user_id, content, created_at, profiles:user_id(full_name))')
+              .order('created_at', { ascending: false });
+            if (res.data && !res.error) {
+              supaPosts = res.data;
+            } else {
+              const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false });
+              if (simpleRes.data) supaPosts = simpleRes.data;
+            }
+          } catch (pe) {
+            const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false });
+            if (simpleRes.data) supaPosts = simpleRes.data;
           }
 
-          // Sync Live Stories
-          const { data: supaStories } = await supabase
-            .from('stories')
-            .select('*, profiles:user_id(full_name, avatar_url), story_views(viewer_id, profiles:viewer_id(full_name, avatar_url, role)), story_likes(user_id)')
-            .gte('expires_at', new Date().toISOString())
-            .order('created_at', { ascending: false });
+          if (supaPosts && supaPosts.length > 0) {
+            const freshPosts = supaPosts.map(p => {
+              const authorProfile = userLookup.get(p.user_id) || p.profiles || {};
+              const isCurrentUser = p.user_id === currentUser?.id;
+              const authorName = isCurrentUser ? currentUser.name : (authorProfile.name || authorProfile.full_name || p.profiles?.full_name || 'Artiste StageLink');
+              const authorAvatar = isCurrentUser ? currentUser.avatar : (authorProfile.avatar || authorProfile.avatar_url || p.profiles?.avatar_url || '');
+              const authorRole = isCurrentUser ? (currentUser.role || 'Artiste') : (authorProfile.role || p.profiles?.role || 'Membre StageLink');
+              const isVerified = isCurrentUser ? currentUser.verified : (authorProfile.verified || authorProfile.verified_badge === 'gold' || authorProfile.verified_badge === 'blue' || p.profiles?.verified_badge === 'gold');
+              const badgeType = isCurrentUser ? currentUser.badgeType : (authorProfile.badgeType || authorProfile.verified_badge || p.profiles?.verified_badge || 'none');
 
-          if (supaStories) {
-            const freshStories = supaStories.map(s => ({
-              id: s.id,
-              userId: s.user_id,
-              userName: s.profiles?.full_name || 'Artiste StageLink',
-              avatar: s.profiles?.avatar_url || '',
-              hasUnread: s.story_views ? !s.story_views.some(v => v.viewer_id === currentUser?.id) : true,
-              storyMedia: s.media_url,
-              caption: s.caption || '',
-              likesCount: s.story_likes ? s.story_likes.length : 0,
-              isLiked: s.story_likes ? s.story_likes.some(l => l.user_id === currentUser?.id) : false,
-              viewers: s.story_views ? s.story_views.map(v => ({
-                id: v.viewer_id,
-                name: v.profiles?.full_name || 'Artiste',
-                avatar: v.profiles?.avatar_url || '',
-                role: v.profiles?.role || 'Artiste'
-              })) : [],
-              time: 'Récemment'
-            }));
+              return {
+                id: p.id,
+                userId: p.user_id,
+                userName: authorName,
+                userRole: authorRole,
+                userAvatar: authorAvatar,
+                isVerified: isVerified,
+                badgeType: badgeType,
+                text: p.content || '',
+                image: p.media_url || null,
+                hasAudio: Boolean(p.audio_url),
+                audioTitle: p.audio_title || 'Extrait Audio',
+                audioUrl: p.audio_url || null,
+                likesCount: p.post_likes ? p.post_likes.length : (p.likes_count || 0),
+                isLiked: p.post_likes ? p.post_likes.some(l => l.user_id === currentUser?.id) : false,
+                commentsCount: p.post_comments ? p.post_comments.length : (p.comments_count || (p.comments ? p.comments.length : 0)),
+                comments: p.post_comments ? p.post_comments.map(c => ({
+                  id: c.id,
+                  userId: c.user_id,
+                  userName: c.profiles?.full_name || userLookup.get(c.user_id)?.name || 'Artiste',
+                  text: c.content,
+                  time: new Date(c.created_at).toLocaleDateString()
+                })) : [],
+                timeAgo: 'Récemment'
+              };
+            });
+            setPosts(freshPosts);
+            setStoredItem(STORAGE_KEYS.POSTS, freshPosts);
+          }
+
+          // 3. Sync Live Stories with resilient fallback
+          let supaStories = null;
+          try {
+            const res = await supabase
+              .from('stories')
+              .select('*, profiles:user_id(full_name, avatar_url), story_views(viewer_id, profiles:viewer_id(full_name, avatar_url, role)), story_likes(user_id)')
+              .order('created_at', { ascending: false });
+            if (res.data && !res.error) {
+              supaStories = res.data;
+            } else {
+              const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false });
+              if (simpleRes.data) supaStories = simpleRes.data;
+            }
+          } catch (se) {
+            const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false });
+            if (simpleRes.data) supaStories = simpleRes.data;
+          }
+
+          if (supaStories && supaStories.length > 0) {
+            const freshStories = supaStories.map(s => {
+              const authorProfile = userLookup.get(s.user_id) || s.profiles || {};
+              const isCurrentUser = s.user_id === currentUser?.id;
+              const authorName = isCurrentUser ? currentUser.name : (authorProfile.name || authorProfile.full_name || s.profiles?.full_name || 'Artiste StageLink');
+              const authorAvatar = isCurrentUser ? currentUser.avatar : (authorProfile.avatar || authorProfile.avatar_url || s.profiles?.avatar_url || '');
+
+              return {
+                id: s.id,
+                userId: s.user_id,
+                userName: authorName,
+                avatar: authorAvatar,
+                userAvatar: authorAvatar,
+                hasUnread: s.story_views ? !s.story_views.some(v => v.viewer_id === currentUser?.id) : true,
+                storyMedia: s.media_url,
+                mediaUrl: s.media_url,
+                caption: s.caption || '',
+                likesCount: s.story_likes ? s.story_likes.length : 0,
+                isLiked: s.story_likes ? s.story_likes.some(l => l.user_id === currentUser?.id) : false,
+                viewers: s.story_views ? s.story_views.map(v => ({
+                  id: v.viewer_id,
+                  name: v.profiles?.full_name || userLookup.get(v.viewer_id)?.name || 'Artiste',
+                  avatar: v.profiles?.avatar_url || userLookup.get(v.viewer_id)?.avatar || '',
+                  role: v.profiles?.role || 'Artiste'
+                })) : [],
+                time: 'Récemment'
+              };
+            });
             setStories(freshStories);
+            setStoredItem(STORAGE_KEYS.STORIES, freshStories);
           }
         } catch (e) { console.error("Suppressed error:", e); }
       };
@@ -1512,97 +1608,143 @@ function MainApp() {
   };
 
   const handleCreatePost = async (newPostData) => {
-    const postUuid = generateUUID();
-    const newPost = {
-      id: postUuid,
-      userId: currentUser.id,
-      userName: currentUser.name,
-      userRole: `${currentUser.role}, ${currentUser.company}`,
-      userAvatar: currentUser.avatar,
-      isVerified: currentUser.verified,
-      badgeType: currentUser.badgeType,
-      text: newPostData.text,
-      mediaList: newPostData.mediaList || [],
-      hasAudio: !!newPostData.hasAudio,
-      audioUrl: newPostData.audioUrl || null,
-      audioTitle: newPostData.audioTitle || (newPostData.hasAudio ? 'Note Vocale' : null),
-      timeAgo: 'À l\'instant',
-      likesCount: 0,
-      isLiked: false,
-      commentsCount: 0,
-      comments: []
-    };
+    setIsUploadingPost(true);
+    try {
+      const postUuid = generateUUID();
+      let rawMedia = newPostData.image || (newPostData.mediaList && newPostData.mediaList[0]?.url) || (newPostData.mediaList && typeof newPostData.mediaList[0] === 'string' ? newPostData.mediaList[0] : null);
+      let finalMediaUrl = rawMedia;
 
-    const updated = [newPost, ...posts];
-    setPosts(updated);
-    setStoredItem(STORAGE_KEYS.POSTS, updated);
-
-    // Save post directly to Supabase Database for all users
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('posts').insert({
-          id: postUuid,
-          user_id: currentUser.id,
-          content: newPostData.text || '',
-          media_url: newPostData.image || (newPostData.mediaList && newPostData.mediaList[0]?.url) || (newPostData.mediaList && typeof newPostData.mediaList[0] === 'string' ? newPostData.mediaList[0] : null),
-          audio_url: newPostData.audioUrl || null,
-          audio_title: newPostData.audioTitle || null
-        });
-      } catch (pe) {
-        console.warn('Supabase post creation note:', pe?.message || pe);
+      if (rawMedia && typeof rawMedia === 'string' && rawMedia.startsWith('data:')) {
+        finalMediaUrl = await uploadChatMediaToSupabase(rawMedia, `post_${Date.now()}`);
       }
-    }
 
-    if (newPost.hasAudio) {
-      handleStartGlobalAudio({
-        title: newPost.audioTitle || 'Composition Audio',
-        artist: currentUser.name,
-        genre: 'Afro-Gospel'
+      let finalAudioUrl = newPostData.audioUrl || null;
+      if (finalAudioUrl && typeof finalAudioUrl === 'string' && finalAudioUrl.startsWith('data:')) {
+        finalAudioUrl = await uploadChatMediaToSupabase(finalAudioUrl, `audio_${Date.now()}`);
+      }
+
+      const newPost = {
+        id: postUuid,
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: `${currentUser.role || 'Artiste'}, ${currentUser.company || 'StageLink'}`,
+        userAvatar: currentUser.avatar,
+        isVerified: currentUser.verified,
+        badgeType: currentUser.badgeType,
+        text: newPostData.text || '',
+        mediaList: newPostData.mediaList || [],
+        image: finalMediaUrl,
+        hasAudio: !!newPostData.hasAudio || !!finalAudioUrl,
+        audioUrl: finalAudioUrl,
+        audioTitle: newPostData.audioTitle || (newPostData.hasAudio ? 'Note Vocale' : null),
+        timeAgo: 'À l\'instant',
+        likesCount: 0,
+        isLiked: false,
+        commentsCount: 0,
+        comments: []
+      };
+
+      const updated = [newPost, ...posts];
+      setPosts(updated);
+      setStoredItem(STORAGE_KEYS.POSTS, updated);
+
+      // Save post directly to Supabase Database for all users
+      if (isSupabaseConfigured()) {
+        try {
+          await supabase.from('posts').insert({
+            id: postUuid,
+            user_id: currentUser.id,
+            content: newPostData.text || '',
+            media_url: finalMediaUrl,
+            audio_url: finalAudioUrl,
+            audio_title: newPostData.audioTitle || null
+          });
+        } catch (pe) {
+          console.warn('Supabase post creation note:', pe?.message || pe);
+        }
+      }
+
+      // Success Notification Toast
+      setToastNotification({
+        title: 'Publication mise en ligne ! ✨',
+        message: 'Votre publication est maintenant visible par toute la communauté.',
+        avatar: currentUser?.avatar
       });
+      setTimeout(() => setToastNotification(null), 5000);
+
+      if (newPost.hasAudio) {
+        handleStartGlobalAudio({
+          title: newPost.audioTitle || 'Composition Audio',
+          artist: currentUser.name,
+          genre: 'Afro-Gospel'
+        });
+      }
+    } finally {
+      setIsUploadingPost(false);
     }
   };
 
   const handleCreateStory = async (storyData) => {
-    const rawMedia = storyData.storyMedia || storyData.mediaUrl || storyData.media || null;
-    const storyUuid = generateUUID();
-    const newStory = {
-      id: storyUuid,
-      userId: currentUser.id,
-      userName: currentUser.name,
-      userAvatar: currentUser.avatar,
-      isVerified: currentUser.verified,
-      badgeType: currentUser.badgeType,
-      hasUnread: false,
-      isTextStory: storyData.isTextStory || false,
-      mediaUrl: rawMedia,
-      storyMedia: rawMedia,
-      mediaType: storyData.mediaType || storyData.type || (rawMedia ? 'image' : null),
-      caption: storyData.caption || '',
-      bgGradient: storyData.bgGradient || 'linear-gradient(135deg, #0066FF, #0047FF)',
-      filter: storyData.filter || 'none',
-      stickers: storyData.stickers || [],
-      allowReshare: storyData.allowReshare !== false,
-      isReshared: storyData.isReshared || false,
-      resharedFrom: storyData.resharedFrom || null,
-      time: 'À l\'instant'
-    };
+    setIsUploadingStory(true);
+    try {
+      const rawMedia = storyData.storyMedia || storyData.mediaUrl || storyData.media || null;
+      let finalMediaUrl = rawMedia;
 
-    const updated = [newStory, ...stories];
-    setStories(updated);
-    setStoredItem(STORAGE_KEYS.STORIES, updated);
-
-    // Save story directly to Supabase Database for all users
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('stories').insert({
-          id: storyUuid,
-          user_id: currentUser.id,
-          media_url: rawMedia,
-          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-        });
-      } catch (se) {
-        console.warn('Supabase story creation note:', se?.message || se);
+      if (rawMedia && typeof rawMedia === 'string' && rawMedia.startsWith('data:')) {
+        finalMediaUrl = await uploadChatMediaToSupabase(rawMedia, `story_${Date.now()}`);
       }
+
+      const storyUuid = generateUUID();
+      const newStory = {
+        id: storyUuid,
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userAvatar: currentUser.avatar,
+        isVerified: currentUser.verified,
+        badgeType: currentUser.badgeType,
+        hasUnread: false,
+        isTextStory: storyData.isTextStory || false,
+        mediaUrl: finalMediaUrl,
+        storyMedia: finalMediaUrl,
+        mediaType: storyData.mediaType || storyData.type || (rawMedia ? 'image' : null),
+        caption: storyData.caption || '',
+        bgGradient: storyData.bgGradient || 'linear-gradient(135deg, #0066FF, #0047FF)',
+        filter: storyData.filter || 'none',
+        stickers: storyData.stickers || [],
+        allowReshare: storyData.allowReshare !== false,
+        isReshared: storyData.isReshared || false,
+        resharedFrom: storyData.resharedFrom || null,
+        time: 'À l\'instant'
+      };
+
+      const updated = [newStory, ...stories];
+      setStories(updated);
+      setStoredItem(STORAGE_KEYS.STORIES, updated);
+
+      // Save story directly to Supabase Database for all users
+      if (isSupabaseConfigured()) {
+        try {
+          await supabase.from('stories').insert({
+            id: storyUuid,
+            user_id: currentUser.id,
+            media_url: finalMediaUrl,
+            caption: storyData.caption || '',
+            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+          });
+        } catch (se) {
+          console.warn('Supabase story creation note:', se?.message || se);
+        }
+      }
+
+      // Success Notification Toast
+      setToastNotification({
+        title: 'Story publiée avec succès ! 🎉',
+        message: 'Votre statut est maintenant visible par vos contacts et artistes.',
+        avatar: currentUser?.avatar
+      });
+      setTimeout(() => setToastNotification(null), 5000);
+    } finally {
+      setIsUploadingStory(false);
     }
   };
 
@@ -1959,6 +2101,7 @@ function MainApp() {
             <div style={{ position: 'relative' }}>
               <StoryBar
                 stories={stories}
+                isUploadingStory={isUploadingStory}
                 onSelectStory={(st) => {
                   const updated = stories.map((s) => s.id === st.id ? { ...s, hasUnread: false } : s);
                   setStories(updated);
