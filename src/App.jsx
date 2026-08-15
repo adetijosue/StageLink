@@ -426,6 +426,8 @@ function MainApp() {
                   hasUnread: s.story_views ? !s.story_views.some(v => v.viewer_id === currentUser?.id) : true,
                   storyMedia: s.media_url,
                   mediaUrl: s.media_url,
+                  mediaType: s.is_video ? 'video' : ((s.media_url && (s.media_url.includes('.mp4') || s.media_url.includes('.webm') || s.media_url.includes('.mov') || s.media_url.startsWith('data:video'))) ? 'video' : 'image'),
+                  isVideo: s.is_video || (s.media_url && (s.media_url.includes('.mp4') || s.media_url.includes('.webm') || s.media_url.includes('.mov'))),
                   caption: s.caption || '',
                   likesCount: s.story_likes ? s.story_likes.length : 0,
                   isLiked: s.story_likes ? s.story_likes.some(l => l.user_id === currentUser?.id) : false,
@@ -805,6 +807,8 @@ function MainApp() {
                 hasUnread: s.story_views ? !s.story_views.some(v => v.viewer_id === currentUser?.id) : true,
                 storyMedia: s.media_url,
                 mediaUrl: s.media_url,
+                mediaType: s.is_video ? 'video' : ((s.media_url && (s.media_url.includes('.mp4') || s.media_url.includes('.webm') || s.media_url.includes('.mov') || s.media_url.startsWith('data:video'))) ? 'video' : 'image'),
+                isVideo: s.is_video || (s.media_url && (s.media_url.includes('.mp4') || s.media_url.includes('.webm') || s.media_url.includes('.mov'))),
                 caption: s.caption || '',
                 likesCount: s.story_likes ? s.story_likes.length : 0,
                 isLiked: s.story_likes ? s.story_likes.some(l => l.user_id === currentUser?.id) : false,
@@ -1226,15 +1230,28 @@ function MainApp() {
         }
       }
 
-      // 2. Background Live Posts, Stories & Profiles Polling Sync (Fallback every 8 seconds)
+      // 2. Background Live Posts, Stories & Profiles Polling Sync (Every 4 seconds)
       const pollInterval = setInterval(() => {
         syncPostsStoriesAndProfiles();
         syncNotifications();
         if (syncMessagesFallback) syncMessagesFallback();
-      }, 5000);
+      }, 4000);
+
+      // 3. Instant Silent Sync on Tab Focus / Visibility Change
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          syncPostsStoriesAndProfiles();
+          syncNotifications();
+          if (syncMessagesFallback) syncMessagesFallback();
+        }
+      };
+      window.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('focus', handleVisibilityChange);
 
       return () => {
         clearInterval(pollInterval);
+        window.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('focus', handleVisibilityChange);
         if (profilesSub) supabase.removeChannel(profilesSub);
         if (postsSub) supabase.removeChannel(postsSub);
         if (storiesSub) supabase.removeChannel(storiesSub);
@@ -1725,16 +1742,23 @@ function MainApp() {
       // Save story directly to Supabase Database for all users
       if (isSupabaseConfigured()) {
         try {
-          await supabase.from('stories').insert({
+          const isVideo = storyData.mediaType === 'video' || storyData.isVideo || (typeof finalMediaUrl === 'string' && (finalMediaUrl.includes('.mp4') || finalMediaUrl.includes('.webm') || finalMediaUrl.includes('.mov') || finalMediaUrl.startsWith('data:video')));
+          const { error: insertErr } = await supabase.from('stories').insert({
             id: storyUuid,
             user_id: currentUser.id,
             media_url: finalMediaUrl,
             caption: storyData.caption || '',
+            is_video: isVideo || false,
             expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
           });
+          if (insertErr) {
+            console.error('Supabase story insert error:', insertErr);
+          }
         } catch (se) {
           console.warn('Supabase story creation note:', se?.message || se);
         }
+        // Immediate silent sync
+        syncPostsStoriesAndProfiles();
       }
 
       // Success Notification Toast

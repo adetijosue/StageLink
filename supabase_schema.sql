@@ -244,8 +244,9 @@ CREATE POLICY "Tout le monde peut voir les posts"
     ON public.posts FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "Les utilisateurs peuvent publier" ON public.posts;
-CREATE POLICY "Les utilisateurs peuvent publier"
-    ON public.posts FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Tout le monde peut publier des posts" ON public.posts;
+CREATE POLICY "Tout le monde peut publier des posts"
+    ON public.posts FOR INSERT WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Les utilisateurs peuvent modifier leurs posts" ON public.posts;
 CREATE POLICY "Les utilisateurs peuvent modifier leurs posts"
@@ -262,8 +263,9 @@ CREATE POLICY "Tout le monde peut voir les likes"
     ON public.post_likes FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "Les utilisateurs peuvent liker" ON public.post_likes;
-CREATE POLICY "Les utilisateurs peuvent liker"
-    ON public.post_likes FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Tout le monde peut liker" ON public.post_likes;
+CREATE POLICY "Tout le monde peut liker"
+    ON public.post_likes FOR INSERT WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Les utilisateurs peuvent retirer leur like" ON public.post_likes;
 CREATE POLICY "Les utilisateurs peuvent retirer leur like"
@@ -276,8 +278,9 @@ CREATE POLICY "Tout le monde peut voir les commentaires"
     ON public.post_comments FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "Les utilisateurs peuvent commenter" ON public.post_comments;
-CREATE POLICY "Les utilisateurs peuvent commenter"
-    ON public.post_comments FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Tout le monde peut commenter" ON public.post_comments;
+CREATE POLICY "Tout le monde peut commenter"
+    ON public.post_comments FOR INSERT WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Les utilisateurs peuvent supprimer leurs commentaires" ON public.post_comments;
 CREATE POLICY "Les utilisateurs peuvent supprimer leurs commentaires"
@@ -290,8 +293,14 @@ CREATE POLICY "Tout le monde peut voir les stories"
     ON public.stories FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "Les utilisateurs peuvent publier des stories" ON public.stories;
-CREATE POLICY "Les utilisateurs peuvent publier des stories"
-    ON public.stories FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Tout le monde peut publier des stories" ON public.stories;
+CREATE POLICY "Tout le monde peut publier des stories"
+    ON public.stories FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Les utilisateurs peuvent supprimer leurs stories" ON public.stories;
+DROP POLICY IF EXISTS "Tout le monde peut supprimer des stories" ON public.stories;
+CREATE POLICY "Tout le monde peut supprimer des stories"
+    ON public.stories FOR DELETE USING (auth.uid() = user_id OR true);
 
 DROP POLICY IF EXISTS "Les utilisateurs peuvent supprimer leurs stories" ON public.stories;
 DROP POLICY IF EXISTS "Les utilisateurs peuvent supprimer leurs stories" ON public.stories;
