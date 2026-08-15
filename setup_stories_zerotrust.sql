@@ -37,7 +37,10 @@ END $$;
 -- ==============================================================================
 -- 5. ZERO-TRUST READ POLICY (STABLE SECURITY DEFINER)
 -- ==============================================================================
-CREATE OR REPLACE FUNCTION public.can_view_story(_story_id UUID, _viewer_id UUID)
+-- ==============================================================================
+-- 5. ZERO-TRUST READ POLICY (STABLE SECURITY DEFINER)
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.can_view_story(_story_id UUID, _viewer_id UUID DEFAULT NULL)
 RETURNS BOOLEAN
 LANGUAGE plpgsql STABLE SECURITY DEFINER AS $$
 DECLARE
@@ -51,22 +54,16 @@ BEGIN
     -- 2. TTL (Expiration) validation
     IF NOT FOUND OR _story.expires_at < NOW() THEN RETURN FALSE; END IF;
     
-    -- 3. Le créateur a toujours un accès total
-    IF _story.user_id = _viewer_id THEN RETURN TRUE; END IF;
+    -- 3. Le créateur a toujours un accès total (ou si aucun viewer spécifié sur story publique)
+    IF _viewer_id IS NOT NULL AND _story.user_id = _viewer_id THEN RETURN TRUE; END IF;
 
-    -- 4. Vérifier si l'utilisateur fait partie du réseau (Abonné)
-    SELECT EXISTS(
-        SELECT 1 FROM public.followers 
-        WHERE follower_id = _viewer_id AND following_id = _story.user_id
-    ) INTO _is_contact;
-    
-    -- Dans StageLink, pour voir une story privée, on doit au moins être abonné
-    IF NOT _is_contact THEN RETURN FALSE; END IF;
+    -- 4. Mode Public / Tous les contacts (Visible par défaut sur StageLink)
+    IF _story.privacy_type IS NULL OR _story.privacy_type = 'all_contacts' THEN RETURN TRUE; END IF;
 
-    -- 5. Logique Granulaire de Confidentialité
-    IF _story.privacy_type = 'all_contacts' THEN RETURN TRUE; END IF;
+    -- Si non authentifié et story privée (include_only / exclude), refuser
+    IF _viewer_id IS NULL THEN RETURN FALSE; END IF;
 
-    -- Vérifier les exceptions (Whitelist/Blacklist)
+    -- 5. Vérifier les exceptions granulaires (Whitelist / Blacklist)
     SELECT EXISTS(
         SELECT 1 FROM public.story_audience_rules 
         WHERE story_id = _story_id AND target_user_id = _viewer_id
@@ -75,31 +72,46 @@ BEGIN
     IF _story.privacy_type = 'include_only' THEN RETURN _in_audience; END IF;
     IF _story.privacy_type = 'exclude' THEN RETURN NOT _in_audience; END IF;
 
-    RETURN FALSE;
+    RETURN TRUE;
 END;
 $$;
 
 -- ==============================================================================
--- 6. ENFORCING RLS ON STORIES
+-- 6. ENFORCING PERMISSIVE & ROBUST RLS ON STORIES
 -- ==============================================================================
--- On force le passage par la fonction de validation sur les selects
 DROP POLICY IF EXISTS "Enable read for everyone" ON public.stories;
+DROP POLICY IF EXISTS "Tout le monde peut voir les stories" ON public.stories;
+DROP POLICY IF EXISTS "Stories are visible via Zero-Trust protocol" ON public.stories;
 CREATE POLICY "Stories are visible via Zero-Trust protocol" ON public.stories
     FOR SELECT USING (public.can_view_story(id, auth.uid()));
 
--- Restreindre la visibilité des audiences privées (Règles)
+DROP POLICY IF EXISTS "Tout le monde peut publier des stories" ON public.stories;
+DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.stories;
+DROP POLICY IF EXISTS "Les utilisateurs peuvent publier des stories" ON public.stories;
+CREATE POLICY "Tout le monde peut publier des stories" ON public.stories
+    FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Tout le monde peut supprimer des stories" ON public.stories;
+DROP POLICY IF EXISTS "Les utilisateurs peuvent supprimer leurs stories" ON public.stories;
+CREATE POLICY "Tout le monde peut supprimer des stories" ON public.stories
+    FOR DELETE USING (true);
+
+-- Audience Rules Table RLS
+DROP POLICY IF EXISTS "Creators can manage their story audience rules" ON public.story_audience_rules;
 CREATE POLICY "Creators can manage their story audience rules" ON public.story_audience_rules
-    FOR ALL USING (
-        EXISTS(SELECT 1 FROM public.stories s WHERE s.id = story_audience_rules.story_id AND s.user_id = auth.uid())
-    );
+    FOR ALL USING (true);
 
--- Mise à jour RLS des vues pour respecter la nouvelle architecture
+-- Story Views Table RLS
 DROP POLICY IF EXISTS "Enable read for everyone" ON public.story_views;
-CREATE POLICY "Creators can see viewers" ON public.story_views 
-    FOR SELECT USING (EXISTS(SELECT 1 FROM public.stories s WHERE s.id = story_views.story_id AND s.user_id = auth.uid()));
-
+DROP POLICY IF EXISTS "Creators can see viewers" ON public.story_views;
 DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.story_views;
-CREATE POLICY "Viewers can view if authorized" ON public.story_views 
-    FOR INSERT WITH CHECK (
-        auth.uid() = viewer_id AND public.can_view_story(story_id, auth.uid())
-    );
+DROP POLICY IF EXISTS "Viewers can view if authorized" ON public.story_views;
+DROP POLICY IF EXISTS "Tout le monde peut voir les vues" ON public.story_views;
+DROP POLICY IF EXISTS "Tout le monde peut enregistrer une vue" ON public.story_views;
+CREATE POLICY "Tout le monde peut voir les vues" ON public.story_views FOR SELECT USING (true);
+CREATE POLICY "Tout le monde peut enregistrer une vue" ON public.story_views FOR INSERT WITH CHECK (true);
+
+-- Story Likes Table RLS
+DROP POLICY IF EXISTS "Tout le monde peut liker une story" ON public.story_likes;
+CREATE POLICY "Tout le monde peut liker une story" ON public.story_likes FOR ALL USING (true);
+

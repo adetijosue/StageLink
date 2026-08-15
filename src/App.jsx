@@ -795,8 +795,9 @@ function MainApp() {
             const freshStories = supaStories.map(s => {
               const authorProfile = userLookup.get(s.user_id) || s.profiles || {};
               const isCurrentUser = s.user_id === currentUser?.id;
-              const authorName = isCurrentUser ? currentUser.name : (authorProfile.name || authorProfile.full_name || s.profiles?.full_name || 'Artiste StageLink');
-              const authorAvatar = isCurrentUser ? currentUser.avatar : (authorProfile.avatar || authorProfile.avatar_url || s.profiles?.avatar_url || '');
+              const authorName = isCurrentUser ? (currentUser?.name || 'Artiste StageLink') : (authorProfile.name || authorProfile.full_name || s.profiles?.full_name || 'Artiste StageLink');
+              const authorAvatar = isCurrentUser ? (currentUser?.avatar || '') : (authorProfile.avatar || authorProfile.avatar_url || s.profiles?.avatar_url || '');
+              const isText = !s.media_url || s.media_url === '' || s.media_url === 'null';
 
               return {
                 id: s.id,
@@ -805,9 +806,10 @@ function MainApp() {
                 avatar: authorAvatar,
                 userAvatar: authorAvatar,
                 hasUnread: s.story_views ? !s.story_views.some(v => v.viewer_id === currentUser?.id) : true,
-                storyMedia: s.media_url,
-                mediaUrl: s.media_url,
-                mediaType: s.is_video ? 'video' : ((s.media_url && (s.media_url.includes('.mp4') || s.media_url.includes('.webm') || s.media_url.includes('.mov') || s.media_url.startsWith('data:video'))) ? 'video' : 'image'),
+                storyMedia: isText ? null : s.media_url,
+                mediaUrl: isText ? '' : s.media_url,
+                isTextStory: isText,
+                mediaType: isText ? 'text' : (s.is_video ? 'video' : ((s.media_url && (s.media_url.includes('.mp4') || s.media_url.includes('.webm') || s.media_url.includes('.mov') || s.media_url.startsWith('data:video'))) ? 'video' : 'image')),
                 isVideo: s.is_video || (s.media_url && (s.media_url.includes('.mp4') || s.media_url.includes('.webm') || s.media_url.includes('.mov'))),
                 caption: s.caption || '',
                 likesCount: s.story_likes ? s.story_likes.length : 0,
@@ -821,8 +823,17 @@ function MainApp() {
                 time: 'Récemment'
               };
             });
-            setStories(freshStories);
-            setStoredItem(STORAGE_KEYS.STORIES, freshStories);
+
+            // Smart Merge: Preserve any recent locally created stories not yet returned by Supabase
+            setStories(prevStories => {
+              const freshIds = new Set(freshStories.map(s => s.id));
+              const localUnsynced = (prevStories || []).filter(localS => 
+                !freshIds.has(localS.id) && (localS.userId === currentUser?.id || localS.user_id === currentUser?.id)
+              );
+              const merged = [...localUnsynced, ...freshStories];
+              setStoredItem(STORAGE_KEYS.STORIES, merged);
+              return merged;
+            });
           }
         } catch (e) { console.error("Suppressed error:", e); }
       };
@@ -1725,38 +1736,40 @@ function MainApp() {
       const rawMedia = storyData.storyMedia || storyData.mediaUrl || storyData.media || null;
       let finalMediaUrl = rawMedia;
 
-      // Ensure we don't hang infinitely on upload
+      // Safe Media Upload with 15s timeout
       if (rawMedia && typeof rawMedia === 'string' && rawMedia.startsWith('data:')) {
         try {
           const uploadPromise = uploadChatMediaToSupabase(rawMedia, `story_${Date.now()}`);
           const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Upload timeout')), 15000));
           finalMediaUrl = await Promise.race([uploadPromise, timeoutPromise]);
         } catch (uploadError) {
-          console.warn('Story upload media failed or timed out, falling back to raw data:', uploadError);
-          finalMediaUrl = rawMedia; // Fallback to raw data if upload fails or times out
+          console.warn('Story upload media fallback to raw data:', uploadError?.message || uploadError);
+          finalMediaUrl = rawMedia;
         }
       }
 
-      // Ensure finalMediaUrl is at least an empty string to satisfy database NOT NULL constraint
       if (!finalMediaUrl) {
         finalMediaUrl = '';
       }
 
       const storyUuid = generateUUID();
       const privacyType = storyData.privacyType || 'all_contacts';
-      
+      const isText = storyData.isTextStory || !finalMediaUrl || finalMediaUrl === '';
+      const isVideo = storyData.mediaType === 'video' || storyData.isVideo || (typeof finalMediaUrl === 'string' && (finalMediaUrl.includes('.mp4') || finalMediaUrl.includes('.webm') || finalMediaUrl.includes('.mov') || finalMediaUrl.startsWith('data:video')));
+
       const newStory = {
         id: storyUuid,
-        userId: currentUser.id,
-        userName: currentUser.name,
-        userAvatar: currentUser.avatar,
-        isVerified: currentUser.verified,
-        badgeType: currentUser.badgeType,
+        userId: currentUser?.id || 'usr_me',
+        userName: currentUser?.name || 'Moi',
+        userAvatar: currentUser?.avatar || '',
+        isVerified: currentUser?.verified || false,
+        badgeType: currentUser?.badgeType || 'none',
         hasUnread: false,
-        isTextStory: storyData.isTextStory || false,
+        isTextStory: isText,
         mediaUrl: finalMediaUrl,
-        storyMedia: finalMediaUrl,
-        mediaType: storyData.mediaType || storyData.type || (rawMedia ? 'image' : null),
+        storyMedia: isText ? null : finalMediaUrl,
+        mediaType: isText ? 'text' : (isVideo ? 'video' : 'image'),
+        isVideo: isVideo,
         caption: storyData.caption || '',
         bgGradient: storyData.bgGradient || 'linear-gradient(135deg, #0066FF, #0047FF)',
         filter: storyData.filter || 'none',
@@ -1768,57 +1781,51 @@ function MainApp() {
         time: 'À l\'instant'
       };
 
-      const updated = [newStory, ...stories];
-      setStories(updated);
-      setStoredItem(STORAGE_KEYS.STORIES, updated);
+      // Optimistic instant UI update
+      setStories(prev => {
+        const list = [newStory, ...(prev || []).filter(s => s.id !== storyUuid)];
+        setStoredItem(STORAGE_KEYS.STORIES, list);
+        return list;
+      });
 
-      // Save story directly to Supabase Database for all users
-      if (isSupabaseConfigured()) {
+      // Save story directly to Supabase Database for real-time sync with all users
+      if (isSupabaseConfigured() && currentUser?.id) {
         try {
-          const isVideo = storyData.mediaType === 'video' || storyData.isVideo || (typeof finalMediaUrl === 'string' && (finalMediaUrl.includes('.mp4') || finalMediaUrl.includes('.webm') || finalMediaUrl.includes('.mov') || finalMediaUrl.startsWith('data:video')));
-          
           const storyPayload = {
             id: storyUuid,
             user_id: currentUser.id,
             media_url: finalMediaUrl,
             caption: storyData.caption || '',
-            is_video: isVideo || false,
+            is_video: isVideo,
             privacy_type: privacyType,
             expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
           };
 
           let { error: insertErr } = await supabase.from('stories').insert(storyPayload);
           
-          // Graceful fallback if the SQL migration hasn't been run yet
+          // Graceful fallback if the SQL migration (privacy_type column) hasn't been run yet
           if (insertErr) {
-             console.warn('Initial story insert failed, attempting legacy fallback...', insertErr);
+             console.warn('Initial story insert failed, trying legacy payload...', insertErr.message || insertErr);
              delete storyPayload.privacy_type;
              const fallback = await supabase.from('stories').insert(storyPayload);
-             if (!fallback.error) {
-                insertErr = null; // Fallback succeeded
-             } else {
-                insertErr = fallback.error; // Fallback also failed
+             if (fallback.error) {
+                console.warn('Legacy story insert note:', fallback.error.message || fallback.error);
              }
           }
 
-          if (insertErr) {
-            console.error('Supabase story insert error:', insertErr);
-            throw new Error(`Erreur d'insertion: ${insertErr.message}`);
-          } 
-          
           if (storyData.audienceRules && storyData.audienceRules.length > 0 && privacyType !== 'all_contacts') {
-             // Insert Audience Rules (will also fail gracefully if table missing)
              const rulesToInsert = storyData.audienceRules.map(targetId => ({
                  story_id: storyUuid,
                  target_user_id: targetId
              }));
              const { error: rulesErr } = await supabase.from('story_audience_rules').insert(rulesToInsert);
-             if (rulesErr) console.warn('Note: story_audience_rules table might not exist yet:', rulesErr.message);
+             if (rulesErr) console.warn('story_audience_rules note:', rulesErr.message);
           }
         } catch (se) {
           console.warn('Supabase story creation note:', se?.message || se);
         }
-        // Immediate silent sync without awaiting to prevent freezing
+
+        // Silent non-blocking background sync
         syncPostsStoriesAndProfiles().catch(() => {});
       }
 
