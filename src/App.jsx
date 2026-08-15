@@ -433,11 +433,12 @@ function MainApp() {
 
             if (supaStories && supaStories.length > 0) {
               const userLookup = new Map((loadedUsers || []).map(u => [u.id, u]));
-              loadedStories = supaStories.map(s => {
+              const mappedSupa = supaStories.map(s => {
                 const authorProfile = userLookup.get(s.user_id) || s.profiles || {};
                 const isCurrentUser = s.user_id === currentUser?.id;
-                const authorName = isCurrentUser ? currentUser.name : (authorProfile.name || authorProfile.full_name || s.profiles?.full_name || 'Artiste StageLink');
-                const authorAvatar = isCurrentUser ? currentUser.avatar : (authorProfile.avatar || authorProfile.avatar_url || s.profiles?.avatar_url || '');
+                const authorName = isCurrentUser ? (currentUser?.name || 'Artiste StageLink') : (authorProfile.name || authorProfile.full_name || s.profiles?.full_name || 'Artiste StageLink');
+                const authorAvatar = isCurrentUser ? (currentUser?.avatar || '') : (authorProfile.avatar || authorProfile.avatar_url || s.profiles?.avatar_url || '');
+                const isText = !s.media_url || s.media_url === '' || s.media_url === 'null';
 
                 return {
                   id: s.id,
@@ -446,9 +447,10 @@ function MainApp() {
                   avatar: authorAvatar,
                   userAvatar: authorAvatar,
                   hasUnread: s.story_views ? !s.story_views.some(v => v.viewer_id === currentUser?.id) : true,
-                  storyMedia: s.media_url,
-                  mediaUrl: s.media_url,
-                  mediaType: s.is_video ? 'video' : ((s.media_url && (s.media_url.includes('.mp4') || s.media_url.includes('.webm') || s.media_url.includes('.mov') || s.media_url.startsWith('data:video'))) ? 'video' : 'image'),
+                  storyMedia: isText ? null : s.media_url,
+                  mediaUrl: isText ? '' : s.media_url,
+                  isTextStory: isText,
+                  mediaType: isText ? 'text' : (s.is_video ? 'video' : ((s.media_url && (s.media_url.includes('.mp4') || s.media_url.includes('.webm') || s.media_url.includes('.mov') || s.media_url.startsWith('data:video'))) ? 'video' : 'image')),
                   isVideo: s.is_video || (s.media_url && (s.media_url.includes('.mp4') || s.media_url.includes('.webm') || s.media_url.includes('.mov'))),
                   caption: s.caption || '',
                   likesCount: s.story_likes ? s.story_likes.length : 0,
@@ -462,6 +464,11 @@ function MainApp() {
                   time: 'Récemment'
                 };
               });
+
+              // Merge local stories that might still be active
+              const freshIds = new Set(mappedSupa.map(s => s.id));
+              const localUnsynced = (loadedStories || []).filter(ls => !freshIds.has(ls.id) && (ls.userId === currentUser?.id || ls.user_id === currentUser?.id));
+              loadedStories = [...localUnsynced, ...mappedSupa];
               setStoredItem(STORAGE_KEYS.STORIES, loadedStories);
             }
 
@@ -1067,7 +1074,18 @@ function MainApp() {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'stories' }, () => syncPostsStoriesAndProfiles())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'story_likes' }, () => syncPostsStoriesAndProfiles())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'story_views' }, () => syncPostsStoriesAndProfiles())
-            .on('broadcast', { event: 'new_story' }, () => syncPostsStoriesAndProfiles())
+            .on('broadcast', { event: 'new_story' }, (payload) => {
+              if (payload.payload && payload.payload.id) {
+                const incomingStory = payload.payload;
+                setStories(prev => {
+                  if ((prev || []).some(s => s.id === incomingStory.id)) return prev;
+                  const updated = [incomingStory, ...(prev || [])];
+                  setStoredItem(STORAGE_KEYS.STORIES, updated);
+                  return updated;
+                });
+              }
+              syncPostsStoriesAndProfiles().catch(() => {});
+            })
             .subscribe();
             
           notificationsSub = supabase
@@ -1815,6 +1833,18 @@ function MainApp() {
       // Save story directly to Supabase Database for real-time sync with all users
       if (isSupabaseConfigured() && currentUser?.id) {
         try {
+          // Ensure profile exists in profiles table so foreign key constraint is satisfied
+          try {
+            await supabase.from('profiles').upsert({
+              id: currentUser.id,
+              full_name: currentUser.name || 'Artiste StageLink',
+              avatar_url: currentUser.avatar || '',
+              role: currentUser.role || 'Artiste'
+            }, { onConflict: 'id' });
+          } catch (pe) {
+            console.warn('Profile upsert check note:', pe);
+          }
+
           const storyPayload = {
             id: storyUuid,
             user_id: currentUser.id,
@@ -1851,7 +1881,7 @@ function MainApp() {
             supabase.channel('realtime:stories_interactions').send({
               type: 'broadcast',
               event: 'new_story',
-              payload: { storyId: storyUuid, userId: currentUser.id }
+              payload: newStory
             });
           } catch (be) {}
 
