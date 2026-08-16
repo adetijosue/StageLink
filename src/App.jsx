@@ -2196,7 +2196,13 @@ function MainApp() {
   const handleDeleteNotification = async (notificationId) => {
     if (isSupabaseConfigured()) {
       try {
-        await supabase.from('notifications').delete().eq('id', notificationId);
+        const { error } = await supabase.from('notifications').delete().eq('id', notificationId);
+        if (error) {
+          console.error("Supabase DELETE error:", error);
+          // Revert local state if deletion failed
+          syncNotifications();
+          return;
+        }
       } catch (e) {
         console.error("Erreur suppression notification:", e);
       }
@@ -2208,7 +2214,12 @@ function MainApp() {
   const handleClearAllNotifications = async () => {
     if (isSupabaseConfigured() && currentUser?.id) {
       try {
-        await supabase.from('notifications').delete().eq('user_id', currentUser.id);
+        const { error } = await supabase.from('notifications').delete().eq('user_id', currentUser.id);
+        if (error) {
+          console.error("Supabase DELETE ALL error:", error);
+          syncNotifications();
+          return;
+        }
       } catch (e) {
         console.error("Erreur suppression all notifications:", e);
       }
