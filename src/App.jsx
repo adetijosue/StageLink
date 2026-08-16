@@ -166,6 +166,7 @@ function MainApp() {
 
   // Chat & Call States
   const [selectedChat, setSelectedChat] = useState(null);
+  const [selectedConversation, setSelectedConversation] = useState(null);
   const [isEphemeralOpen, setIsEphemeralOpen] = useState(false);
   const [isVideoCallActive, setIsVideoCallActive] = useState(false);
   const [isIncomingCall, setIsIncomingCall] = useState(false); // New state for incoming call
@@ -1427,47 +1428,33 @@ function MainApp() {
     }
   };
 
-  const handleStartChatWithUser = (targetUser) => {
+  const handleStartChatWithUser = async (targetUser) => {
     if (!targetUser) return;
     window.history.pushState({ page: 'chat' }, '');
-    const targetId = targetUser.id;
-    const targetName = targetUser.name || targetUser.userName || targetUser.full_name;
-
-    const existing = (chats || []).find((c) => {
-      if (targetId && c.participant?.id) {
-        return String(c.participant.id).toLowerCase() === String(targetId).toLowerCase();
-      }
-      if (targetName && c.participant?.name && targetName !== 'Artiste StageLink' && targetName !== 'Artiste') {
-        return String(c.participant.name).toLowerCase() === String(targetName).toLowerCase();
-      }
-      return false;
-    });
-
-    if (existing) {
-      handleSelectChat(existing);
-      setActiveTab('discussions');
-    } else {
-      const newChat = {
-        id: `chat_${targetId || Date.now()}`,
-        participant: {
-          id: targetId || `usr_${Date.now()}`,
-          name: targetName || 'Artiste StageLink',
-          avatar: targetUser.avatar || targetUser.avatar_url || '',
-          role: targetUser.role || targetUser.userRole || 'Artiste'
-        },
-        unreadCount: 0,
-        lastMessageTime: 'À l\'instant',
-        messages: []
-      };
-
-      setChats(prevChats => {
-        const updated = [newChat, ...(prevChats || []).filter(c => c.id !== newChat.id)];
-        setStoredItem(STORAGE_KEYS.CHATS, updated);
-        return updated;
-      });
-      setSelectedChat(newChat);
-      setActiveTab('discussions');
+    
+    // Switch to new DM system: Create or get conversation
+    if (isSupabaseConfigured() && currentUser?.id) {
+       try {
+           const result = await directChatService.getOrCreateDirectConversation(targetUser.id);
+           if (result && result.conversation_id) {
+               setSelectedConversation({
+                   id: result.conversation_id,
+                   vanish_mode_enabled: result.vanish_mode_enabled,
+                   participants: [
+                       { user_id: currentUser.id },
+                       { user_id: targetUser.id, profile: targetUser }
+                   ]
+               });
+               setActiveTab('discussions');
+               return;
+           }
+       } catch (e) {
+           console.warn('Failed to start chat:', e);
+       }
     }
+    
+    // Fallback if not configured
+    setActiveTab('discussions');
   };
 
   const handleBackFromChat = () => {
@@ -2453,58 +2440,15 @@ function MainApp() {
           />
         )}
         {activeTab === 'discussions' && (
-          <ChatList
-            chats={chats}
-            onSelectChat={handleSelectChat}
+          <InboxView
+            currentUser={currentUser}
+            onSelectConversation={(conv) => {
+               window.history.pushState({ page: 'chat' }, '');
+               setSelectedConversation(conv);
+            }}
             onOpenNewChatModal={() => setIsNewChatModalOpen(true)}
             onOpenCallHistoryModal={() => setIsCallHistoryModalOpen(true)}
-            onOpenPublicProfile={handleOpenPublicProfile}
-            isDarkMode={isDarkMode}
-            onArchiveChat={async (chat) => {
-              const partnerId = chat.participant?.id;
-              if (!partnerId) return;
-              const updatedChats = chats.filter(c => c.id !== chat.id);
-              setChats(updatedChats);
-              if (isSupabaseConfigured()) {
-                try {
-                  await supabase.from('chat_states').upsert({ user_id: currentUser.id, partner_id: partnerId, is_archived: true, updated_at: new Date().toISOString() });
-                } catch (e) { console.warn('Archive error:', e); }
-              }
-            }}
-            onDeleteChat={async (chat) => {
-              // 1. Remove it from local UI instantly
-              const updatedChats = chats.filter(c => c.id !== chat.id);
-              setChats(updatedChats);
-              setStoredItem(STORAGE_KEYS.CHATS, updatedChats);
-              if (selectedChat?.id === chat.id) setSelectedChat(null);
-              
-              // 2. Persist deletion in Supabase using the specialized RPC
-              if (isSupabaseConfigured() && currentUser?.id) {
-                const partnerId = chat.participant?.id;
-                if (!partnerId) return;
-                try {
-                  // The RPC will update chat_states to is_deleted = true
-                  // AND mark all messages as deleted_for = currentUser.id
-                  await supabase.rpc('delete_discussion', { partner: partnerId });
-                  
-                  // Also refresh messages sync to ensure messages are cleared from memory
-                  if (syncMessagesFallback) syncMessagesFallback();
-                } catch (e) { console.warn('Delete discussion error:', e); }
-              }
-            }}
-            onToggleUnread={async (chat) => {
-              const partnerId = chat.participant?.id;
-              if (!partnerId) return;
-              const isCurrentlyUnread = chat.unreadCount > 0;
-              const newUnread = !isCurrentlyUnread;
-              const updatedChats = chats.map(c => c.id === chat.id ? { ...c, unreadCount: newUnread ? 1 : 0 } : c);
-              setChats(updatedChats);
-              if (isSupabaseConfigured()) {
-                try {
-                  await supabase.from('chat_states').upsert({ user_id: currentUser.id, partner_id: partnerId, force_unread: newUnread, updated_at: new Date().toISOString() });
-                } catch (e) { console.warn('Toggle unread error:', e); }
-              }
-            }}
+            onOpenProfile={handleOpenPublicProfile}
           />
         )}
 
@@ -2645,6 +2589,52 @@ function MainApp() {
           onDeleteMessageForEveryone={handleDeleteMessageForEveryone}
           onOpenPublicProfile={handleOpenPublicProfile}
           onOpenStory={handleOpenStoryFromMessage}
+        />
+      )}
+      
+      {/* NEW: Instagram DM Message Thread Overlay */}
+      {selectedConversation && (
+        <MessageThread
+          conversationId={selectedConversation.id}
+          partner={selectedConversation.participants?.find(p => p.user_id !== currentUser?.id)?.profile}
+          currentUser={currentUser}
+          onBack={() => {
+              setSelectedConversation(null);
+              setActiveTab('discussions');
+          }}
+          onStartAudioCall={async () => {
+            setIsAudioCallOnly(true);
+            setIsVideoCallActive(true);
+            setIncomingCallData(null);
+            const partnerId = selectedConversation.participants?.find(p => p.user_id !== currentUser?.id)?.user_id;
+            if (isSupabaseConfigured() && currentUser?.id && partnerId) {
+              try {
+                const { data } = await supabase.from('notifications').insert({
+                  user_id: partnerId,
+                  actor_id: currentUser.id,
+                  type: 'incoming_call_audio'
+                }).select('id').single();
+                if (data) setActiveCallNotificationId(data.id);
+              } catch (e) { console.error("Suppressed error:", e); }
+            }
+          }}
+          onStartVideoCall={async () => {
+            setIsAudioCallOnly(false);
+            setIsVideoCallActive(true);
+            setIncomingCallData(null);
+            const partnerId = selectedConversation.participants?.find(p => p.user_id !== currentUser?.id)?.user_id;
+            if (isSupabaseConfigured() && currentUser?.id && partnerId) {
+              try {
+                const { data } = await supabase.from('notifications').insert({
+                  user_id: partnerId,
+                  actor_id: currentUser.id,
+                  type: 'incoming_call_video'
+                }).select('id').single();
+                if (data) setActiveCallNotificationId(data.id);
+              } catch (e) { console.error("Suppressed error:", e); }
+            }
+          }}
+          onOpenProfile={handleOpenPublicProfile}
         />
       )}
 

@@ -596,7 +596,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
           chat.messages.map((msg) => {
           const isCurrent = msg.sender === 'current';
           const reaction = reactions[msg.id];
-          const isMissedCall = msg.isCallNotice || (msg.text && msg.text.includes('Appel'));
+          const isMissedCall = msg.isCallNotice || (typeof msg.text === 'string' && msg.text.includes('Appel'));
 
           return (
             <div

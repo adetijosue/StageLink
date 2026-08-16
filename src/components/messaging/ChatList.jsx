@@ -9,7 +9,7 @@ export default function ChatList({ chats, onSelectChat, onOpenNewChatModal, onOp
   let missedCallsCount = 0;
   (chats || []).forEach((c) => {
     (c.messages || []).forEach((m) => {
-      if (m.callStatus === 'missed' || (m.text && m.text.toLowerCase().includes('manqué'))) {
+      if (m.callStatus === 'missed' || (typeof m.text === 'string' && m.text.toLowerCase().includes('manqué'))) {
         missedCallsCount++;
       }
     });
