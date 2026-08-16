@@ -1,7 +1,7 @@
 import React from 'react';
 import { Search, Plus, PhoneCall } from 'lucide-react';
 import UserAvatar from '../../common/UserAvatar';
-import NotesTray from './NotesTray';
+
 import { useConversationList } from '../../../hooks/useConversationList';
 import { soundEngine } from '../../../services/audioService';
 
@@ -88,12 +88,6 @@ export default function InboxView({
         </div>
       </div>
 
-      {/* 2. Direct Notes Tray Carousel */}
-      <NotesTray
-        notes={directNotes}
-        currentUser={currentUser}
-        onPostNote={postNote}
-      />
 
       {/* 3. Search Bar */}
       <div style={{ padding: '12px 16px 6px 16px' }}>
