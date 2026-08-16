@@ -524,7 +524,7 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
           >
             <div style={{ position: 'relative' }}>
               <UserAvatar user={{ avatar: chat?.participant?.avatar, name: chat?.participant?.name || 'Artiste' }} size={42} />
-              {chat.participant.online && (
+              {chat?.participant?.online && (
                 <span style={{ position: 'absolute', bottom: 0, right: 0, width: '12px', height: '12px', borderRadius: '50%', background: '#10B981', border: '2px solid #FFF' }} />
               )}
             </div>

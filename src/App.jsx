@@ -2461,7 +2461,8 @@ function MainApp() {
             onOpenPublicProfile={handleOpenPublicProfile}
             isDarkMode={isDarkMode}
             onArchiveChat={async (chat) => {
-              const partnerId = chat.participant.id;
+              const partnerId = chat.participant?.id;
+              if (!partnerId) return;
               const updatedChats = chats.filter(c => c.id !== chat.id);
               setChats(updatedChats);
               if (isSupabaseConfigured()) {
@@ -2492,7 +2493,8 @@ function MainApp() {
               }
             }}
             onToggleUnread={async (chat) => {
-              const partnerId = chat.participant.id;
+              const partnerId = chat.participant?.id;
+              if (!partnerId) return;
               const isCurrentlyUnread = chat.unreadCount > 0;
               const newUnread = !isCurrentlyUnread;
               const updatedChats = chats.map(c => c.id === chat.id ? { ...c, unreadCount: newUnread ? 1 : 0 } : c);
