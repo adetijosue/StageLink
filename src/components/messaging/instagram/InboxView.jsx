@@ -5,7 +5,7 @@ import UserAvatar from '../../common/UserAvatar';
 import { useConversationList } from '../../../hooks/useConversationList';
 import { soundEngine } from '../../../services/audioService';
 
-export default function InboxView({
+const InboxView = React.memo(function InboxView({
   currentUser,
   onSelectConversation,
   onOpenNewChatModal,
@@ -250,4 +250,6 @@ export default function InboxView({
       </div>
     </div>
   );
-}
+});
+
+export default InboxView;

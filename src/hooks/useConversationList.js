@@ -53,7 +53,8 @@ export function useConversationList(currentUser) {
           )
         `)
         .eq('user_id', currentUser.id)
-        .is('left_at', null);
+        .is('left_at', null)
+        .limit(50);
 
       if (partErr) throw partErr;
 

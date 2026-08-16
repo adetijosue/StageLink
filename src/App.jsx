@@ -366,15 +366,15 @@ function MainApp() {
               const res = await supabase
                 .from('posts')
                 .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge), post_likes(user_id), post_comments(id, user_id, content, created_at, profiles:user_id(full_name))')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false }).limit(50);
               if (res.data && !res.error) {
                 supaPosts = res.data;
               } else {
-                const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false });
+                const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(50);
                 if (simpleRes.data) supaPosts = simpleRes.data;
               }
             } catch (pe) {
-              const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false });
+              const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(50);
               if (simpleRes.data) supaPosts = simpleRes.data;
             }
 
@@ -424,15 +424,15 @@ function MainApp() {
               const res = await supabase
                 .from('stories')
                 .select('*, profiles:user_id(full_name, avatar_url), story_views(viewer_id, profiles:viewer_id(full_name, avatar_url, role)), story_likes(user_id)')
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false }).limit(50);
               if (res.data && !res.error) {
                 supaStories = res.data;
               } else {
-                const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false });
+                const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false }).limit(50);
                 if (simpleRes.data) supaStories = simpleRes.data;
               }
             } catch (se) {
-              const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false });
+              const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false }).limit(50);
               if (simpleRes.data) supaStories = simpleRes.data;
             }
 
@@ -484,7 +484,7 @@ function MainApp() {
             }
 
             // Fetch live matches or generate collaboration cards from real Supabase members
-            const { data: supaMatches } = await supabase.from('matches').select('*');
+            const { data: supaMatches } = await supabase.from('matches').select('*').limit(50);
             if (supaMatches && supaMatches.length > 0) {
               loadedMatches = supaMatches;
             } else if (loadedUsers && loadedUsers.length > 0) {
@@ -765,11 +765,11 @@ function MainApp() {
             if (res.data && !res.error) {
               supaPosts = res.data;
             } else {
-              const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false });
+              const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(50);
               if (simpleRes.data) supaPosts = simpleRes.data;
             }
           } catch (pe) {
-            const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false });
+            const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(50);
             if (simpleRes.data) supaPosts = simpleRes.data;
           }
 
@@ -823,11 +823,11 @@ function MainApp() {
             if (res.data && !res.error) {
               supaStories = res.data;
             } else {
-              const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false });
+              const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false }).limit(50);
               if (simpleRes.data) supaStories = simpleRes.data;
             }
           } catch (se) {
-            const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false });
+            const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false }).limit(50);
             if (simpleRes.data) supaStories = simpleRes.data;
           }
 
@@ -932,7 +932,8 @@ function MainApp() {
                 .from('messages')
                 .select('*')
                 .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
-                .order('created_at', { ascending: true });
+                .order('created_at', { ascending: false })
+                .limit(200);
               
               if (supaMsgs && supaMsgs.length > 0) {
                 const partnerIds = new Set();
@@ -956,7 +957,8 @@ function MainApp() {
                 }
 
                 const chatGroups = {};
-                supaMsgs.forEach(msg => {
+                // Reverse to restore chronological order (oldest to newest) since we fetched newest 200
+                supaMsgs.reverse().forEach(msg => {
                   // Filter out messages deleted for me
                   if (msg.metadata?.deleted_for?.includes(currentUser.id)) return;
 

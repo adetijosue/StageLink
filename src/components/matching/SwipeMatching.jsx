@@ -3,7 +3,7 @@ import confetti from 'canvas-confetti';
 import { X, Star, Check, Sparkles, MapPin, Calendar, DollarSign, Briefcase } from 'lucide-react';
 import Logo from '../common/Logo';
 
-export default function SwipeMatching({ matches, onApplyMatch }) {
+const SwipeMatching = React.memo(function SwipeMatching({ matches, onApplyMatch }) {
   const [activeFilter, setActiveFilter] = useState('All');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showMatchSuccess, setShowMatchSuccess] = useState(null);
@@ -345,4 +345,6 @@ export default function SwipeMatching({ matches, onApplyMatch }) {
       )}
     </div>
   );
-}
+});
+
+export default SwipeMatching;
