@@ -4,28 +4,28 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import AuthScreen from './components/auth/AuthScreen';
 import TopBar from './components/navigation/TopBar';
-import GlobalUserSearchModal from './components/navigation/GlobalUserSearchModal';
+const GlobalUserSearchModal = React.lazy(() => import('./components/navigation/GlobalUserSearchModal'));
 import BottomNav from './components/navigation/BottomNav';
 import UserAvatar from './components/common/UserAvatar';
 import StoryBar from './components/feed/StoryBar';
-import StoryViewer from './components/feed/StoryViewer';
+const StoryViewer = React.lazy(() => import('./components/feed/StoryViewer'));
 import FeedCard from './components/feed/FeedCard';
 import CreatePostBar from './components/feed/CreatePostBar';
-import CreatePostView from './components/feed/CreatePostView';
-import CameraStoryRecorder from './components/feed/CameraStoryRecorder';
-import ShareModal from './components/feed/ShareModal';
-import ReportModal from './components/feed/ReportModal';
-import PublicProfileModal from './components/profile/PublicProfileModal';
-import SwipeMatching from './components/matching/SwipeMatching';
-import ChatList from './components/messaging/ChatList';
-import ChatRoom from './components/messaging/ChatRoom';
+const CreatePostView = React.lazy(() => import('./components/feed/CreatePostView'));
+const CameraStoryRecorder = React.lazy(() => import('./components/feed/CameraStoryRecorder'));
+const ShareModal = React.lazy(() => import('./components/feed/ShareModal'));
+const ReportModal = React.lazy(() => import('./components/feed/ReportModal'));
+const PublicProfileModal = React.lazy(() => import('./components/profile/PublicProfileModal'));
+const SwipeMatching = React.lazy(() => import('./components/matching/SwipeMatching'));
+const ChatList = React.lazy(() => import('./components/messaging/ChatList'));
+const ChatRoom = React.lazy(() => import('./components/messaging/ChatRoom'));
 import EphemeralModal from './components/messaging/EphemeralModal';
-import VideoCallScreen from './components/messaging/VideoCallScreen';
-import NewChatModal from './components/messaging/NewChatModal';
-import CallHistoryModal from './components/messaging/CallHistoryModal';
-import AIMusicStudio from './components/music_studio/AIMusicStudio';
-import ProfileView from './components/premium/ProfileView';
-import PaywallModal from './components/premium/PaywallModal';
+const VideoCallScreen = React.lazy(() => import('./components/messaging/VideoCallScreen'));
+const NewChatModal = React.lazy(() => import('./components/messaging/NewChatModal'));
+const CallHistoryModal = React.lazy(() => import('./components/messaging/CallHistoryModal'));
+const AIMusicStudio = React.lazy(() => import('./components/music_studio/AIMusicStudio'));
+const ProfileView = React.lazy(() => import('./components/premium/ProfileView'));
+const PaywallModal = React.lazy(() => import('./components/premium/PaywallModal'));
 import NotificationsDrawer from './components/notifications/NotificationsDrawer';
 import AppSplashScreen from './components/common/AppSplashScreen';
 import GlobalAudioPlayer from './components/audio/GlobalAudioPlayer';
@@ -2369,6 +2369,7 @@ function MainApp() {
   }
 
   return (
+    <React.Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', width: '100vw', background: isDarkMode ? '#0F172A' : '#F8FAFC', color: '#0066FF', fontWeight: 'bold' }}>Chargement...</div>}>
     <div
       className={`app-viewport ${isDarkMode ? 'dark-mode' : ''}`}
       data-theme={isDarkMode ? 'dark' : 'light'}
@@ -2778,6 +2779,7 @@ function MainApp() {
         isDarkMode={isDarkMode}
       />
     </div>
+    </React.Suspense>
   );
 }
 

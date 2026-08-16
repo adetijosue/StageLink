@@ -6,7 +6,7 @@ import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
 import confetti from 'canvas-confetti';
 import UserAvatar from '../common/UserAvatar';
 
-export default function FeedCard({ post, onLike, onFollowUser, onAddComment, onDeletePost, onOpenShare, onOpenReport, onOpenPublicProfile }) {
+function FeedCard({ post, onLike, onFollowUser, onAddComment, onDeletePost, onOpenShare, onOpenReport, onOpenPublicProfile }) {
   const { currentUser } = useAuth();
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -549,3 +549,5 @@ export default function FeedCard({ post, onLike, onFollowUser, onAddComment, onD
     </div>
   );
 }
+
+export default React.memo(FeedCard);

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Trash2, Archive, MessageSquare, MessageCircle, Trash } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 
-export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDelete, onToggleUnread, onOpenPublicProfile }) {
+function SwipeableChatItem({ chat, onSelectChat, onArchive, onDelete, onToggleUnread, onOpenPublicProfile }) {
   const [startX, setStartX] = useState(0);
   const [currentX, setCurrentX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -202,3 +202,5 @@ export default function SwipeableChatItem({ chat, onSelectChat, onArchive, onDel
     </div>
   );
 }
+
+export default React.memo(SwipeableChatItem);

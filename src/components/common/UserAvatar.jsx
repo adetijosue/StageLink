@@ -23,6 +23,7 @@ export default function UserAvatar({
       <img
         src={finalUrl}
         alt={user?.name || user?.userName || 'Avatar'}
+        loading="lazy"
         onError={() => setImgError(true)}
         onClick={onClick}
         className={className}
