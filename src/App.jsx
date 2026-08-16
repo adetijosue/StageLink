@@ -1499,7 +1499,7 @@ function MainApp() {
     const targetRole = storyUser.userRole || storyUser.role || 'Artiste StageLink';
 
     let targetChat = chats.find(
-      (c) => c.participant.id === targetUserId || c.participant.name === targetUserName
+      (c) => c.participant?.id === targetUserId || c.participant?.name === targetUserName
     );
 
     let updatedChatsList = chats;

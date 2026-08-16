@@ -10,16 +10,20 @@ export default function UserAvatar({
   onClick,
   border = 'none'
 }) {
+  const [imgError, setImgError] = React.useState(false);
   const finalUrl = avatarUrl || user?.avatar || user?.avatar_url || user?.userAvatar;
   const userGender = (gender || user?.gender || user?.sex || 'male').toLowerCase();
 
+  React.useEffect(() => { setImgError(false); }, [finalUrl]);
+
   const isFemale = userGender === 'female' || userGender === 'femme' || userGender === 'f';
 
-  if (finalUrl && typeof finalUrl === 'string' && finalUrl.trim() !== '') {
+  if (finalUrl && typeof finalUrl === 'string' && finalUrl.trim() !== '' && !imgError) {
     return (
       <img
         src={finalUrl}
         alt={user?.name || user?.userName || 'Avatar'}
+        onError={() => setImgError(true)}
         onClick={onClick}
         className={className}
         style={{
