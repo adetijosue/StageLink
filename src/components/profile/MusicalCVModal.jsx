@@ -40,7 +40,6 @@ export default function MusicalCVModal({ isOpen, onClose, user, isOwnProfile = t
           padding: '12px 20px 40px 20px', boxShadow: '0 -10px 40px rgba(0,0,0,0.3)',
           display: 'flex', flexDirection: 'column'
         }}
-        onClick={(e) => e.stopPropagation()}
       >
         <div style={{ width: '40px', height: '5px', background: isDarkMode ? '#1E293B' : '#E2E8F0', borderRadius: '3px', alignSelf: 'center', marginBottom: '15px' }} />
 

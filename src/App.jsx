@@ -310,7 +310,7 @@ function MainApp() {
 
       const loadInitialData = async () => {
         // Check cache version to force clean old formats
-        const CACHE_VERSION = 'v4'; // Bumped to force complete reset for new users
+        const CACHE_VERSION = 'v5'; // Bumped to force complete reset and purge deleted stories
         const storedVersion = localStorage.getItem('stagelink_cache_version');
         if (storedVersion !== CACHE_VERSION) {
           localStorage.removeItem(STORAGE_KEYS.CHATS);
@@ -420,6 +420,7 @@ function MainApp() {
 
             // 2. Fetch live active stories with resilient join & fallback
             let supaStories = null;
+            let storyFetchOk = false;
             try {
               const res = await supabase
                 .from('stories')
@@ -427,16 +428,23 @@ function MainApp() {
                 .order('created_at', { ascending: false }).limit(50);
               if (res.data && !res.error) {
                 supaStories = res.data;
+                storyFetchOk = true;
               } else {
                 const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false }).limit(50);
-                if (simpleRes.data) supaStories = simpleRes.data;
+                if (simpleRes.data && !simpleRes.error) {
+                  supaStories = simpleRes.data;
+                  storyFetchOk = true;
+                }
               }
             } catch (se) {
               const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false }).limit(50);
-              if (simpleRes.data) supaStories = simpleRes.data;
+              if (simpleRes.data && !simpleRes.error) {
+                supaStories = simpleRes.data;
+                storyFetchOk = true;
+              }
             }
 
-            if (supaStories && supaStories.length > 0) {
+            if (storyFetchOk && Array.isArray(supaStories)) {
               const userLookup = new Map((loadedUsers || []).map(u => [u.id, u]));
               const mappedSupa = supaStories.map(s => {
                 const authorProfile = userLookup.get(s.user_id) || s.profiles || {};
@@ -470,12 +478,15 @@ function MainApp() {
                 };
               });
 
-              // Merge all active local stories (from all users) less than 24h old
+              // Supabase is the source of truth for remote stories.
+              // Only keep local pending drafts created by the current user that are not yet synced.
               const freshIds = new Set(mappedSupa.map(s => s.id));
               const now = Date.now();
               const ONE_DAY_MS = 24 * 60 * 60 * 1000;
               const localUnsynced = (loadedStories || []).filter(ls => {
                 if (freshIds.has(ls.id)) return false;
+                const isMyPendingDraft = (ls.userId === currentUser?.id || ls.isLocalPending || String(ls.id).startsWith('local_')) && !ls.isDeleted;
+                if (!isMyPendingDraft) return false;
                 const storyTimestamp = ls.createdAtTimestamp || (ls.created_at ? new Date(ls.created_at).getTime() : (ls.expires_at ? new Date(ls.expires_at).getTime() - ONE_DAY_MS : now));
                 return (now - storyTimestamp) < ONE_DAY_MS;
               });
@@ -815,6 +826,7 @@ function MainApp() {
 
           // 3. Sync Live Stories with resilient fallback
           let supaStories = null;
+          let storySyncOk = false;
           try {
             const res = await supabase
               .from('stories')
@@ -822,16 +834,23 @@ function MainApp() {
               .order('created_at', { ascending: false });
             if (res.data && !res.error) {
               supaStories = res.data;
+              storySyncOk = true;
             } else {
               const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false }).limit(50);
-              if (simpleRes.data) supaStories = simpleRes.data;
+              if (simpleRes.data && !simpleRes.error) {
+                supaStories = simpleRes.data;
+                storySyncOk = true;
+              }
             }
           } catch (se) {
             const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false }).limit(50);
-            if (simpleRes.data) supaStories = simpleRes.data;
+            if (simpleRes.data && !simpleRes.error) {
+              supaStories = simpleRes.data;
+              storySyncOk = true;
+            }
           }
 
-          if (supaStories && supaStories.length > 0) {
+          if (storySyncOk && Array.isArray(supaStories)) {
             const freshStories = supaStories.map(s => {
               const authorProfile = userLookup.get(s.user_id) || s.profiles || {};
               const isCurrentUser = s.user_id === currentUser?.id;
@@ -864,13 +883,15 @@ function MainApp() {
               };
             });
 
-            // Smart Merge: Preserve all active stories from all users within 24 hours
+            // Source of truth: Supabase. Do not keep deleted stories from other users.
             setStories(prevStories => {
               const freshIds = new Set(freshStories.map(s => s.id));
               const now = Date.now();
               const ONE_DAY_MS = 24 * 60 * 60 * 1000;
               const localUnsynced = (prevStories || []).filter(localS => {
                 if (freshIds.has(localS.id)) return false;
+                const isMyPendingDraft = (localS.userId === currentUser?.id || localS.isLocalPending || String(localS.id).startsWith('local_')) && !localS.isDeleted;
+                if (!isMyPendingDraft) return false;
                 const storyTimestamp = localS.createdAtTimestamp || (localS.created_at ? new Date(localS.created_at).getTime() : (localS.expires_at ? new Date(localS.expires_at).getTime() - ONE_DAY_MS : now));
                 return (now - storyTimestamp) < ONE_DAY_MS;
               });
@@ -1095,7 +1116,21 @@ function MainApp() {
 
           storiesSub = supabase
             .channel('realtime:stories_interactions')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'stories' }, () => syncPostsStoriesAndProfiles())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'stories' }, (payload) => {
+              if (payload.eventType === 'DELETE') {
+                const deletedId = payload.old?.id;
+                if (deletedId) {
+                  setStories(prev => {
+                    const updated = (prev || []).filter(s => s.id !== deletedId);
+                    setStoredItem(STORAGE_KEYS.STORIES, updated);
+                    return updated;
+                  });
+                  setActiveStory(cur => cur?.id === deletedId ? null : cur);
+                  setActiveStoryUserList(prev => (prev || []).filter(s => s.id !== deletedId));
+                }
+              }
+              syncPostsStoriesAndProfiles().catch(() => {});
+            })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'story_likes' }, () => syncPostsStoriesAndProfiles())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'story_views' }, () => syncPostsStoriesAndProfiles())
             .on('broadcast', { event: 'new_story' }, (payload) => {
@@ -1107,6 +1142,19 @@ function MainApp() {
                   setStoredItem(STORAGE_KEYS.STORIES, updated);
                   return updated;
                 });
+              }
+              syncPostsStoriesAndProfiles().catch(() => {});
+            })
+            .on('broadcast', { event: 'delete_story' }, (payload) => {
+              if (payload.payload && payload.payload.id) {
+                const deletedId = payload.payload.id;
+                setStories(prev => {
+                  const updated = (prev || []).filter(s => s.id !== deletedId);
+                  setStoredItem(STORAGE_KEYS.STORIES, updated);
+                  return updated;
+                });
+                setActiveStory(cur => cur?.id === deletedId ? null : cur);
+                setActiveStoryUserList(prev => (prev || []).filter(s => s.id !== deletedId));
               }
               syncPostsStoriesAndProfiles().catch(() => {});
             })
@@ -2585,16 +2633,36 @@ function MainApp() {
             setSavedStoryContext(null);
           }}
           onDeleteStory={async (storyId) => {
-            const updated = stories.filter((s) => s.id !== storyId);
+            const updated = (stories || []).filter((s) => s.id !== storyId);
             setStories(updated);
             setStoredItem(STORAGE_KEYS.STORIES, updated);
             setActiveStory(null);
+            setActiveStoryUserList((prev) => (prev || []).filter((s) => s.id !== storyId));
 
             if (isSupabaseConfigured() && storyId) {
               try {
-                await supabase.from('stories').delete().eq('id', storyId);
+                // Delete dependent records first to avoid foreign key constraints
+                await supabase.from('story_views').delete().eq('story_id', storyId);
+                await supabase.from('story_likes').delete().eq('story_id', storyId);
+                await supabase.from('story_audience_rules').delete().eq('story_id', storyId);
+                
+                const { error: delErr } = await supabase.from('stories').delete().eq('id', storyId);
+                if (delErr) {
+                  console.warn('Supabase story deletion error:', delErr.message || delErr);
+                }
               } catch (se) {
                 console.warn('Supabase story deletion note:', se?.message || se);
+              }
+
+              // Broadcast real-time deletion to all other connected clients immediately
+              try {
+                supabase.channel('realtime:stories_interactions').send({
+                  type: 'broadcast',
+                  event: 'delete_story',
+                  payload: { id: storyId }
+                });
+              } catch (be) {
+                console.warn('Broadcast delete story note:', be?.message || be);
               }
             }
           }}

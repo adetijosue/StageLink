@@ -102,7 +102,8 @@ DROP POLICY IF EXISTS "Les utilisateurs gèrent leurs états" ON public.chat_sta
 DROP POLICY IF EXISTS "Allow all chat_states" ON public.chat_states;
 CREATE POLICY "Allow all chat_states" ON public.chat_states FOR ALL USING (true);
 
--- 11. ACTIVATE SUPABASE REALTIME REPLICATION
+-- 11. ACTIVATE SUPABASE REALTIME REPLICATION & REPLICA IDENTITY
+ALTER TABLE public.stories REPLICA IDENTITY FULL;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.stories;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.chat_states;

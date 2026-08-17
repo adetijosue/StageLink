@@ -36,7 +36,7 @@ export function useChatThread({ conversationId, currentUser, partner }) {
         .from('direct_messages')
         .select('*, reactions:message_reactions(*)')
         .eq('conversation_id', conversationId)
-        .is('deleted_at', null)
+        // LA LIGNE '.is('deleted_at', null)' DOIT ETRE SUPPRIMEE ICI
         .order('created_at', { ascending: false })
         .limit(50);
 

@@ -62,7 +62,7 @@ export const directChatService = {
             uploadPayload = await res.blob();
             contentType = 'image/jpeg';
           }
-        } catch (e) {}
+        } catch (e) { }
       }
 
       const fileExt = fileName ? fileName.split('.').pop() : (mediaType === 'audio' ? 'webm' : 'jpg');
@@ -72,22 +72,22 @@ export const directChatService = {
       let error = null;
 
       const tryUpload = async (bucket) => {
-         const { error: err } = await supabase.storage.from(bucket).upload(uniquePath, uploadPayload, {
-            contentType,
-            cacheControl: '3600',
-            upsert: true
-         });
-         return err;
+        const { error: err } = await supabase.storage.from(bucket).upload(uniquePath, uploadPayload, {
+          contentType,
+          cacheControl: '3600',
+          upsert: true
+        });
+        return err;
       };
 
       error = await tryUpload(bucketName);
       if (error) {
-         bucketName = 'media';
-         error = await tryUpload(bucketName);
-         if (error) {
-            bucketName = 'public';
-            error = await tryUpload(bucketName);
-         }
+        bucketName = 'media';
+        error = await tryUpload(bucketName);
+        if (error) {
+          bucketName = 'public';
+          error = await tryUpload(bucketName);
+        }
       }
 
       if (error) throw error;
@@ -143,8 +143,8 @@ export const directChatService = {
         // Persist to Postgres database
         const { error } = await supabase.from('direct_messages').insert(newRecord);
         if (error) {
-           console.warn('Direct message DB insert error:', error.message);
-           throw error;
+          console.warn('Direct message DB insert error:', error.message);
+          throw error;
         }
       } catch (err) {
         console.warn('Direct message sending error:', err);
@@ -235,26 +235,37 @@ export const directChatService = {
       await supabase.rpc('purge_vanished_messages', {
         p_conversation_id: conversationId
       });
-    } catch (e) {}
+    } catch (e) { }
   },
 
   /**
    * Mark conversation as read
    */
-  async markAsRead(conversationId, userId) {
-    if (!isSupabaseConfigured() || !conversationId) return;
-
+  async markAsRead(conversationId, currentUserId) {
+    if (!isSupabaseConfigured()) return;
     try {
-      await supabase.rpc('mark_conversation_as_read', {
-        p_conversation_id: conversationId
-      });
+      const now = new Date().toISOString();
 
-      supabase.channel(`dm:${conversationId}`).send({
-        type: 'broadcast',
-        event: 'read_receipt',
-        payload: { conversationId, userId, readAt: new Date().toISOString() }
-      });
-    } catch (e) {}
+      // 1. Met à jour la date de dernière lecture
+      await supabase
+        .from('conversation_participants')
+        .update({ last_read_at: now })
+        .eq('conversation_id', conversationId)
+        .eq('user_id', currentUserId);
+
+      // 2. Force le statut des messages à "lu" (read)
+      await supabase
+        .from('direct_messages')
+        .update({ status: 'read' })
+        .eq('conversation_id', conversationId)
+        .neq('sender_id', currentUserId)
+        .eq('status', 'sent');
+
+      // 3. SOLUTION RADICALE : Déclenche instantanément la mise à jour de l'icône de notification dans l'Inbox !
+      window.dispatchEvent(new Event('refresh_conversations'));
+    } catch (err) {
+      console.error('Error marking as read:', err);
+    }
   },
 
   /**

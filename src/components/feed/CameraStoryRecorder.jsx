@@ -1033,6 +1033,24 @@ export default function CameraStoryRecorder({ isOpen, onClose, onStoryCreated, r
                 </div>
                 {privacyType === 'include_only' && <Check size={18} color="#22C55E" />}
               </label>
+
+              {/* Allow Reshare Toggle */}
+              <div 
+                onClick={() => setAllowReshare(!allowReshare)}
+                style={{ 
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
+                  background: 'rgba(255,255,255,0.05)', padding: '12px', borderRadius: '12px', 
+                  cursor: 'pointer', marginTop: '6px' 
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: '600', color: '#FFF', fontSize: '0.9rem' }}>Autoriser le repartage</div>
+                  <div style={{ fontSize: '0.8rem', color: '#94A3B8' }}>Permettre aux autres de repartager cette story.</div>
+                </div>
+                <div style={{ color: allowReshare ? '#22C55E' : '#475569' }}>
+                  {allowReshare ? <CheckSquare size={20} /> : <Square size={20} />}
+                </div>
+              </div>
             </div>
           </div>
 

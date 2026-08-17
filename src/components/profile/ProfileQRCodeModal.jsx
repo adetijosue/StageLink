@@ -50,7 +50,6 @@ export default function ProfileQRCodeModal({ isOpen, onClose, user, isDarkMode }
           padding: '12px 20px 40px 20px', boxShadow: '0 -10px 40px rgba(0,0,0,0.3)',
           display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center'
         }}
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Handle */}
         <div style={{ width: '40px', height: '5px', background: isDarkMode ? '#1E293B' : '#E2E8F0', borderRadius: '3px', marginBottom: '15px' }} />

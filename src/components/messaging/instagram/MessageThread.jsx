@@ -16,6 +16,7 @@ export default function MessageThread({
   onStartVideoCall,
   onOpenProfile
 }) {
+  const [touchStartX, setTouchStartX] = useState(null);
   const [reactionOverlayData, setReactionOverlayData] = useState(null);
 
   const {
@@ -40,15 +41,23 @@ export default function MessageThread({
   }, [messages, typingText]);
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 100,
-      background: isVanishMode ? '#0B0F19' : 'var(--bg-light)',
-      display: 'flex',
-      flexDirection: 'column',
-      color: isVanishMode ? '#FFFFFF' : 'var(--text-dark)'
-    }}>
+    <div
+      onTouchStart={(e) => setTouchStartX(e.touches[0].clientX)}
+      onTouchEnd={(e) => {
+        if (touchStartX !== null && (e.changedTouches[0].clientX - touchStartX > 100)) {
+          onBack();
+        }
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        // ... le reste de votre style ...
+        background: isVanishMode ? '#0B0F19' : 'var(--bg-light)',
+        display: 'flex',
+        flexDirection: 'column',
+        color: isVanishMode ? '#FFFFFF' : 'var(--text-dark)'
+      }}>
       {/* 1. Header Bar */}
       <div style={{
         paddingTop: 'calc(12px + env(safe-area-inset-top, 12px))',

@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 // 1. SQL Migration
-const sqlMigration = -- ==============================================================================
+const sqlMigration = `-- ==============================================================================
 -- STAGELINK: ZERO-TRUST VOIP & WEBRTC REAL-TIME SIGNALING ENGINE
 -- Architected for 1:1 and Group HD Audio & Video Communications
 -- ==============================================================================
@@ -180,7 +180,7 @@ DECLARE
     v_caller_profile JSONB;
 BEGIN
     v_caller_id := auth.uid();
-    IF v_caller_id IS NULL THEN RAISE EXCEPTION 'Non authentifiÈ'; END IF;
+    IF v_caller_id IS NULL THEN RAISE EXCEPTION 'Non authentifi√©'; END IF;
 
     IF NOT p_is_group AND array_length(p_receiver_ids, 1) = 1 THEN
         SELECT EXISTS (
@@ -189,7 +189,7 @@ BEGIN
             WHERE cp.user_id = p_receiver_ids[1] AND cs.status IN ('initiating', 'ringing', 'active')
         ) INTO v_is_busy;
         IF v_is_busy THEN
-            RETURN jsonb_build_object('success', false, 'error', 'USER_BUSY', 'message', 'Le correspondant est dÈj‡ en ligne');
+            RETURN jsonb_build_object('success', false, 'error', 'USER_BUSY', 'message', 'Le correspondant est d√©j√† en ligne');
         END IF;
     END IF;
 
@@ -270,7 +270,9 @@ END;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.call_sessions;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.call_participants;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.call_signals;
-;
+`;
 
-fs.writeFileSync('d:/PC Toshiba/JABE PRODUCTION/StageLink/supabase/migrations/20260816_voip_webrtc_system.sql', sqlMigration, 'utf8');
+const targetPath = path.join(__dirname, '..', 'supabase', 'migrations', '20260816_voip_webrtc_system.sql');
+fs.writeFileSync(targetPath, sqlMigration, 'utf8');
 console.log('1. Generated supabase/migrations/20260816_voip_webrtc_system.sql');
+

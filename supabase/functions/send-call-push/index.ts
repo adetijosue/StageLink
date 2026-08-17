@@ -52,6 +52,10 @@ serve(async (req) => {
       .select("token, platform, user_id")
       .in("user_id", receiverIds);
 
+    if (deviceError) {
+      console.error("[VoIP Push] Error fetching device tokens:", deviceError);
+    }
+
     const pushResults = [];
 
     // High-Priority Android FCM VoIP / Data Message Payload
@@ -73,7 +77,7 @@ serve(async (req) => {
     if (devices && devices.length > 0) {
       for (const device of devices) {
         // In production, integrate Firebase Admin SDK HTTP v1 or APNs HTTP/2 with Auth Key
-        console.log(`[VoIP Push] Dispatching to user ${device.user_id} (${device.platform}):`, callId);
+        console.log(`[VoIP Push] Dispatching payload to user ${device.user_id} (${device.platform}):`, fcmPayload);
         pushResults.push({ userId: device.user_id, platform: device.platform, dispatched: true });
       }
     }
