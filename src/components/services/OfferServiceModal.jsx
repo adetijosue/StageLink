@@ -1,17 +1,34 @@
 import React, { useState } from 'react';
-import { X, Calendar, Ticket, Video, Clock, MapPin } from 'lucide-react';
+import { X, Sliders, Clock, CheckCircle2, DollarSign } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
 
-export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDarkMode }) {
+export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, isDarkMode }) {
   const { currentUser } = useAuth();
+
   const [title, setTitle] = useState('');
-  const [price, setPrice] = useState('0');
-  const [date, setDate] = useState('Ce Samedi à 20h30');
-  const [type, setType] = useState('Direct Stream HD');
-  const [coverUrl, setCoverUrl] = useState('https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80');
+  const [category, setCategory] = useState('Mixage');
+  const [price, setPrice] = useState('180');
+  const [priceUnit, setPriceUnit] = useState('titre'); // 'titre' | 'session' | 'heure' | 'projet'
+  const [delivery, setDelivery] = useState('48h (3 révisions incluses)');
+  const [description, setDescription] = useState('');
+  const [icon, setIcon] = useState('🎚️');
 
   if (!isOpen) return null;
+
+  const categoryIcons = {
+    'Mixage': '🎚️',
+    'Mastering': '🎧',
+    'Enregistrement': '🎙️',
+    'Beatmaking': '🎹',
+    'Coaching': '🎓',
+    'Arrangement': '🎼'
+  };
+
+  const handleCategoryChange = (cat) => {
+    setCategory(cat);
+    setIcon(categoryIcons[cat] || '🎚️');
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -19,16 +36,19 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
 
     soundEngine?.playPopSound?.();
 
-    onEventCreated({
-      id: `event_${Date.now()}`,
+    onServiceCreated({
+      id: `srv_${Date.now()}`,
       title,
-      organizer: currentUser?.name || 'Hôte Événement',
-      date,
-      price: price === '0' || !price ? 'Gratuit' : `${price} €`,
-      type,
-      attendees: '1 réservation (Nouveau)',
-      cover: coverUrl
+      category,
+      provider: currentUser?.name || 'Artiste Prestataire Pro',
+      providerAvatar: currentUser?.avatar || null,
+      price: `${price} € / ${priceUnit}`,
+      delivery,
+      description: description || 'Prestation professionnelle réalisée avec matériel haut de gamme et écoute attentive de vos besoins artistiques.',
+      rating: '5.0 ⭐ (Nouveau)',
+      icon: icon || '🎚️'
     });
+
     onClose();
   };
 
@@ -52,7 +72,7 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: '440px',
+          maxWidth: '460px',
           maxHeight: 'calc(100dvh - max(48px, env(safe-area-inset-top, 16px) + env(safe-area-inset-bottom, 20px)))',
           display: 'flex',
           flexDirection: 'column',
@@ -63,7 +83,7 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
           overflow: 'hidden'
         }}
       >
-        {/* Sticky Header */}
+        {/* Top Header */}
         <div
           style={{
             flexShrink: 0,
@@ -87,10 +107,10 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
                 gap: '8px'
               }}
             >
-              <Calendar size={20} color="#0066FF" /> Organiser un Événement Live
+              <Sliders size={20} color="#10B981" /> Proposer un Service Studio
             </h3>
             <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '2px 0 0 0' }}>
-              Showcase, Live listening ou Masterclass en direct
+              Offrez vos prestations aux artistes et producteurs de StageLink
             </p>
           </div>
 
@@ -114,7 +134,7 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
           </button>
         </div>
 
-        {/* Scrollable Body */}
+        {/* Scrollable Form Body */}
         <div
           style={{
             flex: 1,
@@ -124,14 +144,47 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
           }}
         >
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {/* Category Selector */}
+            <div>
+              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '6px' }}>
+                Domaine de Prestation
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                {Object.keys(categoryIcons).map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => handleCategoryChange(cat)}
+                    style={{
+                      padding: '8px 4px',
+                      borderRadius: '12px',
+                      border: category === cat ? '2px solid #10B981' : isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E2E8F0',
+                      background: category === cat ? (isDarkMode ? 'rgba(16,185,129,0.2)' : '#ECFDF5') : isDarkMode ? '#1E293B' : '#F8FAFC',
+                      color: category === cat ? '#10B981' : isDarkMode ? '#F8FAFC' : '#0F172A',
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>{categoryIcons[cat]}</span> {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Title */}
             <div>
               <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Nom de l'Événement *
+                Intitulé de la Prestation *
               </label>
               <input
                 type="text"
                 required
-                placeholder="Ex: Listening Session & Pitch Prods avec Labels"
+                placeholder="Ex: Mixage Stéréo & Spécialisation Dolby Atmos"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 style={{
@@ -147,16 +200,17 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            {/* Pricing & Unit */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Prix du Billet (€) (0 = Gratuit)
+                  Tarif (€) *
                 </label>
                 <input
                   type="number"
+                  required
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  placeholder="0"
                   style={{
                     width: '100%',
                     padding: '10px 14px',
@@ -172,11 +226,11 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
 
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Format de l'Événement
+                  Unité de Facturation
                 </label>
                 <select
-                  value={type}
-                  onChange={(e) => setType(e.target.value)}
+                  value={priceUnit}
+                  onChange={(e) => setPriceUnit(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '10px',
@@ -187,23 +241,24 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
                     fontSize: '0.82rem'
                   }}
                 >
-                  <option value="Direct Stream HD">Live Stream HD</option>
-                  <option value="Showcase Privé">Showcase Privé</option>
-                  <option value="Atelier Studio Présentiel">Studio Présentiel</option>
-                  <option value="Webinar Q&A">Webinar Q&A</option>
+                  <option value="titre">Par Titre / Track</option>
+                  <option value="session">Par Session Studio</option>
+                  <option value="heure">Par Heure</option>
+                  <option value="projet">Par Projet / EP</option>
                 </select>
               </div>
             </div>
 
+            {/* Delivery & Revisions */}
             <div>
               <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Date & Heure
+                Délai & Conditions de Révision
               </label>
               <input
                 type="text"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                placeholder="Ex: Ce Vendredi à 20h00"
+                value={delivery}
+                onChange={(e) => setDelivery(e.target.value)}
+                placeholder="Ex: Livraison 48h (3 révisions incluses)"
                 style={{
                   width: '100%',
                   padding: '10px 14px',
@@ -217,6 +272,31 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
               />
             </div>
 
+            {/* Description */}
+            <div>
+              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
+                Description détaillée de votre savoir-faire
+              </label>
+              <textarea
+                rows={3}
+                placeholder="Décrivez votre expérience, votre équipement (plugins UAD, convertisseurs, micros...) et ce qui est inclus dans votre formule."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '14px',
+                  border: isDarkMode ? '1px solid rgba(255,255,255,0.15)' : '1px solid #CBD5E1',
+                  background: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  color: isDarkMode ? '#FFFFFF' : '#0F172A',
+                  fontSize: '0.84rem',
+                  outline: 'none',
+                  resize: 'none'
+                }}
+              />
+            </div>
+
+            {/* Submit Button */}
             <button
               type="submit"
               style={{
@@ -224,16 +304,16 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
                 padding: '14px',
                 borderRadius: '16px',
                 border: 'none',
-                background: 'linear-gradient(135deg, #0066FF 0%, #0047FF 100%)',
+                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
                 color: '#FFFFFF',
                 fontWeight: 800,
                 fontSize: '0.9rem',
                 cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(0, 102, 255, 0.35)',
-                marginTop: '6px'
+                boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
+                marginTop: '4px'
               }}
             >
-              🚀 Lancer l'Événement & Billetterie
+              🚀 Mettre en Ligne mon Service Studio
             </button>
           </form>
         </div>

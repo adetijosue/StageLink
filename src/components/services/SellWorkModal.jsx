@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { X, DollarSign, FileAudio } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
+import { useAuth } from '../../context/AuthContext';
 
 export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMode }) {
+  const { currentUser } = useAuth();
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('150');
   const [category, setCategory] = useState('Beatmaking'); // 'Beatmaking' | 'Master' | 'SamplePack' | 'Mixage'
@@ -29,7 +31,7 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
     onWorkCreated({
       id: `work_${Date.now()}`,
       title,
-      author: 'Vous (Artiste VIP Pro)',
+      author: currentUser?.name || 'Vous',
       price: `${price} €`,
       genre,
       category,
@@ -305,7 +307,7 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
                 marginTop: '4px'
               }}
             >
-              🚀 Mettre à disposition sur le Catalogue VIP Pro
+              🚀 Mettre à disposition sur le Catalogue Pro StageLink
             </button>
           </form>
         </div>
