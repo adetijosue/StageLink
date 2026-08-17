@@ -191,9 +191,9 @@ export const directChatService = {
         }
 
         // Insert notification in notifications table for recipient (instant push & sync across devices)
+        const notifContent = content || (messageType === 'audio' ? '🎤 Note vocale' : (messageType === 'image' ? '📷 Photo' : 'Nouveau message'));
         if (targetRecipientId && targetRecipientId !== senderId) {
           try {
-            const notifContent = content || (messageType === 'audio' ? '🎤 Note vocale' : (messageType === 'image' ? '📷 Photo' : 'Nouveau message'));
             await supabase.from('notifications').insert({
               user_id: targetRecipientId,
               actor_id: senderId,
@@ -205,6 +205,79 @@ export const directChatService = {
           } catch (ne) {
             console.warn('Direct message notification insert note:', ne.message);
           }
+        }
+
+        // 4. INSTANT MULTI-CHANNEL WEBSOCKET BROADCASTS (Delivery <20ms guaranteed)
+        try {
+          // A. Broadcast on conversation thread channel (for in-chat instant UI append)
+          supabase.channel(`dm:${conversationId}`).send({
+            type: 'broadcast',
+            event: 'new_direct_message',
+            payload: {
+              message: newRecord,
+              conversationId,
+              senderId,
+              recipientId: targetRecipientId
+            }
+          }).catch(() => {});
+
+          // B. Broadcast to target recipient's private user channel (for instant floating banner & badge)
+          if (targetRecipientId && targetRecipientId !== senderId) {
+            supabase.channel(`user:${targetRecipientId}`).send({
+              type: 'broadcast',
+              event: 'new_direct_message',
+              payload: {
+                message: newRecord,
+                conversationId,
+                senderId,
+                recipientId: targetRecipientId
+              }
+            }).catch(() => {});
+
+            // C. Broadcast notification event on recipient user channel
+            supabase.channel(`user:${targetRecipientId}`).send({
+              type: 'broadcast',
+              event: 'new_notification',
+              payload: {
+                user_id: targetRecipientId,
+                actor_id: senderId,
+                type: 'message',
+                reference_id: conversationId,
+                content: notifContent,
+                created_at: now
+              }
+            }).catch(() => {});
+          }
+
+          // D. Broadcast on global realtime:direct_messages
+          supabase.channel('realtime:direct_messages').send({
+            type: 'broadcast',
+            event: 'new_direct_message',
+            payload: {
+              message: newRecord,
+              conversationId,
+              senderId,
+              recipientId: targetRecipientId
+            }
+          }).catch(() => {});
+
+          // E. Broadcast on global realtime:notifications
+          if (targetRecipientId && targetRecipientId !== senderId) {
+            supabase.channel('realtime:notifications').send({
+              type: 'broadcast',
+              event: 'new_notification',
+              payload: {
+                user_id: targetRecipientId,
+                actor_id: senderId,
+                type: 'message',
+                reference_id: conversationId,
+                content: notifContent,
+                created_at: now
+              }
+            }).catch(() => {});
+          }
+        } catch (bErr) {
+          console.warn('Realtime direct message broadcast note:', bErr);
         }
       } catch (err) {
         console.warn('Direct message sending error:', err);

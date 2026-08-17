@@ -1155,7 +1155,7 @@ function MainApp() {
 
       // 1. Instant Realtime Subscription Setup for Posts, Stories, Profiles, Messages & Notifications (<100ms sync)
       syncNotifications();
-      let profilesSub, postsSub, storiesSub, messagesSub, notificationsSub;
+      let profilesSub, postsSub, storiesSub, messagesSub, notificationsSub, userPrivateSub;
         let syncMessagesFallback = null;
       if (isSupabaseConfigured()) {
         try {
@@ -1372,154 +1372,217 @@ function MainApp() {
               syncPostsStoriesAndProfiles().catch(() => {});
             })
             .subscribe();
-            
-          notificationsSub = supabase
-            .channel('realtime:notifications')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, async (payload) => {
-              if (payload.new && payload.new.user_id === currentUser.id) {
-                if (payload.new.type === 'incoming_call_audio' || payload.new.type === 'incoming_call_video') {
-                  const isAudioOnly = payload.new.type === 'incoming_call_audio';
-                  const callerId = payload.new.actor_id;
-                  try {
-                    const { data: actor } = await supabase
-                      .from('profiles')
-                      .select('id, full_name, username, avatar_url, role, verified_badge')
-                      .eq('id', callerId)
-                      .maybeSingle();
-                    const callerName = actor?.full_name || actor?.username || 'Artiste';
-                    const callerAvatar = actor?.avatar_url || '';
-                    const callerRole = actor?.role || 'Artiste';
 
-                    const partnerInfo = {
-                      id: callerId,
-                      name: callerName,
-                      full_name: callerName,
-                      avatar: callerAvatar,
-                      avatar_url: callerAvatar,
-                      role: callerRole,
-                      userRole: callerRole,
-                      verified: actor?.verified_badge === 'gold' || actor?.verified_badge === 'blue'
-                    };
+          // ----------------------------------------------------
+          // UNIFIED REAL-TIME INCOMING NOTIFICATION HANDLER
+          // ----------------------------------------------------
+          const handleIncomingNotification = async (notif) => {
+            if (!notif) return;
+            const targetUserId = notif.user_id || notif.userId;
+            if (targetUserId && targetUserId !== currentUser.id) return;
+            const actorId = notif.actor_id || notif.actorId || notif.sender_id;
+            if (actorId && actorId === currentUser.id) return;
 
-                    setActiveCallPartner(partnerInfo);
-                    setIncomingCallData({
-                      callerName,
-                      callerAvatar,
-                      callerRole,
-                      isAudioOnly,
-                      notificationId: payload.new.id,
-                      callerId
-                    });
-                    setIsAudioCallOnly(isAudioOnly);
-                    setIsVideoCallActive(true);
-                  } catch (e) { console.error("Incoming call notification handler note:", e); }
-                  return; // Do not push native notification or regular sync for calls
+            // Handle incoming calls (Audio / Video)
+            if (notif.type === 'incoming_call_audio' || notif.type === 'incoming_call_video') {
+              const isAudioOnly = notif.type === 'incoming_call_audio';
+              const callerId = actorId;
+              try {
+                const { data: actor } = await supabase
+                  .from('profiles')
+                  .select('id, full_name, username, avatar_url, role, verified_badge')
+                  .eq('id', callerId)
+                  .maybeSingle();
+                const callerName = actor?.full_name || actor?.username || 'Artiste';
+                const callerAvatar = actor?.avatar_url || '';
+                const callerRole = actor?.role || 'Artiste';
+
+                const partnerInfo = {
+                  id: callerId,
+                  name: callerName,
+                  full_name: callerName,
+                  avatar: callerAvatar,
+                  avatar_url: callerAvatar,
+                  role: callerRole,
+                  userRole: callerRole,
+                  verified: actor?.verified_badge === 'gold' || actor?.verified_badge === 'blue'
+                };
+
+                setActiveCallPartner(partnerInfo);
+                setIncomingCallData({
+                  callerName,
+                  callerAvatar,
+                  callerRole,
+                  isAudioOnly,
+                  notificationId: notif.id,
+                  callerId
+                });
+                setIsAudioCallOnly(isAudioOnly);
+                setIsVideoCallActive(true);
+              } catch (e) { console.error("Incoming call notification note:", e); }
+              return;
+            }
+
+            try {
+              let actorName = 'Quelqu\'un';
+              let actorAvatar = '';
+              if (actorId) {
+                const { data: actor } = await supabase.from('profiles').select('id, full_name, username, avatar_url, role').eq('id', actorId).maybeSingle();
+                if (actor) {
+                  actorName = actor.full_name || actor.username || 'Quelqu\'un';
+                  actorAvatar = actor.avatar_url || '';
                 }
-
-                let body = 'Vous avez une nouvelle notification';
-                try {
-                  const { data: actor } = await supabase.from('profiles').select('id, full_name, username, avatar_url, role').eq('id', payload.new.actor_id).maybeSingle();
-                  const actorName = actor?.full_name || actor?.username || 'Quelqu\'un';
-                  const activePartnerId = getActivePartnerId();
-
-                  if (payload.new.type === 'message') {
-                    if (activePartnerId && activePartnerId === payload.new.actor_id) {
-                      // Already in active discussion with sender -> skip top pop-up banner
-                      return;
-                    }
-                    body = `${actorName} : ${payload.new.content || 'Nouveau message'}`;
-                    soundEngine.playMessageReceivedSound();
-                    setToastNotification({
-                      type: 'message',
-                      title: actorName,
-                      message: payload.new.content || 'Nouveau message reçu',
-                      avatar: actor?.avatar_url,
-                      actorId: payload.new.actor_id,
-                      partnerId: payload.new.actor_id
-                    });
-                    window.dispatchEvent(new Event('refresh_conversations'));
-                    await updateUnreadDirectMessagesCount();
-                  } else if (payload.new.type === 'like_post') {
-                    body = `${actorName} a aimé votre publication.`;
-                    soundEngine.playPopSound();
-                    setToastNotification({
-                      type: 'like_post',
-                      title: actorName,
-                      message: 'a aimé votre publication',
-                      avatar: actor?.avatar_url,
-                      actorId: payload.new.actor_id,
-                      targetTab: 'feed'
-                    });
-                  } else if (payload.new.type === 'comment_post') {
-                    body = `${actorName} a commenté votre publication.`;
-                    soundEngine.playPopSound();
-                    setToastNotification({
-                      type: 'comment_post',
-                      title: actorName,
-                      message: payload.new.content || 'a commenté votre publication',
-                      avatar: actor?.avatar_url,
-                      actorId: payload.new.actor_id,
-                      targetTab: 'feed'
-                    });
-                  } else if (payload.new.type === 'like_story') {
-                    body = `${actorName} a aimé votre story.`;
-                    soundEngine.playPopSound();
-                    setToastNotification({
-                      type: 'like_story',
-                      title: actorName,
-                      message: 'a aimé votre story',
-                      avatar: actor?.avatar_url,
-                      actorId: payload.new.actor_id,
-                      targetTab: 'feed'
-                    });
-                  } else if (payload.new.type === 'view_story') {
-                    body = `${actorName} a vu votre story.`;
-                    setToastNotification({
-                      type: 'view_story',
-                      title: actorName,
-                      message: 'a vu votre story',
-                      avatar: actor?.avatar_url,
-                      actorId: payload.new.actor_id,
-                      targetTab: 'feed'
-                    });
-                  } else if (payload.new.type === 'match') {
-                    body = `${actorName} a matché avec vous !`;
-                    soundEngine.playPopSound();
-                    setToastNotification({
-                      type: 'match',
-                      title: actorName,
-                      message: 'a matché avec vous !',
-                      avatar: actor?.avatar_url,
-                      actorId: payload.new.actor_id,
-                      targetTab: 'match'
-                    });
-                  } else {
-                    body = `Nouvelle notification de ${actorName}.`;
-                    setToastNotification({
-                      type: payload.new.type || 'notification',
-                      title: actorName,
-                      message: payload.new.content || 'Nouvelle interaction sur votre profil',
-                      avatar: actor?.avatar_url,
-                      actorId: payload.new.actor_id
-                    });
-                  }
-                  
-                  sendNativeNotification('StageLink', body);
-                } catch (e) { console.error("Suppressed error:", e); }
               }
-              syncNotifications();
-            })
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications' }, () => syncNotifications())
-            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'notifications' }, (payload) => {
-              if (payload.old && incomingCallDataRef.current && payload.old.id === incomingCallDataRef.current.notificationId) {
-                // The caller cancelled the call (deleted the incoming_call notification)
-                setIsVideoCallActive(false);
-                setIncomingCallData(null);
-              }
-              syncNotifications();
-            })
-            .subscribe();
 
+              const activePartnerId = getActivePartnerId();
+
+              if (notif.type === 'message') {
+                if (activePartnerId && activePartnerId === actorId) {
+                  // Already actively viewing this conversation -> suppress top banner
+                  return;
+                }
+                const msgBody = notif.content || 'Nouveau message reçu';
+                soundEngine.playMessageReceivedSound();
+                setToastNotification({
+                  type: 'message',
+                  title: actorName,
+                  message: msgBody,
+                  avatar: actorAvatar,
+                  actorId: actorId,
+                  partnerId: actorId,
+                  reference_id: notif.reference_id
+                });
+                window.dispatchEvent(new Event('refresh_conversations'));
+                updateUnreadDirectMessagesCount().catch(() => {});
+                sendNativeNotification('StageLink', `${actorName} : ${msgBody}`);
+              } else if (notif.type === 'like_post') {
+                soundEngine.playPopSound();
+                setToastNotification({
+                  type: 'like_post',
+                  title: actorName,
+                  message: 'a aimé votre publication',
+                  avatar: actorAvatar,
+                  actorId: actorId,
+                  targetTab: 'feed'
+                });
+                sendNativeNotification('StageLink', `${actorName} a aimé votre publication.`);
+              } else if (notif.type === 'comment_post') {
+                soundEngine.playPopSound();
+                setToastNotification({
+                  type: 'comment_post',
+                  title: actorName,
+                  message: notif.content || 'a commenté votre publication',
+                  avatar: actorAvatar,
+                  actorId: actorId,
+                  targetTab: 'feed'
+                });
+                sendNativeNotification('StageLink', `${actorName} a commenté votre publication.`);
+              } else if (notif.type === 'like_story') {
+                soundEngine.playPopSound();
+                setToastNotification({
+                  type: 'like_story',
+                  title: actorName,
+                  message: 'a aimé votre story',
+                  avatar: actorAvatar,
+                  actorId: actorId,
+                  targetTab: 'feed'
+                });
+              } else if (notif.type === 'view_story') {
+                setToastNotification({
+                  type: 'view_story',
+                  title: actorName,
+                  message: 'a vu votre story',
+                  avatar: actorAvatar,
+                  actorId: actorId,
+                  targetTab: 'feed'
+                });
+              } else if (notif.type === 'match') {
+                soundEngine.playPopSound();
+                setToastNotification({
+                  type: 'match',
+                  title: actorName,
+                  message: 'a matché avec vous !',
+                  avatar: actorAvatar,
+                  actorId: actorId,
+                  targetTab: 'match'
+                });
+                sendNativeNotification('StageLink', `${actorName} a matché avec vous !`);
+              } else {
+                setToastNotification({
+                  type: notif.type || 'notification',
+                  title: actorName,
+                  message: notif.content || 'Nouvelle interaction sur votre profil',
+                  avatar: actorAvatar,
+                  actorId: actorId
+                });
+                sendNativeNotification('StageLink', `Nouvelle notification de ${actorName}.`);
+              }
+            } catch (e) {
+              console.error('Notification handler error:', e);
+            }
+            syncNotifications().catch(() => {});
+          };
+
+          // ----------------------------------------------------
+          // UNIFIED REAL-TIME INCOMING DIRECT MESSAGE HANDLER
+          // ----------------------------------------------------
+          const handleIncomingDirectMessage = async (msgRecord) => {
+            if (!msgRecord || msgRecord.sender_id === currentUser.id) return;
+
+            // 1. Dispatch custom event for active chat thread (MessageThread.jsx / useChatThread.js)
+            window.dispatchEvent(new CustomEvent('direct_message_received', { detail: msgRecord }));
+            window.dispatchEvent(new Event('refresh_conversations'));
+            updateUnreadDirectMessagesCount().catch(() => {});
+
+            const activePartnerId = getActivePartnerId();
+            if (activePartnerId && activePartnerId === msgRecord.sender_id) {
+              // Already actively chatting in this exact conversation -> soft sound, no top banner
+              soundEngine.playPopSound();
+              return;
+            }
+
+            // Recipient is somewhere else in the app -> Show top floating push banner & sound!
+            try {
+              let senderName = 'Nouveau message';
+              let senderAvatar = '';
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('id, full_name, username, avatar_url')
+                .eq('id', msgRecord.sender_id)
+                .maybeSingle();
+
+              if (profile) {
+                senderName = profile.full_name || profile.username || 'Artiste';
+                senderAvatar = profile.avatar_url || '';
+              }
+
+              soundEngine.playMessageReceivedSound();
+              
+              const bannerMessage = msgRecord.message_type === 'audio' 
+                ? '🎤 Note vocale' 
+                : (msgRecord.message_type === 'image' 
+                  ? '📷 Photo' 
+                  : (msgRecord.content || 'Nouveau message'));
+
+              setToastNotification({
+                type: 'message',
+                title: senderName,
+                message: bannerMessage,
+                avatar: senderAvatar,
+                partnerId: msgRecord.sender_id,
+                actorId: msgRecord.sender_id,
+                conversationId: msgRecord.conversation_id
+              });
+
+              sendNativeNotification('StageLink', `${senderName}: ${bannerMessage}`);
+            } catch (err) {
+              console.warn('Error handling incoming direct message banner:', err);
+            }
+          };
+
+          // ----------------------------------------------------
+          // UNIFIED REAL-TIME INCOMING CLASSIC CHAT MESSAGE HANDLER
+          // ----------------------------------------------------
           const handleIncomingMessageRecord = async (msgRecord, fallbackSenderProfile) => {
             if (!msgRecord || msgRecord.receiver_id !== currentUser.id) return;
             
@@ -1675,6 +1738,64 @@ function MainApp() {
             }
           };
 
+          // ----------------------------------------------------
+          // 1. PRIVATE USER CHANNEL (Dedicated Instant Push per User)
+          // ----------------------------------------------------
+          userPrivateSub = supabase
+            .channel(`user:${currentUser.id}`)
+            .on('broadcast', { event: 'new_direct_message' }, async ({ payload }) => {
+              const msg = payload?.message || payload;
+              if (msg) handleIncomingDirectMessage(msg);
+            })
+            .on('broadcast', { event: 'new_chat_message' }, (payload) => {
+              if (payload.payload && payload.payload.msgRecord) {
+                handleIncomingMessageRecord(payload.payload.msgRecord, payload.payload.senderProfile);
+              }
+            })
+            .on('broadcast', { event: 'new_notification' }, async ({ payload }) => {
+              if (payload) handleIncomingNotification(payload);
+            })
+            .on('broadcast', { event: 'messages_read' }, ({ payload }) => {
+              if (payload?.readerId) {
+                setSelectedChat(prev => {
+                  if (!prev) return null;
+                  return {
+                    ...prev,
+                    messages: (prev.messages || []).map(m => ({ ...m, isRead: true, status: 'read' }))
+                  };
+                });
+              }
+            })
+            .subscribe();
+
+          // ----------------------------------------------------
+          // 2. NOTIFICATIONS CHANNEL
+          // ----------------------------------------------------
+          notificationsSub = supabase
+            .channel('realtime:notifications')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, async (payload) => {
+              if (payload.new && payload.new.user_id === currentUser.id) {
+                handleIncomingNotification(payload.new);
+              }
+            })
+            .on('broadcast', { event: 'new_notification' }, async ({ payload }) => {
+              if (payload && (payload.user_id === currentUser.id || payload.userId === currentUser.id)) {
+                handleIncomingNotification(payload);
+              }
+            })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications' }, () => syncNotifications())
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'notifications' }, (payload) => {
+              if (payload.old && incomingCallDataRef.current && payload.old.id === incomingCallDataRef.current.notificationId) {
+                setIsVideoCallActive(false);
+                setIncomingCallData(null);
+              }
+              syncNotifications();
+            })
+            .subscribe();
+
+          // ----------------------------------------------------
+          // 3. MESSAGES CHANNEL (Classic Chat)
+          // ----------------------------------------------------
           messagesSub = supabase
             .channel('realtime:messages')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
@@ -1710,7 +1831,6 @@ function MainApp() {
             })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, async (payload) => {
               if (payload.new) {
-                // Update local message status (e.g. read / delivered ticks)
                 setSelectedChat(prev => {
                   if (!prev) return null;
                   return {
@@ -1723,38 +1843,20 @@ function MainApp() {
             })
             .subscribe();
 
+          // ----------------------------------------------------
+          // 4. DIRECT MESSAGES CHANNEL (Instagram-style DMs)
+          // ----------------------------------------------------
           window.directMessagesSub = supabase
             .channel('realtime:direct_messages')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' }, async (payload) => {
-              if (payload.new && payload.new.sender_id !== currentUser.id) {
-                // Dispatch event to refresh InboxView & update badge
-                window.dispatchEvent(new Event('refresh_conversations'));
-                await updateUnreadDirectMessagesCount();
-
-                const activePartnerId = getActivePartnerId();
-                if (activePartnerId && activePartnerId === payload.new.sender_id) {
-                  // Already actively chatting with sender -> skip top pop-up banner
-                  return;
-                }
-
-                // Fetch sender name for banner
-                let senderName = 'Nouveau message';
-                try {
-                  const { data } = await supabase.from('profiles').select('id, full_name, avatar_url').eq('id', payload.new.sender_id).maybeSingle();
-                  if (data) {
-                    senderName = data.full_name || 'Artiste';
-                    soundEngine.playMessageReceivedSound();
-                    setToastNotification({
-                      type: 'message',
-                      title: senderName,
-                      message: payload.new.message_type === 'audio' ? '🎤 Message vocal' : (payload.new.message_type === 'image' ? '📷 Photo' : (payload.new.content || 'Nouveau message')),
-                      avatar: data.avatar_url,
-                      partnerId: data.id,
-                      actorId: data.id
-                    });
-                    sendNativeNotification('StageLink', `Nouveau message de ${senderName}`);
-                  }
-                } catch(e) {}
+              if (payload.new) {
+                handleIncomingDirectMessage(payload.new);
+              }
+            })
+            .on('broadcast', { event: 'new_direct_message' }, async ({ payload }) => {
+              const msg = payload?.message || payload;
+              if (msg) {
+                handleIncomingDirectMessage(msg);
               }
             })
             .subscribe();
@@ -1804,6 +1906,7 @@ function MainApp() {
         if (notificationsSub) supabase.removeChannel(notificationsSub);
         if (messagesSub) supabase.removeChannel(messagesSub);
         if (window.directMessagesSub) supabase.removeChannel(window.directMessagesSub);
+        if (userPrivateSub) supabase.removeChannel(userPrivateSub);
       };
     }
   }, [isAuthenticated, currentUser?.id]);
@@ -2563,35 +2666,67 @@ function MainApp() {
 
         // 1. Instant Realtime Broadcast to recipient
         try {
+          const msgPayload = {
+            msgRecord: {
+              id: msgUuid,
+              sender_id: currentUser.id,
+              receiver_id: recipientId,
+              content: newMsg.text || '',
+              media_url: newMsg.mediaUrl || null,
+              audio_url: newMsg.audioUrl || null,
+              metadata: {
+                quotedMessage: newMsg.quotedMessage || null,
+                isAudio: newMsg.isAudio || false,
+                isVideo: newMsg.isVideo || false,
+                videoUrl: newMsg.videoUrl || null,
+                fileName: newMsg.fileName || null,
+                audioDuration: newMsg.audioDuration || null,
+                documentName: newMsg.documentName || null
+              },
+              created_at: new Date().toISOString()
+            },
+            senderProfile: {
+              id: currentUser.id,
+              full_name: currentUser.name || 'Artiste StageLink',
+              avatar_url: currentUser.avatar || '',
+              role: currentUser.role || 'Artiste'
+            }
+          };
+
+          const notifPayload = {
+            user_id: recipientId,
+            actor_id: currentUser.id,
+            type: 'message',
+            reference_id: msgUuid,
+            content: newMsg.text || (newMsg.isAudio ? '🎤 Message audio' : '📷 Photo'),
+            created_at: new Date().toISOString()
+          };
+
+          // Broadcast to global messages channel
           supabase.channel('realtime:messages').send({
             type: 'broadcast',
             event: 'new_chat_message',
-            payload: {
-              msgRecord: {
-                id: msgUuid,
-                sender_id: currentUser.id,
-                receiver_id: recipientId,
-                content: newMsg.text || '',
-                media_url: newMsg.mediaUrl || null,
-                audio_url: newMsg.audioUrl || null,
-                metadata: {
-                  quotedMessage: newMsg.quotedMessage || null,
-                  isAudio: newMsg.isAudio || false,
-                  isVideo: newMsg.isVideo || false,
-                  videoUrl: newMsg.videoUrl || null,
-                  fileName: newMsg.fileName || null,
-                  audioDuration: newMsg.audioDuration || null,
-                  documentName: newMsg.documentName || null
-                },
-                created_at: new Date().toISOString()
-              },
-              senderProfile: {
-                id: currentUser.id,
-                full_name: currentUser.name || 'Artiste StageLink',
-                avatar_url: currentUser.avatar || '',
-                role: currentUser.role || 'Artiste'
-              }
-            }
+            payload: msgPayload
+          });
+
+          // Broadcast directly to recipient's private user channel (<20ms delivery)
+          supabase.channel(`user:${recipientId}`).send({
+            type: 'broadcast',
+            event: 'new_chat_message',
+            payload: msgPayload
+          });
+
+          // Broadcast notification to recipient
+          supabase.channel(`user:${recipientId}`).send({
+            type: 'broadcast',
+            event: 'new_notification',
+            payload: notifPayload
+          });
+
+          supabase.channel('realtime:notifications').send({
+            type: 'broadcast',
+            event: 'new_notification',
+            payload: notifPayload
           });
         } catch (be) {}
 
@@ -2658,7 +2793,8 @@ function MainApp() {
               user_id: recipientId,
               actor_id: currentUser.id,
               type: 'message',
-              reference_id: msgUuid
+              reference_id: msgUuid,
+              content: newMsg.text || (newMsg.isAudio ? '🎤 Message audio' : '📷 Photo')
             });
           } catch (ne) {
             console.warn('Supabase message notification note:', ne);
@@ -3532,6 +3668,36 @@ function MainApp() {
           setSelectedChat(null);
         }}
         unreadMessagesCount={unreadDirectMessagesCount || chats.reduce((acc, c) => acc + (c.unreadCount || 0), 0)}
+        isDarkMode={isDarkMode}
+      />
+
+      {/* StageLink Top Floating In-App Push & Pop-up Notification Banner */}
+      <TopNotificationBanner
+        notification={toastNotification}
+        onOpen={(notif) => {
+          if (!notif) return;
+          if (notif.type === 'message' || notif.partnerId || notif.actorId) {
+            const partnerId = notif.partnerId || notif.actorId;
+            if (partnerId) {
+              handleStartChatWithUser({
+                id: partnerId,
+                full_name: notif.title,
+                name: notif.title,
+                avatar_url: notif.avatar,
+                avatar: notif.avatar
+              });
+              setActiveTab('discussions');
+            } else {
+              setActiveTab('discussions');
+            }
+          } else if (notif.targetTab) {
+            setActiveTab(notif.targetTab);
+          } else if (notif.actorId) {
+            handleOpenPublicProfile({ id: notif.actorId });
+          }
+          setToastNotification(null);
+        }}
+        onClose={() => setToastNotification(null)}
         isDarkMode={isDarkMode}
       />
     </div>

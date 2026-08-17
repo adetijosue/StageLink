@@ -111,26 +111,40 @@ export function useChatThread({ conversationId, currentUser, partner }) {
   useEffect(() => {
     if (!conversationId || !isSupabaseConfigured()) return;
 
+    const handleIncoming = (incomingMsg) => {
+      if (!incomingMsg || incomingMsg.conversation_id !== conversationId) return;
+      if (incomingMsg.sender_id === currentUser?.id) return;
+
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === incomingMsg.id)) return prev;
+        const next = [...prev, incomingMsg];
+        persistMessagesCache(next);
+        return next;
+      });
+
+      soundEngine.playPopSound();
+      if (currentUser?.id) {
+        directChatService.markAsRead(conversationId, currentUser.id);
+      }
+    };
+
+    // 1. Listen to custom window event if App.jsx received it first
+    const handleWindowDm = (e) => {
+      if (e.detail) {
+        handleIncoming(e.detail);
+      }
+    };
+    window.addEventListener('direct_message_received', handleWindowDm);
+
+    // 2. Realtime WebSocket Channel
     const channel = supabase
       .channel(`dm:${conversationId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `conversation_id=eq.${conversationId}` }, (payload) => {
-        const msg = payload.new;
-        if (!msg) return;
-        if (msg.sender_id === currentUser?.id) return;
-
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === msg.id)) return prev;
-          const next = [...prev, msg];
-          persistMessagesCache(next);
-          return next;
-        });
-
-        if (msg.sender_id !== currentUser?.id) {
-          soundEngine.playPopSound();
-          if (currentUser?.id) {
-            directChatService.markAsRead(conversationId, currentUser.id);
-          }
-        }
+        handleIncoming(payload.new);
+      })
+      .on('broadcast', { event: 'new_direct_message' }, ({ payload }) => {
+        const msg = payload?.message || payload;
+        handleIncoming(msg);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'direct_messages', filter: `conversation_id=eq.${conversationId}` }, (payload) => {
         const updatedMsg = payload.new;
@@ -203,6 +217,7 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     channelRef.current = channel;
 
     return () => {
+      window.removeEventListener('direct_message_received', handleWindowDm);
       if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
   }, [conversationId, currentUser, persistMessagesCache]);
