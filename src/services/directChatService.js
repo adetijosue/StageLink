@@ -140,13 +140,6 @@ export const directChatService = {
 
     if (isSupabaseConfigured()) {
       try {
-        // Broadcast on realtime channel for sub-10ms UI sync
-        supabase.channel(`dm:${conversationId}`).send({
-          type: 'broadcast',
-          event: 'new_message',
-          payload: newRecord
-        });
-
         // Persist to Postgres database
         const { error } = await supabase.from('direct_messages').insert(newRecord);
         if (error) console.warn('Direct message DB insert note:', error.message);

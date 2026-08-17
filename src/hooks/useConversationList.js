@@ -91,6 +91,10 @@ export function useConversationList(currentUser) {
 
   useEffect(() => {
     loadInboxData();
+    
+    const handleRefresh = () => loadInboxData();
+    window.addEventListener('refresh_conversations', handleRefresh);
+    return () => window.removeEventListener('refresh_conversations', handleRefresh);
   }, [loadInboxData]);
 
   /**

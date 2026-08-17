@@ -37,11 +37,11 @@ export function useChatThread({ conversationId, currentUser, partner }) {
         .select('*, reactions:message_reactions(*)')
         .eq('conversation_id', conversationId)
         .is('deleted_at', null)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
-      setMessages(msgs || []);
+      setMessages((msgs || []).reverse());
 
       // 3. Mark conversation as read
       if (currentUser?.id) {
@@ -66,8 +66,8 @@ export function useChatThread({ conversationId, currentUser, partner }) {
 
     const channel = supabase
       .channel(`dm:${conversationId}`)
-      .on('broadcast', { event: 'new_message' }, (payload) => {
-        const msg = payload.payload;
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `conversation_id=eq.${conversationId}` }, (payload) => {
+        const msg = payload.new;
         if (!msg) return;
         if (msg.sender_id === currentUser?.id) return;
 

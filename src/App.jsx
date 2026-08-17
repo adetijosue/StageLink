@@ -1349,6 +1349,32 @@ function MainApp() {
               syncMessages();
             })
             .subscribe();
+
+          window.directMessagesSub = supabase
+            .channel('realtime:direct_messages')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' }, async (payload) => {
+              if (payload.new && payload.new.sender_id !== currentUser.id) {
+                // Dispatch event to refresh InboxView
+                window.dispatchEvent(new Event('refresh_conversations'));
+                // Fetch sender name for toast
+                let senderName = 'Nouveau message';
+                try {
+                  const { data } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', payload.new.sender_id).maybeSingle();
+                  if (data) {
+                    senderName = data.full_name;
+                    soundEngine.playMessageReceivedSound();
+                    setToastNotification({
+                      title: senderName,
+                      message: payload.new.message_type === 'audio' ? '🎤 Message vocal' : (payload.new.message_type === 'image' ? '📷 Photo' : (payload.new.content || 'Nouveau message')),
+                      avatar: data.avatar_url
+                    });
+                    setTimeout(() => setToastNotification(null), 4000);
+                    sendNativeNotification('StageLink', `Nouveau message de ${senderName}`);
+                  }
+                } catch(e) {}
+              }
+            })
+            .subscribe();
         } catch (re) {
           console.warn('Realtime subscription fallback note:', re);
         }
@@ -1381,6 +1407,7 @@ function MainApp() {
         if (storiesSub) supabase.removeChannel(storiesSub);
         if (notificationsSub) supabase.removeChannel(notificationsSub);
         if (messagesSub) supabase.removeChannel(messagesSub);
+        if (window.directMessagesSub) supabase.removeChannel(window.directMessagesSub);
       };
     }
   }, [isAuthenticated, currentUser?.id]);
