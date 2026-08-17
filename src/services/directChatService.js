@@ -209,16 +209,18 @@ export const directChatService = {
 
         // 4. INSTANT MULTI-CHANNEL WEBSOCKET BROADCASTS (Delivery <20ms guaranteed)
         try {
+          const broadcastPayload = {
+            message: newRecord,
+            conversationId,
+            senderId,
+            recipientId: targetRecipientId
+          };
+
           // A. Broadcast on conversation thread channel (for in-chat instant UI append)
           supabase.channel(`dm:${conversationId}`).send({
             type: 'broadcast',
             event: 'new_direct_message',
-            payload: {
-              message: newRecord,
-              conversationId,
-              senderId,
-              recipientId: targetRecipientId
-            }
+            payload: broadcastPayload
           }).catch(() => {});
 
           // B. Broadcast to target recipient's private user channel (for instant floating banner & badge)
@@ -226,56 +228,16 @@ export const directChatService = {
             supabase.channel(`user:${targetRecipientId}`).send({
               type: 'broadcast',
               event: 'new_direct_message',
-              payload: {
-                message: newRecord,
-                conversationId,
-                senderId,
-                recipientId: targetRecipientId
-              }
-            }).catch(() => {});
-
-            // C. Broadcast notification event on recipient user channel
-            supabase.channel(`user:${targetRecipientId}`).send({
-              type: 'broadcast',
-              event: 'new_notification',
-              payload: {
-                user_id: targetRecipientId,
-                actor_id: senderId,
-                type: 'message',
-                reference_id: conversationId,
-                content: notifContent,
-                created_at: now
-              }
+              payload: broadcastPayload
             }).catch(() => {});
           }
 
-          // D. Broadcast on global realtime:direct_messages
+          // C. Broadcast on global realtime:direct_messages (fallback)
           supabase.channel('realtime:direct_messages').send({
             type: 'broadcast',
             event: 'new_direct_message',
-            payload: {
-              message: newRecord,
-              conversationId,
-              senderId,
-              recipientId: targetRecipientId
-            }
+            payload: broadcastPayload
           }).catch(() => {});
-
-          // E. Broadcast on global realtime:notifications
-          if (targetRecipientId && targetRecipientId !== senderId) {
-            supabase.channel('realtime:notifications').send({
-              type: 'broadcast',
-              event: 'new_notification',
-              payload: {
-                user_id: targetRecipientId,
-                actor_id: senderId,
-                type: 'message',
-                reference_id: conversationId,
-                content: notifContent,
-                created_at: now
-              }
-            }).catch(() => {});
-          }
         } catch (bErr) {
           console.warn('Realtime direct message broadcast note:', bErr);
         }

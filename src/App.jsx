@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import InboxView from './components/messaging/instagram/InboxView';
 import MessageThread from './components/messaging/instagram/MessageThread';
 import { directChatService } from './services/directChatService';
@@ -161,8 +161,9 @@ function MainApp() {
   const [activeStory, setActiveStory] = useState(null);
   const [activeStoryUserList, setActiveStoryUserList] = useState([]);
   
-  // Toast Notification State
+  // Toast Notification State & Realtime Deduplication Engine
   const [toastNotification, setToastNotification] = useState(null);
+  const processedNotificationIdsRef = useRef(new Map());
 
   const [savedStoryContext, setSavedStoryContext] = useState(null);
   const [resharedStoryData, setResharedStoryData] = useState(null);
@@ -221,7 +222,7 @@ function MainApp() {
   }, [selectedConversation]);
 
   // Active chat partner detector (works across both ChatRoom and MessageThread)
-  const getActivePartnerId = () => {
+  const getActivePartnerId = useCallback(() => {
     const sc = selectedChatRef.current;
     if (sc) {
       return sc.participant?.id || sc.participantId || (typeof sc.id === 'string' ? sc.id.replace('chat_', '') : null);
@@ -231,7 +232,61 @@ function MainApp() {
       return scon.partner?.id || scon.participant?.id || scon.participantId || scon.partnerId || (scon.participants?.find(p => p.user_id !== currentUser?.id)?.user_id);
     }
     return null;
-  };
+  }, [currentUser?.id]);
+
+  // Centralized In-App Push Notification Delivery with 6-second Deduplication Filter
+  const showInAppToast = useCallback((toastData) => {
+    if (!toastData) return;
+
+    // 1. Generate unique deterministic deduplication key
+    const rawKey = toastData.id || 
+      toastData.messageId || 
+      toastData.reference_id || 
+      `${toastData.type || 'msg'}_${toastData.actorId || toastData.partnerId || ''}_${(toastData.message || toastData.content || '').slice(0, 40)}`;
+
+    const dedupKey = String(rawKey);
+    const now = Date.now();
+
+    if (processedNotificationIdsRef.current.has(dedupKey)) {
+      const lastSeen = processedNotificationIdsRef.current.get(dedupKey);
+      if (now - lastSeen < 6000) {
+        // Drop duplicate notification within 6 seconds window!
+        return;
+      }
+    }
+    processedNotificationIdsRef.current.set(dedupKey, now);
+
+    // Periodic cleanup of stale keys (older than 30s)
+    if (processedNotificationIdsRef.current.size > 80) {
+      for (const [k, ts] of processedNotificationIdsRef.current.entries()) {
+        if (now - ts > 30000) {
+          processedNotificationIdsRef.current.delete(k);
+        }
+      }
+    }
+
+    // 2. Check if user is currently looking at this conversation
+    const activePartnerId = getActivePartnerId();
+    const senderId = toastData.partnerId || toastData.actorId;
+    if (activePartnerId && senderId && activePartnerId === senderId) {
+      // User is in active discussion -> soft sound, no pop-up banner
+      soundEngine.playPopSound();
+      return;
+    }
+
+    // 3. Play sound & display top push banner exactly once
+    if (toastData.type === 'message') {
+      soundEngine.playMessageReceivedSound();
+    } else {
+      soundEngine.playPopSound();
+    }
+
+    setToastNotification(toastData);
+
+    const bannerBody = toastData.message || toastData.content || 'Nouveau message';
+    const bannerTitle = toastData.title || 'StageLink';
+    sendNativeNotification('StageLink', `${bannerTitle} : ${bannerBody}`);
+  }, [getActivePartnerId]);
 
   const [stories, setStories] = useState([]);
   const [matches, setMatches] = useState([]);
@@ -250,33 +305,11 @@ function MainApp() {
     }
   }, [chats, selectedChat]);
 
-  // Native Notifications Setup & Realtime Listener
+  // Request Native Notifications Permission on Startup
   useEffect(() => {
     if (currentUser?.id) {
-      nativeNotificationService.initRealtimeNotifications(currentUser, (row, { actorName, actorAvatar }) => {
-        if (row.type === 'message') {
-          const activePartnerId = getActivePartnerId();
-          if (activePartnerId && activePartnerId === row.actor_id) {
-            // Already in active discussion with this user -> skip top toast
-            return;
-          }
-          soundEngine.playMessageReceivedSound();
-          setToastNotification({
-            type: 'message',
-            title: actorName,
-            message: row.content || 'Nouveau message reçu',
-            avatar: actorAvatar,
-            actorId: row.actor_id,
-            partnerId: row.actor_id
-          });
-          window.dispatchEvent(new Event('refresh_conversations'));
-        }
-      });
+      nativeNotificationService.requestPermission().catch(() => {});
     }
-
-    return () => {
-      nativeNotificationService.cleanup();
-    };
   }, [currentUser]);
 
   // Handle clicking a native notification (switch to messages tab)
@@ -1434,16 +1467,10 @@ function MainApp() {
                 }
               }
 
-              const activePartnerId = getActivePartnerId();
-
               if (notif.type === 'message') {
-                if (activePartnerId && activePartnerId === actorId) {
-                  // Already actively viewing this conversation -> suppress top banner
-                  return;
-                }
                 const msgBody = notif.content || 'Nouveau message reçu';
-                soundEngine.playMessageReceivedSound();
-                setToastNotification({
+                showInAppToast({
+                  id: notif.id || notif.reference_id,
                   type: 'message',
                   title: actorName,
                   message: msgBody,
@@ -1454,10 +1481,9 @@ function MainApp() {
                 });
                 window.dispatchEvent(new Event('refresh_conversations'));
                 updateUnreadDirectMessagesCount().catch(() => {});
-                sendNativeNotification('StageLink', `${actorName} : ${msgBody}`);
               } else if (notif.type === 'like_post') {
-                soundEngine.playPopSound();
-                setToastNotification({
+                showInAppToast({
+                  id: notif.id || `like_post_${actorId}_${notif.reference_id}`,
                   type: 'like_post',
                   title: actorName,
                   message: 'a aimé votre publication',
@@ -1465,10 +1491,9 @@ function MainApp() {
                   actorId: actorId,
                   targetTab: 'feed'
                 });
-                sendNativeNotification('StageLink', `${actorName} a aimé votre publication.`);
               } else if (notif.type === 'comment_post') {
-                soundEngine.playPopSound();
-                setToastNotification({
+                showInAppToast({
+                  id: notif.id || `comment_post_${actorId}_${notif.reference_id}`,
                   type: 'comment_post',
                   title: actorName,
                   message: notif.content || 'a commenté votre publication',
@@ -1476,10 +1501,9 @@ function MainApp() {
                   actorId: actorId,
                   targetTab: 'feed'
                 });
-                sendNativeNotification('StageLink', `${actorName} a commenté votre publication.`);
               } else if (notif.type === 'like_story') {
-                soundEngine.playPopSound();
-                setToastNotification({
+                showInAppToast({
+                  id: notif.id || `like_story_${actorId}_${notif.reference_id}`,
                   type: 'like_story',
                   title: actorName,
                   message: 'a aimé votre story',
@@ -1488,7 +1512,8 @@ function MainApp() {
                   targetTab: 'feed'
                 });
               } else if (notif.type === 'view_story') {
-                setToastNotification({
+                showInAppToast({
+                  id: notif.id || `view_story_${actorId}_${notif.reference_id}`,
                   type: 'view_story',
                   title: actorName,
                   message: 'a vu votre story',
@@ -1497,8 +1522,8 @@ function MainApp() {
                   targetTab: 'feed'
                 });
               } else if (notif.type === 'match') {
-                soundEngine.playPopSound();
-                setToastNotification({
+                showInAppToast({
+                  id: notif.id || `match_${actorId}`,
                   type: 'match',
                   title: actorName,
                   message: 'a matché avec vous !',
@@ -1506,16 +1531,15 @@ function MainApp() {
                   actorId: actorId,
                   targetTab: 'match'
                 });
-                sendNativeNotification('StageLink', `${actorName} a matché avec vous !`);
               } else {
-                setToastNotification({
+                showInAppToast({
+                  id: notif.id,
                   type: notif.type || 'notification',
                   title: actorName,
                   message: notif.content || 'Nouvelle interaction sur votre profil',
                   avatar: actorAvatar,
                   actorId: actorId
                 });
-                sendNativeNotification('StageLink', `Nouvelle notification de ${actorName}.`);
               }
             } catch (e) {
               console.error('Notification handler error:', e);
@@ -1534,14 +1558,7 @@ function MainApp() {
             window.dispatchEvent(new Event('refresh_conversations'));
             updateUnreadDirectMessagesCount().catch(() => {});
 
-            const activePartnerId = getActivePartnerId();
-            if (activePartnerId && activePartnerId === msgRecord.sender_id) {
-              // Already actively chatting in this exact conversation -> soft sound, no top banner
-              soundEngine.playPopSound();
-              return;
-            }
-
-            // Recipient is somewhere else in the app -> Show top floating push banner & sound!
+            // 2. Resolve sender profile & trigger deduplicated in-app floating banner
             try {
               let senderName = 'Nouveau message';
               let senderAvatar = '';
@@ -1556,15 +1573,14 @@ function MainApp() {
                 senderAvatar = profile.avatar_url || '';
               }
 
-              soundEngine.playMessageReceivedSound();
-              
               const bannerMessage = msgRecord.message_type === 'audio' 
                 ? '🎤 Note vocale' 
                 : (msgRecord.message_type === 'image' 
                   ? '📷 Photo' 
                   : (msgRecord.content || 'Nouveau message'));
 
-              setToastNotification({
+              showInAppToast({
+                id: msgRecord.id,
                 type: 'message',
                 title: senderName,
                 message: bannerMessage,
@@ -1573,8 +1589,6 @@ function MainApp() {
                 actorId: msgRecord.sender_id,
                 conversationId: msgRecord.conversation_id
               });
-
-              sendNativeNotification('StageLink', `${senderName}: ${bannerMessage}`);
             } catch (err) {
               console.warn('Error handling incoming direct message banner:', err);
             }
@@ -1689,8 +1703,8 @@ function MainApp() {
                 return prev;
               });
             } else {
-              soundEngine.playMessageReceivedSound();
-              setToastNotification({
+              showInAppToast({
+                id: msgRecord.id,
                 type: 'message',
                 title: senderProfile?.full_name || 'Nouveau message',
                 message: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Message audio' : '📷 Média'),
@@ -1885,8 +1899,7 @@ function MainApp() {
       };
       const handleShowToast = (e) => {
         if (e.detail) {
-          setToastNotification(e.detail);
-          setTimeout(() => setToastNotification(null), 4500);
+          showInAppToast(e.detail);
         }
       };
       window.addEventListener('refresh_conversations', handleRefreshConversations);
@@ -3265,40 +3278,6 @@ function MainApp() {
         />
       )}
 
-      {/* Global Top Floating Notification & Push Banner */}
-      {toastNotification && (
-        <TopNotificationBanner
-          notification={toastNotification}
-          isDarkMode={isDarkMode}
-          onClose={() => setToastNotification(null)}
-          onOpen={(notif) => {
-            setToastNotification(null);
-            const targetId = notif.partnerId || notif.actorId || notif.senderId;
-            const targetUser = allUsers.find(u => u.id === targetId) || {
-              id: targetId,
-              name: notif.title || notif.actorName || 'Artiste',
-              full_name: notif.title || notif.actorName || 'Artiste',
-              avatar: notif.avatar || notif.actorAvatar || '',
-              avatar_url: notif.avatar || notif.actorAvatar || '',
-              role: 'Artiste'
-            };
-
-            if (notif.type === 'message' || notif.partnerId) {
-              handleStartChatWithUser(targetUser);
-            } else if (notif.type === 'like_post' || notif.type === 'comment_post') {
-              setActiveTab('feed');
-            } else if (notif.type === 'like_story' || notif.type === 'view_story') {
-              setActiveTab('feed');
-            } else if (notif.type === 'match') {
-              setActiveTab('match');
-            } else if (targetId) {
-              handleOpenPublicProfile(targetUser);
-            } else if (notif.targetTab) {
-              setActiveTab(notif.targetTab);
-            }
-          }}
-        />
-      )}
 
       {/* Active Story Viewer Overlay */}
       {activeStory && (
