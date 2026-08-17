@@ -1,29 +1,18 @@
 import React, { useState, useEffect } from 'react';
 
-/**
- * AppSplashScreen - Official StageLink Splash Screen Animation
- * 
- * Timeline & Specifications:
- * - 0.0s – 1.2s : SVG Path Tracing (stroke-dashoffset 100% -> 0%, glow trail, light dot flare)
- * - 1.2s – 1.8s : Solid White Fill Emergence & Lower "S" Light Sweep / Glint
- * - 1.6s – 2.4s : Typography Slide-Up & Kinetic Letter-Spacing ("StageLink")
- * - 2.2s – 3.2s : Arrow Tip Accent Spark, Radial Ripple Waves & Logo Breath Pulse
- * - 3.2s – 3.8s : Stabilized Hero State with 4-point Star Idle Shimmer
- * - 3.8s – 4.2s : Smooth Fade-out Exit into Main Application
- */
 export default function AppSplashScreen({ onFinish }) {
-  const [stage, setStage] = useState('active'); // 'active' -> 'exiting'
+  const [stage, setStage] = useState('active'); // active -> exiting
 
   useEffect(() => {
-    // Start exit transition after full animation sequence (3.8s)
+    // Phase 5 Transition to main app at ~3.6s
     const exitTimer = setTimeout(() => {
       setStage('exiting');
-    }, 3800);
+    }, 3600);
 
-    // Complete unmount after exit transition (4.2s)
+    // Full unmount callback at ~4.0s
     const finishTimer = setTimeout(() => {
       if (onFinish) onFinish();
-    }, 4200);
+    }, 4000);
 
     return () => {
       clearTimeout(exitTimer);
@@ -35,572 +24,628 @@ export default function AppSplashScreen({ onFinish }) {
 
   return (
     <div
-      className={`stagelink-splash-root ${isExiting ? 'splash-exiting' : ''}`}
+      className="stagelink-splash-root"
       style={{
         position: 'fixed',
         inset: 0,
         zIndex: 99999,
-        background: 'linear-gradient(180deg, #0D72D1 0%, #0A3C96 100%)',
+        background: 'linear-gradient(180deg, #0D72D1 0%, #0B52B5 50%, #0A3C96 100%)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
+        opacity: isExiting ? 0 : 1,
+        transform: isExiting ? 'scale(1.04)' : 'scale(1)',
+        transition: 'opacity 0.5s cubic-bezier(0.4, 0.0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1)',
+        pointerEvents: isExiting ? 'none' : 'auto',
         overflow: 'hidden',
-        pointerEvents: 'none',
         userSelect: 'none'
       }}
+      onClick={() => {
+        // Optional quick skip on tap if user wants instant entry
+        if (stage === 'active') {
+          setStage('exiting');
+          setTimeout(() => { if (onFinish) onFinish(); }, 400);
+        }
+      }}
     >
-      {/* 1. Ambient Background Particles & Subtle Cyan Glow */}
-      <div className="splash-ambient-center" />
-      <div className="splash-cyan-aurora" />
+      {/* 1. Ambient Dynamic Glows */}
+      <div className="splash-ambient-radial-1" />
+      <div className="splash-ambient-radial-2" />
 
-      {/* 2. Concentric Radial Ripple Waves (Impact Waves at 2.2s) */}
-      <div className="splash-ripple-wave ripple-1" />
-      <div className="splash-ripple-wave ripple-2" />
+      {/* 2. Concentric Ripple Rings (Stage 4: 2.2s - 3.2s) */}
+      <div className="splash-ripple-ring ripple-1" />
+      <div className="splash-ripple-ring ripple-2" />
 
-      {/* 3. Main Central Hero Logo Container */}
-      <div className="splash-hero-wrapper">
-        <div className="splash-logo-core">
-          
+      {/* 3. Main StageLink Logo Animated Container */}
+      <div className="splash-brand-stage">
+        
+        {/* SVG Animated Emblem */}
+        <div className="splash-logo-wrapper">
           <svg
-            viewBox="0 0 240 240"
-            className="splash-svg-canvas"
+            viewBox="0 0 340 300"
+            className="splash-svg-logo"
+            fill="none"
             xmlns="http://www.w3.org/2000/svg"
           >
             <defs>
-              {/* Glowing Blur Filter for stroke tracing */}
-              <filter id="trace-glow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="3" result="blur" />
+              {/* Neon cyan glowing stroke filter */}
+              <filter id="splashGlow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3.5" result="blur1" />
+                <feGaussianBlur stdDeviation="8" result="blur2" />
                 <feMerge>
-                  <feMergeNode in="blur" />
+                  <feMergeNode in="blur2" />
+                  <feMergeNode in="blur1" />
                   <feMergeNode in="SourceGraphic" />
                 </feMerge>
               </filter>
 
-              {/* Cyan Accent Flare Gradient */}
-              <linearGradient id="flare-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#FFFFFF" />
-                <stop offset="60%" stopColor="#38BDF8" />
-                <stop offset="100%" stopColor="#0EA5E9" />
+              {/* Linear gradient shine mask */}
+              <linearGradient id="shineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
+                <stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.8" />
+                <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
               </linearGradient>
 
-              {/* Light Sweep Linear Gradient */}
-              <linearGradient id="shine-sweep-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="rgba(255,255,255,0)" />
-                <stop offset="50%" stopColor="rgba(255,255,255,0.9)" />
-                <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-              </linearGradient>
-
-              {/* Clip Path for the Bottom Curve Shine Sweep */}
-              <clipPath id="bottom-s-clip">
-                <path d="M 45 160 C 45 195, 80 215, 120 215 C 165 215, 195 190, 195 155 C 195 125, 160 110, 120 100 C 80 90, 45 75, 45 45 Z" />
+              {/* Clip path for the bottom sweep */}
+              <clipPath id="logoClip">
+                {/* Outer S Ribbon */}
+                <path d="M 238,62 C 205,32 128,32 94,66 C 62,98 58,154 75,190 C 86,214 108,228 132,228 L 132,204 C 116,204 100,192 92,176 C 80,148 84,106 108,82 C 132,58 190,56 216,78 C 228,88 238,98 238,98 Z" />
+                <path d="M 94,228 C 94,268 144,292 196,290 C 238,288 258,252 258,206 L 234,206 C 234,240 218,266 188,266 C 148,266 118,246 118,228 Z" />
+                {/* Student */}
+                <circle cx="128" cy="120" r="14" />
+                <polygon points="104,104 128,92 152,104 128,114" />
+                {/* Professional */}
+                <circle cx="198" cy="112" r="14" />
+                {/* Handshake & Torso */}
+                <path d="M 104,196 C 104,160 120,144 140,144 C 150,144 158,154 164,166 L 174,178 L 184,166 C 190,154 198,144 208,144 C 218,144 224,152 228,162 L 254,124 L 274,104 L 268,136 L 256,150 L 236,182 C 232,192 222,196 212,196 L 188,196 L 174,182 L 160,196 Z" />
               </clipPath>
             </defs>
 
-            {/* A. Outer "S" Vector Path & Ascending Growth Arrow */}
-            {/* 1. Traced Stroke Layer (0s - 1.2s) */}
-            <path
-              d="M 168 62 L 194 36 M 172 36 L 194 36 L 194 58 M 165 70 C 145 46, 110 32, 75 42 C 48 50, 36 74, 42 98 C 48 122, 76 132, 116 142 C 160 152, 196 168, 190 200 C 182 226, 146 238, 108 232 C 72 226, 44 204, 38 178"
-              fill="none"
-              stroke="#FFFFFF"
-              strokeWidth="3.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="anim-path-stroke"
-              filter="url(#trace-glow)"
-            />
-
-            {/* B. Inner Silhouettes (Graduate at left, Professional with arrow at right, handshake node) */}
-            {/* Student Graduate Cap & Silhouette (Left) */}
-            <g className="anim-inner-elements">
-              {/* Graduation Mortarboard */}
-              <polygon
-                points="72,66 90,57 108,66 90,75"
-                fill="none"
+            {/* --- 1. STROKE OUTLINE TRACING (Stage 1: 0.0s - 1.2s) --- */}
+            <g className="splash-stroke-layer">
+              {/* Outer Top S-Arch */}
+              <path
+                d="M 238,72 C 210,40 134,38 98,72 C 68,102 64,152 78,186 C 88,210 108,224 130,224"
                 stroke="#FFFFFF"
-                strokeWidth="2.5"
+                strokeWidth="16"
+                strokeLinecap="round"
                 strokeLinejoin="round"
-                className="anim-path-stroke-fast"
-              />
-              <path
-                d="M 108 66 L 112 78"
-                fill="none"
-                stroke="#FFFFFF"
-                strokeWidth="2"
-                strokeLinecap="round"
-                className="anim-path-stroke-fast"
-              />
-              {/* Student Profile Head */}
-              <circle
-                cx="90"
-                cy="85"
-                r="6.5"
-                fill="none"
-                stroke="#FFFFFF"
-                strokeWidth="2.5"
-                className="anim-path-stroke-fast"
-              />
-              {/* Student Torso / Connection */}
-              <path
-                d="M 75 106 C 75 96, 105 96, 105 106 L 105 116"
-                fill="none"
-                stroke="#FFFFFF"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                className="anim-path-stroke-fast"
+                pathLength="100"
+                className="splash-draw-path path-s-top"
               />
 
-              {/* Professional Mentor / Growth Profile (Right) */}
-              <circle
-                cx="148"
-                cy="98"
-                r="6.5"
-                fill="none"
-                stroke="#FFFFFF"
-                strokeWidth="2.5"
-                className="anim-path-stroke-fast"
-              />
+              {/* Outer Bottom S-Arch */}
               <path
-                d="M 133 120 C 133 110, 163 110, 163 120 L 163 130"
-                fill="none"
+                d="M 102,224 C 102,264 148,284 194,282 C 234,280 252,248 252,204"
                 stroke="#FFFFFF"
-                strokeWidth="2.5"
+                strokeWidth="16"
                 strokeLinecap="round"
-                className="anim-path-stroke-fast"
+                strokeLinejoin="round"
+                pathLength="100"
+                className="splash-draw-path path-s-bottom"
               />
 
-              {/* Central Handshake / Link Node */}
+              {/* Student Mortarboard Cap Diamond */}
               <path
-                d="M 98 126 C 110 118, 126 118, 138 126"
-                fill="none"
-                stroke="#FFFFFF"
-                strokeWidth="3"
-                strokeLinecap="round"
-                className="anim-path-stroke-fast"
-              />
-            </g>
-
-            {/* C. Solid Fill Shapes (Emerge smoothly at 1.2s – 1.8s) */}
-            <g className="anim-solid-fill">
-              {/* Main Outer S Contour Filled Body */}
-              <path
-                d="M 166 60 L 194 36 M 172 36 L 194 36 L 194 58 M 165 70 C 145 46, 110 32, 75 42 C 48 50, 36 74, 42 98 C 48 122, 76 132, 116 142 C 160 152, 196 168, 190 200 C 182 226, 146 238, 108 232 C 72 226, 44 204, 38 178"
-                fill="none"
+                d="M 104,100 L 128,88 L 152,100 L 128,110 Z"
                 stroke="#FFFFFF"
                 strokeWidth="4"
+                strokeLinejoin="round"
+                pathLength="100"
+                className="splash-draw-path path-cap"
+              />
+              {/* Cap Tassel */}
+              <path
+                d="M 110,103 C 104,110 102,118 104,124"
+                stroke="#FFFFFF"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                pathLength="100"
+                className="splash-draw-path path-tassel"
+              />
+
+              {/* Student Head */}
+              <circle
+                cx="128"
+                cy="118"
+                r="13"
+                stroke="#FFFFFF"
+                strokeWidth="4"
+                pathLength="100"
+                className="splash-draw-path path-head-1"
+              />
+
+              {/* Student Torso & Left Arm */}
+              <path
+                d="M 106,192 C 106,162 118,146 136,146 C 146,146 154,154 162,166 L 172,178"
+                stroke="#FFFFFF"
+                strokeWidth="12"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                pathLength="100"
+                className="splash-draw-path path-body-student"
+              />
+
+              {/* Professional Head */}
+              <circle
+                cx="198"
+                cy="110"
+                r="13"
+                stroke="#FFFFFF"
+                strokeWidth="4"
+                pathLength="100"
+                className="splash-draw-path path-head-2"
+              />
+
+              {/* Handshake Clasp (Connection) */}
+              <path
+                d="M 160,170 L 172,182 L 184,170"
+                stroke="#FFFFFF"
+                strokeWidth="10"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                pathLength="100"
+                className="splash-draw-path path-handshake"
+              />
+
+              {/* Professional Torso & Ascending Arrow Arm */}
+              <path
+                d="M 182,172 C 190,158 198,146 208,146 C 218,146 226,156 230,166 L 258,124"
+                stroke="#FFFFFF"
+                strokeWidth="12"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                pathLength="100"
+                className="splash-draw-path path-body-pro"
+              />
+
+              {/* Arrow Head */}
+              <path
+                d="M 242,122 L 278,98 L 268,140 Z"
+                stroke="#FFFFFF"
+                strokeWidth="4"
+                strokeLinejoin="round"
+                pathLength="100"
+                className="splash-draw-path path-arrowhead"
+              />
+            </g>
+
+            {/* --- 2. SOLID FILL SHAPES (Stage 2: 1.2s - 1.8s) --- */}
+            <g className="splash-fill-layer">
+              {/* Outer Top S-Arch Ribbon */}
+              <path
+                d="M 238,72 C 210,40 134,38 98,72 C 68,102 64,152 78,186 C 88,210 108,224 130,224"
+                stroke="#FFFFFF"
+                strokeWidth="16"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
-              {/* Student Cap Filled */}
-              <polygon points="72,66 90,57 108,66 90,75" fill="#FFFFFF" />
-              <path d="M 108 66 L 112 78" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
-              <circle cx="90" cy="85" r="6.5" fill="#FFFFFF" />
-              <path d="M 75 106 C 75 96, 105 96, 105 106 Z" fill="#FFFFFF" />
 
-              {/* Professional Filled */}
-              <circle cx="148" cy="98" r="6.5" fill="#FFFFFF" />
-              <path d="M 133 120 C 133 110, 163 110, 163 120 Z" fill="#FFFFFF" />
-
-              {/* Central Connection Bar */}
-              <path d="M 98 124 C 110 117, 126 117, 138 124" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" />
-            </g>
-
-            {/* D. Micro-interaction: Light Glint Sweep (1.2s - 1.8s) */}
-            <g clipPath="url(#bottom-s-clip)">
-              <rect
-                x="-80"
-                y="120"
-                width="90"
-                height="100"
-                fill="url(#shine-sweep-grad)"
-                className="anim-light-sweep"
-              />
-            </g>
-
-            {/* E. Arrow Tip Accent Spark & Arc Swoop (Fires at 2.2s) */}
-            <g className="anim-arrow-spark-group">
-              {/* Arc Swoop */}
+              {/* Outer Bottom S-Arch Ribbon */}
               <path
-                d="M 194 36 C 210 24, 222 42, 206 58"
-                fill="none"
-                stroke="#38BDF8"
-                strokeWidth="2.5"
+                d="M 102,224 C 102,264 148,284 194,282 C 234,280 252,248 252,204"
+                stroke="#FFFFFF"
+                strokeWidth="16"
                 strokeLinecap="round"
-                className="anim-arc-swoop"
+                strokeLinejoin="round"
               />
-              {/* 4-Ray Spark Burst */}
-              <line x1="194" y1="24" x2="194" y2="12" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
-              <line x1="206" y1="36" x2="218" y2="36" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
-              <line x1="203" y1="27" x2="212" y2="18" stroke="#38BDF8" strokeWidth="2" strokeLinecap="round" />
-              <circle cx="194" cy="36" r="3.5" fill="#FFFFFF" filter="url(#trace-glow)" />
+
+              {/* Student Mortarboard Cap */}
+              <polygon
+                points="104,100 128,88 152,100 128,110"
+                fill="#FFFFFF"
+              />
+              {/* Cap Tassel */}
+              <path
+                d="M 110,103 C 104,110 102,118 104,124"
+                stroke="#FFFFFF"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+              />
+              <circle cx="104" cy="125" r="2.5" fill="#FFFFFF" />
+
+              {/* Student Head */}
+              <circle cx="128" cy="118" r="13" fill="#FFFFFF" />
+
+              {/* Professional Head */}
+              <circle cx="198" cy="110" r="13" fill="#FFFFFF" />
+
+              {/* Combined Student Body, Handshake & Professional Suit Body */}
+              <path
+                d="M 106,192 C 106,162 118,146 136,146 C 146,146 154,154 162,166 L 172,178 L 182,166 C 190,154 198,146 208,146 C 218,146 226,156 230,166 L 258,124"
+                stroke="#FFFFFF"
+                strokeWidth="13"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+
+              {/* Solid Student Torso Base */}
+              <path
+                d="M 104,196 C 104,166 116,152 134,152 C 146,152 154,162 162,176 L 172,188 L 160,196 Z"
+                fill="#FFFFFF"
+              />
+
+              {/* Solid Pro Torso Base */}
+              <path
+                d="M 184,176 C 192,162 200,152 212,152 C 224,152 232,166 234,196 L 184,196 Z"
+                fill="#FFFFFF"
+              />
+
+              {/* Solid Arrow Head */}
+              <polygon
+                points="242,122 280,96 268,140"
+                fill="#FFFFFF"
+              />
+
+              {/* Light Sweep Glint along Bottom Curve */}
+              <g clipPath="url(#logoClip)">
+                <rect
+                  className="splash-light-glint"
+                  x="-150"
+                  y="0"
+                  width="120"
+                  height="300"
+                  fill="url(#shineGradient)"
+                  transform="skewX(-25)"
+                />
+              </g>
             </g>
 
-            {/* F. Four-Pointed Sparkle Star (Bottom Right - Idle Shimmer at 3.2s+) */}
-            <g className="anim-star-shimmer">
+            {/* --- 3. DYNAMIC ARROW SPARK (Stage 4: 2.2s - 3.2s) --- */}
+            <g className="splash-arrow-spark-group" transform="translate(280, 96)">
+              {/* Bursting Star Rays */}
               <path
-                d="M 202 188 Q 202 198 212 198 Q 202 198 202 208 Q 202 198 192 198 Q 202 198 202 188 Z"
+                d="M 0,-18 L 4,-5 L 18,0 L 4,5 L 0,18 L -4,5 L -18,0 L -4,-5 Z"
                 fill="#FFFFFF"
-                filter="url(#trace-glow)"
+                className="splash-spark-star"
               />
-              <circle cx="202" cy="198" r="1.5" fill="#38BDF8" />
+              <circle cx="0" cy="0" r="4" fill="#FFFFFF" className="splash-spark-center" />
             </g>
           </svg>
-
-          {/* Trace Flare Light Dot (Follows outline during 0.0s – 1.2s) */}
-          <div className="splash-trace-flare" />
         </div>
 
-        {/* 4. Typography Entrance: "StageLink" (1.6s – 2.4s) */}
-        <div className="splash-typography-block">
-          <h1 className="splash-brand-title">StageLink</h1>
-          <p className="splash-brand-tagline">Connectez votre talent au monde</p>
+        {/* --- 4. TYPOGRAPHY 'StageLink' (Stage 3: 1.6s - 2.4s) --- */}
+        <div className="splash-brand-typography">
+          <span className="splash-text-stage">Stage</span>
+          <span className="splash-text-link">Link</span>
         </div>
 
+        {/* Subtitle Slogan */}
+        <div className="splash-tagline-text">
+          Connectez votre talent au monde
+        </div>
       </div>
 
-      {/* 5. Subdued Corporate Signature */}
-      <div className="splash-signature-footer">
-        Powered by <span style={{ color: '#FFFFFF', fontWeight: 800 }}>JABE PRODUCTION</span>
+      {/* --- 5. FOOTER BRANDING --- */}
+      <div className="splash-brand-footer">
+        Powered by <strong>JABE PRODUCTION</strong>
       </div>
 
+      {/* --- PURE CSS ANIMATION TIMELINE & KEYFRAMES --- */}
       <style>{`
-        /* =========================================================================
-           1. CORE VARIABLES & EASING
-           ========================================================================= */
-        :root {
-          --splash-ease: cubic-bezier(0.4, 0.0, 0.2, 1);
-          --splash-bounce: cubic-bezier(0.16, 1, 0.3, 1);
-        }
+        /* ============================================================
+           GLOBAL SPLASH KEYFRAMES & EASING
+           Duration: 3.6s - 4.0s
+           Easing: cubic-bezier(0.4, 0.0, 0.2, 1)
+           ============================================================ */
 
-        /* =========================================================================
-           2. AMBIENT BACKGROUND GLOWS
-           ========================================================================= */
-        .splash-ambient-center {
+        /* Ambient Glow Pulses */
+        .splash-ambient-radial-1 {
           position: absolute;
           width: 500px;
           height: 500px;
           border-radius: 50%;
           background: radial-gradient(circle, rgba(56, 189, 248, 0.22) 0%, rgba(13, 114, 209, 0) 70%);
-          filter: blur(60px);
-          animation: ambientBreathe 4s ease-in-out infinite alternate;
-        }
-
-        .splash-cyan-aurora {
-          position: absolute;
-          top: 15%;
-          right: 20%;
-          width: 320px;
-          height: 320px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(14, 165, 233, 0.18) 0%, rgba(10, 60, 150, 0) 65%);
-          filter: blur(50px);
-          animation: auroraFloat 5s ease-in-out infinite alternate-reverse;
-        }
-
-        @keyframes ambientBreathe {
-          0% { transform: scale(0.85); opacity: 0.6; }
-          100% { transform: scale(1.15); opacity: 1; }
-        }
-
-        @keyframes auroraFloat {
-          0% { transform: translate(0, 0) scale(0.9); }
-          100% { transform: translate(-30px, 25px) scale(1.2); }
-        }
-
-        /* =========================================================================
-           3. CONCENTRIC IMPACT RIPPLE WAVES (Triggered at 2.2s)
-           ========================================================================= */
-        .splash-ripple-wave {
-          position: absolute;
-          top: 50%;
+          top: 20%;
           left: 50%;
-          transform: translate(-50%, -50%) scale(0.6);
+          transform: translate(-50%, -50%);
+          filter: blur(50px);
+          pointer-events: none;
+          animation: ambientFloat 4s ease-in-out infinite alternate;
+        }
+
+        .splash-ambient-radial-2 {
+          position: absolute;
+          width: 350px;
+          height: 350px;
           border-radius: 50%;
-          border: 1.5px solid rgba(255, 255, 255, 0.6);
-          box-shadow: 0 0 16px rgba(56, 189, 248, 0.4);
-          opacity: 0;
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, rgba(10, 60, 150, 0) 65%);
+          top: 65%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          filter: blur(40px);
           pointer-events: none;
         }
 
+        @keyframes ambientFloat {
+          0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.7; }
+          100% { transform: translate(-50%, -46%) scale(1.15); opacity: 1; }
+        }
+
+        /* ------------------------------------------------------------
+           STAGE 4: Concentric Ripple Rings (2.2s – 3.2s)
+           ------------------------------------------------------------ */
+        .splash-ripple-ring {
+          position: absolute;
+          top: 45%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          border-radius: 50%;
+          border: 1.5px solid rgba(255, 255, 255, 0.7);
+          box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+          pointer-events: none;
+          opacity: 0;
+        }
+
         .ripple-1 {
-          width: 240px;
-          height: 240px;
-          animation: rippleTrigger 1.0s var(--splash-bounce) 2.2s forwards;
+          width: 140px;
+          height: 140px;
+          animation: rippleExpand 1.1s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+          animation-delay: 2.2s;
         }
 
         .ripple-2 {
-          width: 240px;
-          height: 240px;
-          animation: rippleTrigger 1.0s var(--splash-bounce) 2.38s forwards;
+          width: 140px;
+          height: 140px;
+          animation: rippleExpand 1.1s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+          animation-delay: 2.45s;
         }
 
-        @keyframes rippleTrigger {
+        @keyframes rippleExpand {
           0% {
             transform: translate(-50%, -50%) scale(0.6);
-            opacity: 0.45;
+            opacity: 0.55;
             border-width: 2px;
           }
           100% {
-            transform: translate(-50%, -50%) scale(2.2);
+            transform: translate(-50%, -50%) scale(2.3);
             opacity: 0;
             border-width: 0.5px;
           }
         }
 
-        /* =========================================================================
-           4. HERO WRAPPER & LOGO CORE
-           ========================================================================= */
-        .splash-hero-wrapper {
+        /* ------------------------------------------------------------
+           LOGO STAGE & BREATHING PULSE (Stage 4 & 5)
+           ------------------------------------------------------------ */
+        .splash-brand-stage {
           display: flex;
           flex-direction: column;
           align-items: center;
           justifyContent: center;
           position: relative;
           z-index: 10;
+          animation: logoPulse 1.2s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+          animation-delay: 2.2s;
         }
 
-        .splash-logo-core {
+        @keyframes logoPulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.035); }
+          100% { transform: scale(1); }
+        }
+
+        .splash-logo-wrapper {
+          width: 220px;
+          height: 195px;
+          display: flex;
+          align-items: center;
+          justifyContent: center;
           position: relative;
-          width: 170px;
-          height: 170px;
-          animation: logoBreathePulse 1.0s var(--splash-ease) 2.2s forwards;
         }
 
-        @keyframes logoBreathePulse {
-          0% { transform: scale(1.0); }
-          45% { transform: scale(1.045); filter: drop-shadow(0 0 20px rgba(255,255,255,0.7)); }
-          100% { transform: scale(1.0); filter: drop-shadow(0 0 12px rgba(255,255,255,0.3)); }
-        }
-
-        .splash-svg-canvas {
+        .splash-svg-logo {
           width: 100%;
           height: 100%;
           overflow: visible;
+          filter: drop-shadow(0 12px 30px rgba(0, 20, 70, 0.35));
         }
 
-        /* =========================================================================
-           5. STAGE 1: STROKE PATH TRACING (0.0s – 1.2s)
-           ========================================================================= */
-        .anim-path-stroke {
-          stroke-dasharray: 800;
-          stroke-dashoffset: 800;
-          animation: traceOuter 1.2s var(--splash-ease) forwards;
+        /* ------------------------------------------------------------
+           STAGE 1: Stroke Path Tracing (0.0s – 1.2s)
+           ------------------------------------------------------------ */
+        .splash-stroke-layer {
+          filter: url(#splashGlow);
+          animation: strokeFadeOut 0.4s ease-out forwards;
+          animation-delay: 1.4s;
         }
 
-        .anim-path-stroke-fast {
-          stroke-dasharray: 400;
-          stroke-dashoffset: 400;
-          animation: traceInner 1.1s var(--splash-ease) 0.1s forwards;
+        .splash-draw-path {
+          stroke-dasharray: 100;
+          stroke-dashoffset: 100;
+          animation: drawPath 1.2s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
         }
 
-        @keyframes traceOuter {
+        .path-s-top { animation-delay: 0.0s; }
+        .path-s-bottom { animation-delay: 0.15s; }
+        .path-cap { animation-delay: 0.25s; }
+        .path-tassel { animation-delay: 0.35s; }
+        .path-head-1 { animation-delay: 0.3s; }
+        .path-body-student { animation-delay: 0.4s; }
+        .path-handshake { animation-delay: 0.5s; }
+        .path-head-2 { animation-delay: 0.45s; }
+        .path-body-pro { animation-delay: 0.55s; }
+        .path-arrowhead { animation-delay: 0.7s; }
+
+        @keyframes drawPath {
           0% {
-            stroke-dashoffset: 800;
-            opacity: 1;
+            stroke-dashoffset: 100;
+            opacity: 0.3;
           }
-          90% {
-            stroke-dashoffset: 0;
+          30% {
             opacity: 1;
           }
           100% {
             stroke-dashoffset: 0;
-            opacity: 0;
+            opacity: 1;
           }
         }
 
-        @keyframes traceInner {
+        @keyframes strokeFadeOut {
+          0% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+
+        /* ------------------------------------------------------------
+           STAGE 2: Solid Fill Emergence & Light Sweep (1.2s – 1.8s)
+           ------------------------------------------------------------ */
+        .splash-fill-layer {
+          opacity: 0;
+          animation: fillEmerge 0.6s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+          animation-delay: 1.2s;
+        }
+
+        @keyframes fillEmerge {
           0% {
-            stroke-dashoffset: 400;
-            opacity: 1;
-          }
-          90% {
-            stroke-dashoffset: 0;
-            opacity: 1;
+            opacity: 0;
+            filter: brightness(1.6) drop-shadow(0 0 16px rgba(255, 255, 255, 0.9));
           }
           100% {
-            stroke-dashoffset: 0;
-            opacity: 0;
+            opacity: 1;
+            filter: brightness(1) drop-shadow(0 4px 16px rgba(0, 0, 0, 0.15));
           }
         }
 
-        /* Flare Light Dot following trace */
-        .splash-trace-flare {
-          position: absolute;
-          width: 10px;
-          height: 10px;
-          background: #FFFFFF;
-          border-radius: 50%;
-          box-shadow: 0 0 14px 4px #38BDF8, 0 0 24px 8px #FFFFFF;
-          top: 25px;
-          right: 25px;
-          opacity: 0;
-          animation: flareGlow 1.2s var(--splash-ease) forwards;
-          pointer-events: none;
+        /* Glint Light Sweep (1.3s - 2.1s) */
+        .splash-light-glint {
+          animation: glintSweep 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+          animation-delay: 1.3s;
         }
 
-        @keyframes flareGlow {
-          0% { opacity: 0; transform: scale(0.2); }
-          20% { opacity: 1; transform: scale(1.4); }
-          75% { opacity: 1; transform: scale(1.1); }
-          100% { opacity: 0; transform: scale(0.4); }
+        @keyframes glintSweep {
+          0% { transform: translateX(-120px) skewX(-25deg); opacity: 0; }
+          30% { opacity: 0.9; }
+          100% { transform: translateX(380px) skewX(-25deg); opacity: 0; }
         }
 
-        /* =========================================================================
-           6. STAGE 2: SOLID FILL EMERGENCE & LIGHT SWEEP (1.2s – 1.8s)
-           ========================================================================= */
-        .anim-solid-fill {
-          opacity: 0;
-          animation: solidFillFadeIn 0.6s var(--splash-ease) 1.15s forwards;
-        }
-
-        @keyframes solidFillFadeIn {
-          0% { opacity: 0; transform: scale(0.96); }
-          100% { opacity: 1; transform: scale(1.0); }
-        }
-
-        .anim-light-sweep {
-          animation: sweepAction 0.65s ease-out 1.25s forwards;
-          opacity: 0;
-        }
-
-        @keyframes sweepAction {
-          0% { transform: translateX(0); opacity: 0; }
-          20% { opacity: 1; }
-          80% { opacity: 0.9; }
-          100% { transform: translateX(260px); opacity: 0; }
-        }
-
-        /* =========================================================================
-           7. STAGE 3: TYPOGRAPHY ENTRANCE (1.6s – 2.4s)
-           ========================================================================= */
-        .splash-typography-block {
-          margin-top: 22px;
-          text-align: center;
+        /* ------------------------------------------------------------
+           STAGE 3: Typography 'StageLink' (1.6s – 2.4s)
+           ------------------------------------------------------------ */
+        .splash-brand-typography {
+          margin-top: 14px;
+          display: flex;
+          align-items: center;
+          justifyContent: center;
+          font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Outfit', 'Inter', sans-serif;
+          font-size: 2.35rem;
+          color: #FFFFFF;
+          text-shadow: 0 4px 18px rgba(0, 20, 60, 0.35);
           opacity: 0;
           transform: translateY(25px);
-          animation: typographyEntrance 0.8s var(--splash-ease) 1.6s forwards;
+          animation: textSlideUp 0.8s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+          animation-delay: 1.6s;
         }
 
-        @keyframes typographyEntrance {
+        .splash-text-stage {
+          font-weight: 850;
+          letter-spacing: -0.5px;
+        }
+
+        .splash-text-link {
+          font-weight: 600;
+          letter-spacing: -0.5px;
+          margin-left: 1px;
+        }
+
+        @keyframes textSlideUp {
           0% {
             opacity: 0;
             transform: translateY(25px);
-            letter-spacing: 3.5px;
+            letter-spacing: 2px;
           }
           100% {
             opacity: 1;
-            transform: translateY(0);
-            letter-spacing: -0.3px;
+            transform: translateY(0px);
+            letter-spacing: normal;
           }
         }
 
-        .splash-brand-title {
-          margin: 0;
-          font-family: -apple-system, BlinkMacSystemFont, 'Outfit', 'Inter', 'Segoe UI', Roboto, sans-serif;
-          font-size: 2.2rem;
-          font-weight: 800;
-          color: #FFFFFF;
-          line-height: 1.1;
-          text-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
-        }
-
-        .splash-brand-tagline {
-          margin: 6px 0 0 0;
-          font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
-          font-size: 0.9rem;
+        .splash-tagline-text {
+          margin-top: 6px;
+          font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif;
+          font-size: 0.92rem;
           font-weight: 500;
           color: rgba(255, 255, 255, 0.85);
           letter-spacing: 0.2px;
-          text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+          text-shadow: 0 2px 8px rgba(0,0,0,0.25);
+          opacity: 0;
+          transform: translateY(15px);
+          animation: taglineFadeIn 0.8s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+          animation-delay: 1.85s;
         }
 
-        /* =========================================================================
-           8. STAGE 4: ARROW ACCENT SPARK & SWOOP (2.2s – 3.2s)
-           ========================================================================= */
-        .anim-arrow-spark-group {
+        @keyframes taglineFadeIn {
+          0% { opacity: 0; transform: translateY(15px); }
+          100% { opacity: 0.9; transform: translateY(0); }
+        }
+
+        /* ------------------------------------------------------------
+           STAGE 4: Dynamic Arrow Spark & Star (2.2s – 3.2s)
+           ------------------------------------------------------------ */
+        .splash-arrow-spark-group {
           opacity: 0;
-          transform-origin: 194px 36px;
-          animation: sparkBurst 0.75s var(--splash-bounce) 2.2s forwards;
+          transform-origin: center;
+          animation: sparkBurst 0.9s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+          animation-delay: 2.15s;
+        }
+
+        .splash-spark-star {
+          filter: drop-shadow(0 0 8px rgba(255, 255, 255, 1)) drop-shadow(0 0 14px rgba(56, 189, 248, 0.8));
+          animation: idleShimmer 2.2s ease-in-out infinite alternate;
+          animation-delay: 3.0s;
         }
 
         @keyframes sparkBurst {
           0% {
-            transform: scale(0) rotate(-20deg);
+            transform: scale(0) rotate(0deg);
             opacity: 0;
           }
           40% {
-            transform: scale(1.3) rotate(0deg);
+            transform: scale(1.35) rotate(45deg);
             opacity: 1;
           }
-          100% {
-            transform: scale(0.9) rotate(5deg);
+          75% {
+            transform: scale(0.9) rotate(90deg);
             opacity: 0.9;
           }
-        }
-
-        .anim-arc-swoop {
-          stroke-dasharray: 60;
-          stroke-dashoffset: 60;
-          animation: swoopTrace 0.5s ease-out 2.2s forwards;
-        }
-
-        @keyframes swoopTrace {
-          0% { stroke-dashoffset: 60; opacity: 1; }
-          100% { stroke-dashoffset: 0; opacity: 1; }
-        }
-
-        /* =========================================================================
-           9. STAGE 5: STABILIZATION & IDLE STAR SHIMMER (3.2s+)
-           ========================================================================= */
-        .anim-star-shimmer {
-          opacity: 0;
-          transform-origin: 202px 198px;
-          animation: starEmerge 0.5s ease-out 1.7s forwards, starIdleShimmer 2.0s ease-in-out 3.2s infinite alternate;
-        }
-
-        @keyframes starEmerge {
-          0% { transform: scale(0); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-
-        @keyframes starIdleShimmer {
-          0% {
-            opacity: 0.5;
-            transform: scale(0.92) rotate(0deg);
-            filter: drop-shadow(0 0 2px rgba(255,255,255,0.4));
-          }
           100% {
-            opacity: 1.0;
-            transform: scale(1.15) rotate(90deg);
-            filter: drop-shadow(0 0 8px rgba(56,189,248,0.9));
+            transform: scale(1) rotate(90deg);
+            opacity: 0.95;
           }
         }
 
-        /* =========================================================================
-           10. FOOTER SIGNATURE & EXIT ANIMATION (3.8s – 4.2s)
-           ========================================================================= */
-        .splash-signature-footer {
+        /* ------------------------------------------------------------
+           STAGE 5: Idle Shimmer (3.2s+)
+           ------------------------------------------------------------ */
+        @keyframes idleShimmer {
+          0% { opacity: 0.55; transform: scale(0.85); }
+          100% { opacity: 1; transform: scale(1.15); filter: drop-shadow(0 0 12px rgba(255, 255, 255, 1)); }
+        }
+
+        /* ------------------------------------------------------------
+           Footer
+           ------------------------------------------------------------ */
+        .splash-brand-footer {
           position: absolute;
-          bottom: 28px;
+          bottom: 34px;
           color: rgba(255, 255, 255, 0.6);
           font-size: 0.78rem;
           letter-spacing: 0.6px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
           opacity: 0;
-          animation: footerFadeIn 0.8s ease-out 2.0s forwards;
+          animation: footerFade 0.8s ease-out forwards;
+          animation-delay: 2.1s;
         }
 
-        @keyframes footerFadeIn {
-          to { opacity: 1; }
+        .splash-brand-footer strong {
+          color: #FFFFFF;
+          font-weight: 700;
         }
 
-        .stagelink-splash-root {
-          opacity: 1;
-          transition: opacity 0.45s var(--splash-ease), transform 0.45s var(--splash-ease);
-        }
-
-        .stagelink-splash-root.splash-exiting {
-          opacity: 0;
-          transform: scale(1.04);
+        @keyframes footerFade {
+          0% { opacity: 0; transform: translateY(8px); }
+          100% { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
