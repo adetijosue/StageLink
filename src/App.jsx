@@ -338,11 +338,16 @@ function MainApp() {
               if (supaProfiles && supaProfiles.length > 0) {
                 mappedSupaUsers = supaProfiles.map(p => ({
                   id: p.id,
-                  name: p.full_name || 'Artiste StageLink',
+                  name: p.full_name || p.username || 'Artiste',
+                  userName: p.username || p.full_name || 'Artiste',
+                  full_name: p.full_name || p.username || 'Artiste',
+                  username: p.username || '',
                   email: p.email || '',
                   role: p.role || 'Artiste',
+                  userRole: p.role || 'Artiste',
                   company: p.company || '',
                   avatar: p.avatar_url || '',
+                  avatar_url: p.avatar_url || '',
                   verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
                   badgeType: p.verified_badge || 'none',
                   bio: p.bio || '',
@@ -1521,17 +1526,57 @@ function MainApp() {
     if (!targetUser) return;
     window.history.pushState({ page: 'chat' }, '');
     
+    let partnerData = {
+      ...targetUser,
+      id: targetUser.id || targetUser.userId,
+      full_name: targetUser.full_name || targetUser.name || targetUser.userName || 'Artiste',
+      name: targetUser.name || targetUser.full_name || targetUser.userName || 'Artiste',
+      username: targetUser.username || '',
+      avatar_url: targetUser.avatar_url || targetUser.avatar || targetUser.userAvatar || '',
+      avatar: targetUser.avatar || targetUser.avatar_url || targetUser.userAvatar || '',
+      role: targetUser.role || targetUser.userRole || 'Artiste',
+      userRole: targetUser.role || targetUser.userRole || 'Artiste'
+    };
+
+    // If partner lacks complete profile fields, fetch fresh from Supabase
+    if (isSupabaseConfigured() && partnerData.id && (!partnerData.username || partnerData.role === 'Artiste' || !partnerData.avatar_url)) {
+      try {
+        const { data: liveProf } = await supabase
+          .from('profiles')
+          .select('id, full_name, username, avatar_url, role, verified_badge')
+          .eq('id', partnerData.id)
+          .single();
+
+        if (liveProf) {
+          partnerData = {
+            ...partnerData,
+            ...liveProf,
+            id: liveProf.id,
+            full_name: liveProf.full_name || liveProf.username || partnerData.full_name,
+            name: liveProf.full_name || liveProf.username || partnerData.name,
+            username: liveProf.username || partnerData.username,
+            avatar_url: liveProf.avatar_url || partnerData.avatar_url,
+            avatar: liveProf.avatar_url || partnerData.avatar,
+            role: liveProf.role || partnerData.role,
+            userRole: liveProf.role || partnerData.userRole
+          };
+        }
+      } catch (_) {}
+    }
+
     // Switch to new DM system: Create or get conversation
-    if (isSupabaseConfigured() && currentUser?.id) {
+    if (isSupabaseConfigured() && currentUser?.id && partnerData.id) {
        try {
-           const result = await directChatService.getOrCreateDirectConversation(targetUser.id);
+           const result = await directChatService.getOrCreateDirectConversation(partnerData.id);
            if (result && result.conversation_id) {
                setSelectedConversation({
                    id: result.conversation_id,
                    vanish_mode_enabled: result.vanish_mode_enabled,
+                   partner: partnerData,
+                   participant: partnerData,
                    participants: [
                        { user_id: currentUser.id },
-                       { user_id: targetUser.id, profile: targetUser }
+                       { user_id: partnerData.id, profile: partnerData }
                    ]
                });
                setActiveTab('discussions');
@@ -1544,11 +1589,13 @@ function MainApp() {
     
     // Fallback if not configured or RPC fails
     setSelectedConversation({
-        id: `conv_${targetUser.id}`,
+        id: `conv_${partnerData.id || Date.now()}`,
         vanish_mode_enabled: false,
+        partner: partnerData,
+        participant: partnerData,
         participants: [
             { user_id: currentUser?.id || 'me' },
-            { user_id: targetUser.id, profile: targetUser }
+            { user_id: partnerData.id, profile: partnerData }
         ]
     });
     setActiveTab('discussions');
@@ -2722,50 +2769,72 @@ function MainApp() {
       )}
       
       {/* NEW: Instagram DM Message Thread Overlay */}
-      {selectedConversation && (
-        <MessageThread
-          conversationId={selectedConversation.id}
-          partner={selectedConversation.participants?.find(p => p.user_id !== currentUser?.id)?.profile}
-          currentUser={currentUser}
-          onBack={() => {
-              setSelectedConversation(null);
-              setActiveTab('discussions');
-          }}
-          onStartAudioCall={async () => {
-            setIsAudioCallOnly(true);
-            setIsVideoCallActive(true);
-            setIncomingCallData(null);
-            const partnerId = selectedConversation.participants?.find(p => p.user_id !== currentUser?.id)?.user_id;
-            if (isSupabaseConfigured() && currentUser?.id && partnerId) {
-              try {
-                const { data } = await supabase.from('notifications').insert({
-                  user_id: partnerId,
-                  actor_id: currentUser.id,
-                  type: 'incoming_call_audio'
-                }).select('id').single();
-                if (data) setActiveCallNotificationId(data.id);
-              } catch (e) { console.error("Suppressed error:", e); }
-            }
-          }}
-          onStartVideoCall={async () => {
-            setIsAudioCallOnly(false);
-            setIsVideoCallActive(true);
-            setIncomingCallData(null);
-            const partnerId = selectedConversation.participants?.find(p => p.user_id !== currentUser?.id)?.user_id;
-            if (isSupabaseConfigured() && currentUser?.id && partnerId) {
-              try {
-                const { data } = await supabase.from('notifications').insert({
-                  user_id: partnerId,
-                  actor_id: currentUser.id,
-                  type: 'incoming_call_video'
-                }).select('id').single();
-                if (data) setActiveCallNotificationId(data.id);
-              } catch (e) { console.error("Suppressed error:", e); }
-            }
-          }}
-          onOpenProfile={handleOpenPublicProfile}
-        />
-      )}
+      {selectedConversation && (() => {
+        const rawPartObj = selectedConversation.participants?.find(p => p.user_id !== currentUser?.id);
+        const rawProfile = Array.isArray(rawPartObj?.profile) ? rawPartObj.profile[0] : rawPartObj?.profile;
+
+        const resolvedPartner = selectedConversation.partner ||
+          selectedConversation.participant ||
+          rawProfile ||
+          rawPartObj ||
+          (selectedConversation.title ? {
+            id: selectedConversation.participantId || selectedConversation.partnerId,
+            full_name: selectedConversation.title,
+            name: selectedConversation.title,
+            avatar_url: selectedConversation.avatar,
+            avatar: selectedConversation.avatar
+          } : null);
+
+        const partnerId = resolvedPartner?.id ||
+          selectedConversation.partner?.id ||
+          rawPartObj?.user_id ||
+          rawPartObj?.id ||
+          selectedConversation.partnerId ||
+          selectedConversation.participantId;
+
+        return (
+          <MessageThread
+            conversationId={selectedConversation.id}
+            partner={resolvedPartner}
+            currentUser={currentUser}
+            onBack={() => {
+                setSelectedConversation(null);
+                setActiveTab('discussions');
+            }}
+            onStartAudioCall={async () => {
+              setIsAudioCallOnly(true);
+              setIsVideoCallActive(true);
+              setIncomingCallData(null);
+              if (isSupabaseConfigured() && currentUser?.id && partnerId) {
+                try {
+                  const { data } = await supabase.from('notifications').insert({
+                    user_id: partnerId,
+                    actor_id: currentUser.id,
+                    type: 'incoming_call_audio'
+                  }).select('id').single();
+                  if (data) setActiveCallNotificationId(data.id);
+                } catch (e) { console.error("Suppressed error:", e); }
+              }
+            }}
+            onStartVideoCall={async () => {
+              setIsAudioCallOnly(false);
+              setIsVideoCallActive(true);
+              setIncomingCallData(null);
+              if (isSupabaseConfigured() && currentUser?.id && partnerId) {
+                try {
+                  const { data } = await supabase.from('notifications').insert({
+                    user_id: partnerId,
+                    actor_id: currentUser.id,
+                    type: 'incoming_call_video'
+                  }).select('id').single();
+                  if (data) setActiveCallNotificationId(data.id);
+                } catch (e) { console.error("Suppressed error:", e); }
+              }
+            }}
+            onOpenProfile={handleOpenPublicProfile}
+          />
+        );
+      })()}
 
       {/* Public Profile View Modal */}
       {publicProfileUser && (

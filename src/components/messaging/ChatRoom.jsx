@@ -523,14 +523,14 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
             style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
           >
             <div style={{ position: 'relative' }}>
-              <UserAvatar user={{ avatar: chat?.participant?.avatar, name: chat?.participant?.name || 'Artiste' }} size={42} />
+              <UserAvatar user={{ avatar: chat?.participant?.avatar_url || chat?.participant?.avatar || chat?.participant?.userAvatar, name: chat?.participant?.full_name || chat?.participant?.name || chat?.participant?.userName || 'Artiste' }} size={42} />
               {chat?.participant?.online && (
                 <span style={{ position: 'absolute', bottom: 0, right: 0, width: '12px', height: '12px', borderRadius: '50%', background: '#10B981', border: '2px solid #FFF' }} />
               )}
             </div>
 
             <div>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>{chat?.participant?.name || 'Artiste'}</h3>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A' }}>{chat?.participant?.full_name || chat?.participant?.name || chat?.participant?.userName || 'Artiste'}</h3>
               <span style={{ fontSize: '0.75rem', color: isPartnerTyping ? '#0066FF' : '#64748B', fontWeight: isPartnerTyping ? 700 : 400 }}>
                 {typingStatusText}
               </span>

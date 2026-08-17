@@ -1,9 +1,10 @@
 // Supabase Edge Function: moneroo-webhook
 // Validates HMAC X-Moneroo-Signature and activates StageLink subscription in Supabase DB
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+declare const Deno: any;
 
 const MONEROO_SECRET_KEY = Deno.env.get("MONEROO_SECRET_KEY") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -37,7 +38,7 @@ async function verifyHmacSignature(bodyText: string, signatureHeader: string | n
   }
 }
 
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
   try {
     const signature = req.headers.get("X-Moneroo-Signature") || req.headers.get("x-moneroo-signature");
     const rawBody = await req.text();

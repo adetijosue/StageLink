@@ -1,5 +1,5 @@
 import React from 'react';
-import { Phone, PhoneOff, Video, Maximize2, ShieldCheck, User } from 'lucide-react';
+import { Phone, PhoneOff, Video, ShieldCheck, User } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 import AudioCallView from './AudioCallView';
 import VideoCallView from './VideoCallView';

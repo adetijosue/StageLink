@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search, Check, MapPin, Music, MessageSquare } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
-import Logo from '../common/Logo';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 
@@ -29,11 +28,14 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
         if (data && !error) {
           const mapped = data.map(p => ({
             id: p.id,
-            name: p.full_name || 'Artiste StageLink',
-            userName: p.full_name || 'Artiste StageLink',
+            name: p.full_name || p.username || 'Artiste',
+            userName: p.username || p.full_name || 'Artiste',
+            full_name: p.full_name || p.username || 'Artiste',
+            username: p.username || '',
             role: p.role || 'Artiste',
             userRole: p.role || 'Artiste',
             avatar: p.avatar_url || '',
+            avatar_url: p.avatar_url || '',
             userAvatar: p.avatar_url || '',
             verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
             location: p.location || ''

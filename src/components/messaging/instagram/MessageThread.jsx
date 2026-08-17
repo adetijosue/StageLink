@@ -6,6 +6,7 @@ import InputBar from './InputBar';
 import ReactionOverlay from './ReactionOverlay';
 import { useChatThread } from '../../../hooks/useChatThread';
 import { useDirectPresence } from '../../../hooks/useDirectPresence';
+import { supabase, isSupabaseConfigured } from '../../../services/supabaseClient';
 
 export default function MessageThread({
   conversationId,
@@ -18,6 +19,90 @@ export default function MessageThread({
 }) {
   const [touchStartX, setTouchStartX] = useState(null);
   const [reactionOverlayData, setReactionOverlayData] = useState(null);
+  const [partnerProfile, setPartnerProfile] = useState(partner || null);
+
+  // Sync internal partner state if prop changes
+  useEffect(() => {
+    if (partner) {
+      setPartnerProfile(partner);
+    }
+  }, [partner]);
+
+  // Fallback: If partner has no name or avatar or role, fetch directly from Supabase profiles
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      const partnerId = partnerProfile?.id || partnerProfile?.userId || partner?.id || partner?.userId;
+      if (partnerId && isSupabaseConfigured()) {
+        try {
+          const { data: prof, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, username, avatar_url, role, verified_badge')
+            .eq('id', partnerId)
+            .single();
+
+          if (!error && prof && isMounted) {
+            setPartnerProfile((prev) => ({
+              ...prev,
+              ...prof,
+              id: prof.id,
+              name: prof.full_name || prof.username || 'Artiste',
+              full_name: prof.full_name || prof.username || 'Artiste',
+              username: prof.username || '',
+              avatar: prof.avatar_url || '',
+              avatar_url: prof.avatar_url || '',
+              role: prof.role || 'Artiste',
+              userRole: prof.role || 'Artiste'
+            }));
+            return;
+          }
+        } catch (err) {
+          console.warn('MessageThread direct profile fetch note:', err);
+        }
+      }
+
+      if (conversationId && isSupabaseConfigured()) {
+        try {
+          const { data: participants, error } = await supabase
+            .from('conversation_participants')
+            .select(`
+              user_id,
+              profile:user_id(id, full_name, username, avatar_url, role, verified_badge)
+            `)
+            .eq('conversation_id', conversationId)
+            .neq('user_id', currentUser?.id || '');
+
+          if (!error && participants && participants.length > 0 && isMounted) {
+            const partObj = participants[0];
+            const prof = Array.isArray(partObj.profile) ? partObj.profile[0] : partObj.profile;
+            if (prof) {
+              setPartnerProfile((prev) => ({
+                ...prev,
+                ...prof,
+                id: prof.id || partObj.user_id,
+                name: prof.full_name || prof.username || 'Artiste',
+                full_name: prof.full_name || prof.username || 'Artiste',
+                username: prof.username || '',
+                avatar: prof.avatar_url || prof.avatar || '',
+                avatar_url: prof.avatar_url || prof.avatar || '',
+                role: prof.role || 'Artiste',
+                userRole: prof.role || 'Artiste'
+              }));
+            }
+          }
+        } catch (err) {
+          console.warn('MessageThread conversation participant fallback note:', err);
+        }
+      }
+    })();
+    return () => { isMounted = false; };
+  }, [conversationId, currentUser?.id, partner?.id]);
+
+  const activePartner = partnerProfile || partner || {};
+  const partnerName = activePartner.full_name || activePartner.name || activePartner.username || activePartner.userName || 'Artiste';
+  const partnerUsername = activePartner.username || '';
+  const partnerAvatar = activePartner.avatar_url || activePartner.avatar || activePartner.userAvatar || '';
+  const partnerRole = activePartner.role || activePartner.userRole || activePartner.metier || 'Artiste';
 
   const {
     messages,
@@ -28,7 +113,7 @@ export default function MessageThread({
     sendMessage,
     toggleReaction,
     toggleVanishMode
-  } = useChatThread({ conversationId, currentUser, partner });
+  } = useChatThread({ conversationId, currentUser, partner: activePartner });
 
   const { typingText, isOnline, sendTypingEvent } = useDirectPresence(conversationId, currentUser);
 
@@ -72,7 +157,7 @@ export default function MessageThread({
         boxShadow: 'var(--shadow-sm)',
         zIndex: 10
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
           <button
             onClick={onBack}
             style={{
@@ -81,7 +166,8 @@ export default function MessageThread({
               color: isVanishMode ? '#FFFFFF' : '#0F172A',
               cursor: 'pointer',
               display: 'flex',
-              alignItems: 'center'
+              alignItems: 'center',
+              padding: 0
             }}
           >
             <ArrowLeft size={22} />
@@ -89,14 +175,14 @@ export default function MessageThread({
 
           {/* Clickable Avatar & Status */}
           <div
-            onClick={() => onOpenProfile && onOpenProfile(partner)}
-            style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+            onClick={() => onOpenProfile && onOpenProfile(activePartner)}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', minWidth: 0 }}
           >
-            <div style={{ position: 'relative' }}>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
               <UserAvatar
                 user={{
-                  avatar: partner?.avatar_url || partner?.avatar,
-                  name: partner?.full_name || partner?.name || 'Artiste'
+                  avatar: partnerAvatar,
+                  name: partnerName
                 }}
                 size={40}
               />
@@ -114,28 +200,58 @@ export default function MessageThread({
               )}
             </div>
 
-            <div>
-              <h3 style={{
-                fontSize: '0.95rem',
-                fontWeight: 700,
-                color: isVanishMode ? '#FFFFFF' : '#0F172A',
-                margin: 0
-              }}>
-                {partner?.full_name || partner?.name || 'Artiste StageLink'}
-              </h3>
-              <span style={{
-                fontSize: '0.72rem',
-                color: typingText ? '#0066FF' : (isOnline ? '#10B981' : '#64748B'),
-                fontWeight: typingText ? 700 : 500
-              }}>
-                {typingText || (isOnline ? 'En ligne' : (partner?.role || 'Artiste'))}
-              </span>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                <h3 style={{
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
+                  color: isVanishMode ? '#FFFFFF' : '#0F172A',
+                  margin: 0,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {partnerName}
+                </h3>
+                {partnerUsername && (
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    color: isVanishMode ? '#94A3B8' : '#64748B',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    @{partnerUsername.replace(/^@/, '')}
+                  </span>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '1px' }}>
+                <span style={{
+                  fontSize: '0.74rem',
+                  color: isVanishMode ? '#60A5FA' : '#0066FF',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {partnerRole}
+                </span>
+                <span style={{ fontSize: '0.65rem', color: isVanishMode ? '#64748B' : '#94A3B8' }}>•</span>
+                <span style={{
+                  fontSize: '0.72rem',
+                  color: typingText ? '#0066FF' : (isOnline ? '#10B981' : '#64748B'),
+                  fontWeight: typingText ? 700 : 500,
+                  whiteSpace: 'nowrap'
+                }}>
+                  {typingText || (isOnline ? 'En ligne' : 'Hors ligne')}
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Action Call Icons & Vanish Mode Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
           <button
             onClick={toggleVanishMode}
             title="Activer / Désactiver le mode éphémère (Vanish Mode)"

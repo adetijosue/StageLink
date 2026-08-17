@@ -188,13 +188,23 @@ const InboxView = React.memo(function InboxView({
                 boxShadow: conv.unreadCount > 0 ? '0 4px 12px rgba(0, 102, 255, 0.08)' : 'none'
               }}
             >
-              <UserAvatar
-                user={{
-                  avatar: conv.avatar,
-                  name: conv.title
+              <div
+                onClick={(e) => {
+                  if (onOpenProfile && conv.participant) {
+                    e.stopPropagation();
+                    onOpenProfile(conv.participant);
+                  }
                 }}
-                size={50}
-              />
+                style={{ cursor: onOpenProfile && conv.participant ? 'pointer' : 'default' }}
+              >
+                <UserAvatar
+                  user={{
+                    avatar: conv.avatar,
+                    name: conv.title
+                  }}
+                  size={50}
+                />
+              </div>
 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

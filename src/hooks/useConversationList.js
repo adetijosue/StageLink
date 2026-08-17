@@ -40,7 +40,7 @@ export function useConversationList(currentUser) {
             last_message_at,
             participants:conversation_participants(
               user_id,
-              profile:profiles(id, full_name, avatar_url, role, verified_badge)
+              profile:user_id(id, full_name, username, avatar_url, role, verified_badge)
             ),
             last_message:direct_messages(
               id,
@@ -63,17 +63,46 @@ export function useConversationList(currentUser) {
         if (!conv) return null;
 
         // Find partner profile for 1:1 direct chat
-        const otherParticipant = conv.participants?.find((p) => p.user_id !== currentUser.id)?.profile;
+        const otherPartObj = conv.participants?.find((p) => p.user_id !== currentUser.id);
+        const otherParticipant = Array.isArray(otherPartObj?.profile) ? otherPartObj.profile[0] : otherPartObj?.profile;
         const lastMsg = conv.last_message && conv.last_message.length > 0
           ? conv.last_message[conv.last_message.length - 1]
           : null;
 
+        const partnerName = otherParticipant?.full_name || otherParticipant?.username || otherParticipant?.name || 'Artiste';
+        const partnerUsername = otherParticipant?.username || '';
+        const partnerAvatar = otherParticipant?.avatar_url || otherParticipant?.avatar || '';
+        const partnerRole = otherParticipant?.role || otherParticipant?.userRole || 'Artiste';
+
+        const normalizedPartner = otherParticipant ? {
+          ...otherParticipant,
+          id: otherParticipant.id || otherPartObj?.user_id,
+          full_name: partnerName,
+          name: partnerName,
+          username: partnerUsername,
+          avatar_url: partnerAvatar,
+          avatar: partnerAvatar,
+          role: partnerRole,
+          userRole: partnerRole
+        } : (otherPartObj?.user_id ? {
+          id: otherPartObj.user_id,
+          full_name: 'Artiste',
+          name: 'Artiste',
+          username: '',
+          avatar_url: '',
+          avatar: '',
+          role: 'Artiste',
+          userRole: 'Artiste'
+        } : null);
+
         return {
           id: conv.id,
           type: conv.type,
-          title: conv.type === 'group' ? conv.title : (otherParticipant?.full_name || 'Artiste StageLink'),
-          avatar: conv.type === 'group' ? conv.avatar_url : (otherParticipant?.avatar_url || ''),
-          partner: otherParticipant,
+          title: conv.type === 'group' ? conv.title : partnerName,
+          avatar: conv.type === 'group' ? conv.avatar_url : partnerAvatar,
+          partner: normalizedPartner,
+          participant: normalizedPartner,
+          participants: conv.participants,
           vanishModeEnabled: conv.vanish_mode_enabled,
           lastMessage: lastMsg,
           updatedAt: conv.updated_at,

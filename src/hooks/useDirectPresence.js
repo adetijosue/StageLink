@@ -6,19 +6,25 @@ export function useDirectPresence(conversationId, currentUser) {
   const [isOnline, setIsOnline] = useState(false);
   const typingTimeoutRef = useRef(null);
   const channelRef = useRef(null);
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+
+  const currentUserId = currentUser?.id;
+  const currentUserName = currentUser?.name || currentUser?.full_name;
+  const currentUserAvatar = currentUser?.avatar || currentUser?.avatar_url;
 
   useEffect(() => {
-    if (!conversationId || !currentUser?.id || !isSupabaseConfigured()) return;
+    if (!conversationId || !currentUserId || !isSupabaseConfigured()) return;
 
     const channel = supabase.channel(`presence:${conversationId}`, {
-      config: { presence: { key: currentUser.id } }
+      config: { presence: { key: currentUserId } }
     });
 
     channelRef.current = channel;
 
     // Listen to typing broadcasts
     channel.on('broadcast', { event: 'typing' }, ({ payload }) => {
-      if (payload.userId === currentUser.id) return;
+      if (payload.userId === currentUserId) return;
 
       if (payload.isTyping) {
         setTypingUsers((prev) => {
@@ -61,8 +67,8 @@ export function useDirectPresence(conversationId, currentUser) {
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         await channel.track({
-          userId: currentUser.id,
-          userName: currentUser.name || currentUser.full_name,
+          userId: currentUserId,
+          userName: currentUserName,
           onlineAt: new Date().toISOString()
         });
       }
@@ -73,21 +79,22 @@ export function useDirectPresence(conversationId, currentUser) {
         supabase.removeChannel(channelRef.current);
       }
     };
-  }, [conversationId, currentUser]);
+  }, [conversationId, currentUserId, currentUserName]);
 
   /**
    * Broadcast typing event (debounced)
    */
   const sendTypingEvent = useCallback((isTyping = true) => {
-    if (!channelRef.current || !currentUser?.id) return;
+    const user = currentUserRef.current;
+    if (!channelRef.current || !user?.id) return;
 
     channelRef.current.send({
       type: 'broadcast',
       event: 'typing',
       payload: {
-        userId: currentUser.id,
-        userName: currentUser.name || currentUser.full_name,
-        userAvatar: currentUser.avatar || currentUser.avatar_url,
+        userId: user.id,
+        userName: user.name || user.full_name,
+        userAvatar: user.avatar || user.avatar_url,
         isTyping
       }
     });
@@ -95,10 +102,22 @@ export function useDirectPresence(conversationId, currentUser) {
     if (isTyping) {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
-        sendTypingEvent(false);
+        const cur = currentUserRef.current;
+        if (channelRef.current && cur?.id) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'typing',
+            payload: {
+              userId: cur.id,
+              userName: cur.name || cur.full_name,
+              userAvatar: cur.avatar || cur.avatar_url,
+              isTyping: false
+            }
+          });
+        }
       }, 3000);
     }
-  }, [currentUser]);
+  }, []);
 
   const typingArray = Array.from(typingUsers.values());
   const typingText = typingArray.length > 0

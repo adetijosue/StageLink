@@ -41,6 +41,9 @@ export const directChatService = {
    * Upload media (photo, video, audio note) to Supabase Storage 'chat-media'
    */
   async uploadMedia(fileOrBlob, fileName, mediaType = 'image') {
+    if (!fileOrBlob) return null;
+    if (typeof fileOrBlob === 'string') return fileOrBlob;
+
     if (!isSupabaseConfigured()) {
       return new Promise((resolve) => {
         const reader = new FileReader();
@@ -62,7 +65,7 @@ export const directChatService = {
             uploadPayload = await res.blob();
             contentType = 'image/jpeg';
           }
-        } catch (e) { }
+        } catch (_) { }
       }
 
       const fileExt = fileName ? fileName.split('.').pop() : (mediaType === 'audio' ? 'webm' : 'jpg');
@@ -99,6 +102,7 @@ export const directChatService = {
       return publicData.publicUrl;
     } catch (err) {
       console.warn('Media upload to storage failed, falling back to base64:', err.message);
+      if (typeof fileOrBlob === 'string') return fileOrBlob;
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result);
