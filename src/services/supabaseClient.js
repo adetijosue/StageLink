@@ -95,10 +95,9 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
 
       const username = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_') + '_' + Math.floor(Date.now() % 10000);
       
-      // Upsert profile safely using exact matching DB columns
+      // Update profile with full user metadata
       try {
-        const { error: profileErr } = await supabase.from('profiles').upsert({
-          id: authData.user.id,
+        const { error: updateErr } = await supabase.from('profiles').update({
           username: username,
           full_name: name,
           email: email,
@@ -110,25 +109,40 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
           instruments: [],
           genres: [],
           gear: []
-        }, { onConflict: 'id' });
+        }).eq('id', authData.user.id);
 
-        if (profileErr) {
-          console.warn('Profile upsert note:', profileErr.message);
+        if (updateErr) {
+          await supabase.from('profiles').upsert({
+            id: authData.user.id,
+            username: username,
+            full_name: name,
+            email: email,
+            role: role,
+            gender: gender,
+            avatar_url: '',
+            bio: `Membre ${role} sur StageLink`,
+            verified_badge: 'none',
+            instruments: [],
+            genres: [],
+            gear: []
+          }, { onConflict: 'id' });
         }
       } catch (pe) {
-        console.warn('Profile upsert exception:', pe?.message || pe);
+        console.warn('Profile setup exception:', pe?.message || pe);
       }
 
       // If session not established, attempt auto-login
       let sessionUser = authData.user;
       if (!authData.session) {
-        const { data: loginData } = await withRetry(() => supabase.auth.signInWithPassword({
-          email,
-          password
-        }));
-        if (loginData?.user) {
-          sessionUser = loginData.user;
-        }
+        try {
+          const { data: loginData } = await supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+          if (loginData?.user) {
+            sessionUser = loginData.user;
+          }
+        } catch (le) {}
       }
 
       return {

@@ -11,6 +11,7 @@ export function useChatThread({ conversationId, currentUser, partner }) {
       const cached = localStorage.getItem(`stagelink_cached_msgs_${conversationId}`);
       return cached ? JSON.parse(cached) : [];
     } catch (e) {
+      console.warn("Storage read error (messages):", e);
       return [];
     }
   });
@@ -21,15 +22,16 @@ export function useChatThread({ conversationId, currentUser, partner }) {
       const cached = localStorage.getItem(`stagelink_cached_msgs_${conversationId}`);
       return !cached || JSON.parse(cached).length === 0;
     } catch (e) {
+      console.warn("Storage read error (messages initial state):", e);
       return true;
     }
   });
 
   const [isVanishMode, setIsVanishMode] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
-  const [hasMore, setHasMore] = useState(true);
   const channelRef = useRef(null);
   const isMountedRef = useRef(true);
+  const initialLoadRef = useRef(messages.length > 0);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -42,7 +44,9 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     if (!conversationId || !Array.isArray(msgs)) return;
     try {
       localStorage.setItem(`stagelink_cached_msgs_${conversationId}`, JSON.stringify(msgs.slice(-50)));
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Storage write error (persist messages):", e);
+    }
   }, [conversationId]);
 
   /**
@@ -99,10 +103,10 @@ export function useChatThread({ conversationId, currentUser, partner }) {
         setIsLoading(false);
       }
     }
-  }, [conversationId, currentUser, messages.length, persistMessagesCache]);
+  }, [conversationId, currentUser, persistMessagesCache]);
 
   useEffect(() => {
-    loadMessages(messages.length > 0);
+    loadMessages(initialLoadRef.current);
   }, [loadMessages]);
 
   /**

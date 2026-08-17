@@ -232,11 +232,11 @@ function FeedCard({
                 >
                   {isFollowing ? (
                     <>
-                      <UserCheck size={13} /> {language === 'en' ? 'Following' : 'Abonné'}
+                      <UserCheck size={13} /> {language === 'en' ? 'Following' : 'Suivi'}
                     </>
                   ) : (
                     <>
-                      <UserPlus size={13} /> {t('btn_follow')}
+                      <UserPlus size={13} /> {language === 'en' ? 'Follow' : 'Suivre'}
                     </>
                   )}
                 </button>
@@ -519,7 +519,7 @@ function FeedCard({
               {m.type === 'video' ? (
                 <video src={m.url} controls playsInline style={{ width: '100%', maxHeight: '420px', display: 'block', objectFit: 'contain' }} />
               ) : (
-                <img src={m.url} alt={`Media ${i}`} loading="lazy" style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain' }} />
+                <img src={m.url} alt={`Media ${i}`} loading="lazy" decoding="async" style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain' }} />
               )}
             </div>
           ))}

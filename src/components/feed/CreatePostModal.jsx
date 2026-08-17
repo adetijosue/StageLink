@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Image, Video, Music, Check, Eye, Trash2, Send, Mic, Play, Pause, Square } from 'lucide-react';
+import { X, Image, Video, Eye, Trash2, Send, Mic, Play, Pause } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { soundEngine } from '../../services/audioService';
 import UserAvatar from '../common/UserAvatar';

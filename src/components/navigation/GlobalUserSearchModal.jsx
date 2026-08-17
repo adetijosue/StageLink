@@ -1,11 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { X, Search, Check, Sparkles, MapPin, Music, ChevronRight, UserPlus, UserCheck, User, MessageSquare } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Search, Check, MapPin, Music, UserPlus, UserCheck, User, MessageSquare, Loader2 } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { presenceService } from '../../services/presenceService';
+
+const normalizeStr = (str) => {
+  return String(str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+};
 
 export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPublicProfile, onStartChat, onConnectUser, isDarkMode }) {
   const { currentUser } = useAuth();
@@ -24,16 +32,60 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
     return unsubscribe;
   }, []);
 
+  // Fetch initial profiles on modal open to browse community members immediately
+  useEffect(() => {
+    if (!isOpen || !isSupabaseConfigured()) return;
+
+    let isMounted = true;
+    const fetchInitialProfiles = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (data && !error && isMounted) {
+          const mapped = data.map(p => ({
+            id: p.id,
+            name: p.full_name || p.username || 'Artiste',
+            userName: p.username || p.full_name || 'Artiste',
+            full_name: p.full_name || p.username || 'Artiste',
+            username: p.username || '',
+            role: p.role || 'Artiste',
+            userRole: p.role || 'Artiste',
+            avatar: p.avatar_url || '',
+            avatar_url: p.avatar_url || '',
+            userAvatar: p.avatar_url || '',
+            verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+            location: p.location || '',
+            email: p.email || ''
+          }));
+          setRemoteUsers(mapped);
+        }
+      } catch (e) {
+        console.warn('Initial profiles load note:', e?.message || e);
+      }
+    };
+
+    fetchInitialProfiles();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen]);
+
+  // Live remote search when user types in searchQuery
   useEffect(() => {
     if (!isOpen || !isSupabaseConfigured() || !searchQuery.trim()) {
-      setRemoteUsers([]);
       return;
     }
 
     const timer = setTimeout(async () => {
       setIsSearchingRemote(true);
       try {
-        const q = searchQuery.trim();
+        const q = searchQuery.trim().replace(/[,()"]/g, ' ');
+        if (!q) return;
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
@@ -53,52 +105,69 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
             avatar_url: p.avatar_url || '',
             userAvatar: p.avatar_url || '',
             verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
-            location: p.location || ''
+            location: p.location || '',
+            email: p.email || ''
           }));
-          setRemoteUsers(mapped);
+
+          setRemoteUsers(prev => {
+            const combined = [...mapped];
+            (prev || []).forEach(existing => {
+              if (!combined.some(u => u.id === existing.id)) {
+                combined.push(existing);
+              }
+            });
+            return combined;
+          });
         }
       } catch (e) {
         console.warn('Live profile search note:', e?.message || e);
       } finally {
         setIsSearchingRemote(false);
       }
-    }, 300);
+    }, 250);
 
     return () => clearTimeout(timer);
   }, [searchQuery, isOpen]);
 
-  if (!isOpen) return null;
-
   const safeLocalUsers = Array.isArray(users) ? users : [];
-  const combinedUsers = [...safeLocalUsers];
-  remoteUsers.forEach(ru => {
-    if (!combinedUsers.some(u => u.id === ru.id)) {
-      combinedUsers.push(ru);
-    }
-  });
+  const combinedUsers = useMemo(() => {
+    const list = [...safeLocalUsers];
+    remoteUsers.forEach(ru => {
+      if (!list.some(u => u.id === ru.id)) {
+        list.push(ru);
+      }
+    });
+    return list;
+  }, [safeLocalUsers, remoteUsers]);
 
-  const filteredUsers = combinedUsers.filter((u) => {
-    if (!u) return false;
+  const filteredUsers = useMemo(() => {
+    const normQuery = normalizeStr(searchQuery);
 
-    // Exclude current logged-in user from member search results
-    if (currentUser) {
-      if (u.id && currentUser.id && u.id === currentUser.id) return false;
-      if (u.email && currentUser.email && String(u.email).toLowerCase() === String(currentUser.email).toLowerCase()) return false;
-    }
+    return combinedUsers.filter((u) => {
+      if (!u) return false;
 
-    const name = String(u.name || u.userName || '');
-    const role = String(u.role || u.userRole || '');
-    const location = String(u.location || '');
+      // Exclude current logged-in user from search results
+      if (currentUser) {
+        if (u.id && currentUser.id && String(u.id) === String(currentUser.id)) return false;
+        if (u.email && currentUser.email && String(u.email).toLowerCase() === String(currentUser.email).toLowerCase()) return false;
+      }
 
-    const matchesQuery =
-      name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      location.toLowerCase().includes(searchQuery.toLowerCase());
+      const name = normalizeStr(u.name || u.userName || u.full_name || '');
+      const role = normalizeStr(u.role || u.userRole || '');
+      const location = normalizeStr(u.location || '');
 
-    const matchesRole = filterRole === 'All' || String(role).toLowerCase().includes(String(filterRole).toLowerCase());
+      const matchesQuery = !normQuery ||
+        name.includes(normQuery) ||
+        role.includes(normQuery) ||
+        location.includes(normQuery);
 
-    return matchesQuery && matchesRole;
-  });
+      const matchesRole = filterRole === 'All' || role.includes(normalizeStr(filterRole));
+
+      return matchesQuery && matchesRole;
+    });
+  }, [combinedUsers, currentUser, searchQuery, filterRole]);
+
+  if (!isOpen) return null;
 
   const handleUserClick = (usr) => {
     soundEngine.playPopSound();
@@ -137,7 +206,7 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
         boxShadow: '0 25px 65px rgba(0,0,0,0.4)',
         overflow: 'hidden'
       }}>
-        {/* Sticky Non-collapsible Header */}
+        {/* Sticky Header */}
         <div style={{
           flexShrink: 0,
           padding: '14px 18px',
@@ -179,7 +248,7 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
           </button>
         </div>
 
-        {/* Live Search Input Input Area */}
+        {/* Live Search Input Area */}
         <div style={{ padding: '12px 18px 6px 18px' }}>
           <div style={{ position: 'relative' }}>
             <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#0066FF' }} />
@@ -201,7 +270,9 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
                 fontWeight: 600
               }}
             />
-            {searchQuery && (
+            {isSearchingRemote ? (
+              <Loader2 size={16} className="animate-spin" style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#0066FF' }} />
+            ) : searchQuery ? (
               <button
                 onClick={() => setSearchQuery('')}
                 style={{
@@ -217,7 +288,7 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
               >
                 <X size={16} />
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -270,133 +341,143 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
           gap: '10px'
         }}>
           {filteredUsers.length > 0 ? (
-            filteredUsers.map((usr) => (
-              <div
-                key={usr.id}
-                onClick={() => handleUserClick(usr)}
-                style={{
-                  background: isDarkMode ? '#1E293B' : '#F8FAFC',
-                  border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
-                  borderRadius: '18px',
-                  padding: '12px 14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {/* Avatar with Verified Badge & Online Status Dot */}
-                <div style={{ position: 'relative', flexShrink: 0 }}>
-                  <UserAvatar user={{ avatar: usr.avatar || usr.userAvatar, name: usr.name || usr.userName }} size={48} />
-                  
-                  {/* Realtime Status Dot (Green = Online, Grey = Offline) */}
-                  <span
-                    title={isOnline ? t('online_status') : t('offline_status')}
-                    style={{
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      width: '12px',
-                      height: '12px',
-                      borderRadius: '50%',
-                      background: isOnline ? '#10B981' : '#94A3B8',
-                      border: `2px solid ${isDarkMode ? '#0F172A' : '#FFFFFF'}`,
-                      boxShadow: isOnline ? '0 0 6px rgba(16, 185, 129, 0.6)' : 'none',
-                      transition: 'all 0.25s ease',
-                      zIndex: 2
-                    }}
-                  />
+            filteredUsers.map((usr) => {
+              const isOnline = Boolean(
+                onlineUserIds && (
+                  typeof onlineUserIds.has === 'function'
+                    ? onlineUserIds.has(String(usr.id))
+                    : (Array.isArray(onlineUserIds) ? onlineUserIds.includes(String(usr.id)) : false)
+                )
+              );
 
-                  {usr.verified && (
-                    <span style={{
-                      position: 'absolute',
-                      bottom: '0',
-                      right: '0',
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '50%',
-                      background: '#0066FF',
-                      color: '#FFF',
-                      fontSize: '9px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      border: '1.5px solid #FFF',
-                      zIndex: 2
-                    }}>
-                      <Check size={10} strokeWidth={3} />
-                    </span>
-                  )}
+              return (
+                <div
+                  key={usr.id}
+                  onClick={() => handleUserClick(usr)}
+                  style={{
+                    background: isDarkMode ? '#1E293B' : '#F8FAFC',
+                    border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
+                    borderRadius: '18px',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {/* Avatar with Verified Badge & Online Status Dot */}
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <UserAvatar user={{ avatar: usr.avatar || usr.userAvatar, name: usr.name || usr.userName }} size={48} />
+                    
+                    {/* Realtime Status Dot (Green = Online, Grey = Offline) */}
+                    <span
+                      title={isOnline ? t('online_status') : t('offline_status')}
+                      style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        background: isOnline ? '#10B981' : '#94A3B8',
+                        border: `2px solid ${isDarkMode ? '#0F172A' : '#FFFFFF'}`,
+                        boxShadow: isOnline ? '0 0 6px rgba(16, 185, 129, 0.6)' : 'none',
+                        transition: 'all 0.25s ease',
+                        zIndex: 2
+                      }}
+                    />
+
+                    {usr.verified && (
+                      <span style={{
+                        position: 'absolute',
+                        bottom: '0',
+                        right: '0',
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        background: '#0066FF',
+                        color: '#FFF',
+                        fontSize: '9px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: '1.5px solid #FFF',
+                        zIndex: 2
+                      }}>
+                        <Check size={10} strokeWidth={3} />
+                      </span>
+                    )}
+                  </div>
+
+                  {/* User Information */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h4 style={{ fontSize: '0.92rem', fontWeight: 800, color: isDarkMode ? '#F8FAFC' : '#0F172A', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {usr.name || usr.userName}
+                    </h4>
+                    <p style={{ fontSize: '0.78rem', color: '#0066FF', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Music size={12} /> {usr.role || usr.userRole}
+                    </p>
+                    {usr.location && (
+                      <span style={{ fontSize: '0.72rem', color: isDarkMode ? '#94A3B8' : '#64748B', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
+                        <MapPin size={11} /> {usr.location}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        soundEngine.playPopSound();
+                        setFollowedUsers(prev => ({ ...prev, [usr.id]: !prev[usr.id] }));
+                        if (!followedUsers[usr.id] && onConnectUser) {
+                          onConnectUser(usr.id);
+                        }
+                      }}
+                      title={followedUsers[usr.id] ? t('unfollow') : t('follow')}
+                      style={{
+                        background: followedUsers[usr.id] ? '#ECFDF5' : '#F1F5F9',
+                        color: followedUsers[usr.id] ? '#047857' : '#0F172A',
+                        border: followedUsers[usr.id] ? '1px solid #A7F3D0' : '1px solid #CBD5E1',
+                        borderRadius: '20px',
+                        padding: '8px 12px',
+                        fontSize: '0.76rem',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {followedUsers[usr.id] ? <><UserCheck size={14} color="#047857" /> {language === 'en' ? 'Following' : 'Suivi'}</> : <><UserPlus size={14} color="#0F172A" /> {language === 'en' ? 'Follow' : 'Suivre'}</>}
+                    </button>
+
+                    <button
+                      onClick={(e) => handleStartChatClick(e, usr)}
+                      title={language === 'en' ? 'Start chat' : 'Démarrer une discussion'}
+                      style={{
+                        background: '#0066FF',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        borderRadius: '20px',
+                        padding: '8px 14px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 10px rgba(0, 102, 255, 0.25)'
+                      }}
+                    >
+                      <MessageSquare size={14} /> {language === 'en' ? 'Chat' : 'Discuter'}
+                    </button>
+                  </div>
                 </div>
-
-                {/* User Information */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h4 style={{ fontSize: '0.92rem', fontWeight: 800, color: isDarkMode ? '#F8FAFC' : '#0F172A', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {usr.name || usr.userName}
-                  </h4>
-                  <p style={{ fontSize: '0.78rem', color: '#0066FF', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Music size={12} /> {usr.role || usr.userRole}
-                  </p>
-                  {usr.location && (
-                    <span style={{ fontSize: '0.72rem', color: isDarkMode ? '#94A3B8' : '#64748B', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
-                      <MapPin size={11} /> {usr.location}
-                    </span>
-                  )}
-                </div>
-
-                {/* Action Buttons */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      soundEngine.playPopSound();
-                      setFollowedUsers(prev => ({ ...prev, [usr.id]: !prev[usr.id] }));
-                      if (!followedUsers[usr.id] && onConnectUser) {
-                        onConnectUser(usr.id);
-                      }
-                    }}
-                    title={followedUsers[usr.id] ? t('unfollow') : t('follow')}
-                    style={{
-                      background: followedUsers[usr.id] ? '#ECFDF5' : '#F1F5F9',
-                      color: followedUsers[usr.id] ? '#047857' : '#0F172A',
-                      border: followedUsers[usr.id] ? '1px solid #A7F3D0' : '1px solid #CBD5E1',
-                      borderRadius: '20px',
-                      padding: '8px 12px',
-                      fontSize: '0.76rem',
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {followedUsers[usr.id] ? <><UserCheck size={14} color="#047857" /> {t('unfollow')}</> : <><UserPlus size={14} color="#0F172A" /> {t('follow')}</>}
-                  </button>
-
-                  <button
-                    onClick={(e) => handleStartChatClick(e, usr)}
-                    title={language === 'en' ? 'Start chat' : 'Démarrer une discussion'}
-                    style={{
-                      background: '#0066FF',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      borderRadius: '20px',
-                      padding: '8px 14px',
-                      fontSize: '0.78rem',
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 10px rgba(0, 102, 255, 0.25)'
-                    }}
-                  >
-                    <MessageSquare size={14} /> {language === 'en' ? 'Chat' : 'Discuter'}
-                  </button>
-                </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <div style={{
               textAlign: 'center',
@@ -405,7 +486,11 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
               fontSize: '0.85rem'
             }}>
               <User size={36} color="#CBD5E1" style={{ marginBottom: '8px' }} />
-              <p style={{ margin: 0, fontWeight: 600 }}>{language === 'en' ? `No users match your search "${searchQuery}".` : `Aucun utilisateur ne correspond à votre recherche "${searchQuery}".`}</p>
+              <p style={{ margin: 0, fontWeight: 600 }}>
+                {searchQuery
+                  ? (language === 'en' ? `No users match "${searchQuery}".` : `Aucun utilisateur ne correspond à "${searchQuery}".`)
+                  : (language === 'en' ? 'No members found.' : 'Aucun membre trouvé.')}
+              </p>
             </div>
           )}
         </div>

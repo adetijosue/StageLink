@@ -15,8 +15,7 @@ import {
   Award, 
   RefreshCw, 
   Flame, 
-  ExternalLink,
-  Bookmark
+  ExternalLink
 } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 import { soundEngine } from '../../services/audioService';
@@ -50,6 +49,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
       const saved = localStorage.getItem('stagelink_applied_matches');
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
+      console.warn("Storage read error (applied matches):", e);
       return [];
     }
   });
@@ -60,6 +60,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
       const saved = localStorage.getItem('stagelink_favorite_artists');
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
+      console.warn("Storage read error (favorite artists):", e);
       return [];
     }
   });
@@ -109,14 +110,18 @@ const SwipeMatching = React.memo(function SwipeMatching({
   useEffect(() => {
     try {
       localStorage.setItem('stagelink_applied_matches', JSON.stringify(matchedIds));
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Storage write error (applied matches):", e);
+    }
   }, [matchedIds]);
 
   // Save favorite IDs to localStorage
   useEffect(() => {
     try {
       localStorage.setItem('stagelink_favorite_artists', JSON.stringify(favoriteIds));
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Storage write error (favorite artists):", e);
+    }
   }, [favoriteIds]);
 
   // Confetti trigger
@@ -127,7 +132,9 @@ const SwipeMatching = React.memo(function SwipeMatching({
         spread: 75,
         origin: { y: 0.6 }
       });
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Error triggering confetti:", e);
+    }
   };
 
   // Perform Match, Cancel, or Favorite Action

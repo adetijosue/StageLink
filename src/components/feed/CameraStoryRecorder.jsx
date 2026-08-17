@@ -85,6 +85,7 @@ export default function CameraStoryRecorder({ isOpen, onClose, onStoryCreated, r
     return () => {
       stopCamera();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, creationMode, capturedImage, facingMode]);
 
   const startCameraFeed = async () => {
@@ -103,6 +104,7 @@ export default function CameraStoryRecorder({ isOpen, onClose, onStoryCreated, r
           videoRef.current.srcObject = stream;
         }
       } catch (err1) {
+        console.warn('Camera facingMode error:', err1.message);
         try {
           // Attempt 2: Generic video stream fallback
           const streamFallback = await navigator.mediaDevices.getUserMedia({

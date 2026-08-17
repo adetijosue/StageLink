@@ -24,11 +24,35 @@ const INITIAL_POSTS = [];
 const INITIAL_SWIPE_MATCHES = [];
 const INITIAL_CHATS = [];
 
-// Local Storage Helper Functions with Quota Protection
+// Helper to detect test/dummy artifacts
+export const isTestArtifact = (item) => {
+  if (!item) return true;
+  const content = String(item.text || item.content || item.caption || '').toLowerCase().trim();
+  if (
+    content.includes('test post') ||
+    content.includes('test realtime') ||
+    content.includes('realtime') ||
+    content.includes('real time') ||
+    content.includes('publication test') ||
+    content.includes('essai realtime') ||
+    content.includes('post test') ||
+    content === 'test'
+  ) {
+    return true;
+  }
+  return false;
+};
+
+// Local Storage Helper Functions with Quota Protection and Auto Test Purging
 export const getStoredItem = (key, fallback) => {
   try {
     const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : fallback;
+    if (!data) return fallback;
+    const parsed = JSON.parse(data);
+    if (Array.isArray(parsed) && (key === STORAGE_KEYS.POSTS || key === STORAGE_KEYS.STORIES)) {
+      return parsed.filter(item => !isTestArtifact(item));
+    }
+    return parsed;
   } catch (e) {
     console.warn(`Reading ${key} fallback:`, e.message);
     return fallback;
@@ -37,18 +61,24 @@ export const getStoredItem = (key, fallback) => {
 
 export const setStoredItem = (key, value) => {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    const sanitized = Array.isArray(value) && (key === STORAGE_KEYS.POSTS || key === STORAGE_KEYS.STORIES)
+      ? value.filter(item => !isTestArtifact(item))
+      : value;
+    localStorage.setItem(key, JSON.stringify(sanitized));
   } catch (e) {
     console.warn(`Storage Quota note for ${key}:`, e.message);
     // Prune large Data URL media if storage quota is reached
     try {
       if (Array.isArray(value)) {
-        const pruned = value.map(item => {
-          if (item.video && item.video.startsWith('data:')) {
+        const pruned = value.filter(item => !isTestArtifact(item)).map(item => {
+          if (item.video && typeof item.video === 'string' && item.video.startsWith('data:')) {
             return { ...item, video: null };
           }
-          if (item.image && item.image.startsWith('data:')) {
+          if (item.image && typeof item.image === 'string' && item.image.startsWith('data:')) {
             return { ...item, image: null };
+          }
+          if (item.mediaUrl && typeof item.mediaUrl === 'string' && item.mediaUrl.startsWith('data:')) {
+            return { ...item, mediaUrl: '' };
           }
           return item;
         });
@@ -99,6 +129,25 @@ export const initializeStorage = () => {
       if (Array.isArray(parsed)) {
         const authenticMatches = parsed.filter(m => m && m.id && (String(m.id).startsWith('match_') || m.userId));
         localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(authenticMatches));
+      }
+    }
+  } catch (e) {}
+
+  try {
+    const rawPosts = localStorage.getItem(STORAGE_KEYS.POSTS);
+    if (rawPosts) {
+      const parsed = JSON.parse(rawPosts);
+      if (Array.isArray(parsed)) {
+        const clean = parsed.filter(item => !isTestArtifact(item));
+        localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(clean));
+      }
+    }
+    const rawStories = localStorage.getItem(STORAGE_KEYS.STORIES);
+    if (rawStories) {
+      const parsed = JSON.parse(rawStories);
+      if (Array.isArray(parsed)) {
+        const clean = parsed.filter(item => !isTestArtifact(item));
+        localStorage.setItem(STORAGE_KEYS.STORIES, JSON.stringify(clean));
       }
     }
   } catch (e) {}

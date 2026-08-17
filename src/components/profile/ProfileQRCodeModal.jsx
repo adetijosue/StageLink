@@ -359,6 +359,8 @@ export default function ProfileQRCodeModal({ isOpen, onClose, user, isDarkMode }
               <img 
                 src={userAvatar} 
                 alt={userName}
+                loading="lazy"
+                decoding="async"
                 onError={() => setImageLoadError(true)}
                 style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #0066FF' }} 
               />
@@ -407,6 +409,8 @@ export default function ProfileQRCodeModal({ isOpen, onClose, user, isDarkMode }
             <img 
               src={qrApiUrl} 
               alt={`QR Code ${userName}`} 
+              loading="lazy"
+              decoding="async"
               style={{ width: '220px', height: '220px', borderRadius: '14px', display: 'block' }} 
             />
 
@@ -433,6 +437,8 @@ export default function ProfileQRCodeModal({ isOpen, onClose, user, isDarkMode }
                 <img 
                   src={userAvatar} 
                   alt={userName} 
+                  loading="lazy"
+                  decoding="async"
                   onError={() => setImageLoadError(true)}
                   style={{
                     width: '100%',

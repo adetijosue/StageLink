@@ -43,27 +43,25 @@ export function AuthProvider({ children }) {
         }
         if (session?.user && (!currentUser || currentUser.id !== session.user.id)) {
           supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle().then(({ data: profile }) => {
-            if (profile) {
-              const u = {
-                id: profile.id,
-                email: profile.email || session.user.email,
-                name: profile.full_name || session.user.user_metadata?.full_name || 'Artiste StageLink',
-                role: profile.role || session.user.user_metadata?.role || 'Artiste',
-                gender: profile.gender || 'male',
-                avatar: profile.avatar_url || '',
-                coverPhoto: profile.cover_url || '',
-                bio: profile.bio || '',
-                location: profile.location || '',
-                verified: profile.verified_badge === 'gold' || profile.verified_badge === 'blue',
-                badgeType: profile.verified_badge || 'none',
-                company: profile.company || '',
-                instruments: profile.instruments || [],
-                genres: profile.genres || [],
-                gear: profile.gear || []
-              };
-              setCurrentUser(u);
-              setStoredItem(STORAGE_KEYS.CURRENT_USER, u);
-            }
+            const u = {
+              id: session.user.id,
+              email: profile?.email || session.user.email,
+              name: profile?.full_name || session.user.user_metadata?.full_name || 'Artiste StageLink',
+              role: profile?.role || session.user.user_metadata?.role || 'Beatmaker / Compositeur',
+              gender: profile?.gender || session.user.user_metadata?.gender || 'male',
+              avatar: profile?.avatar_url || '',
+              coverPhoto: profile?.cover_url || '',
+              bio: profile?.bio || `Membre ${profile?.role || 'Artiste'} sur StageLink`,
+              location: profile?.location || '',
+              verified: profile?.verified_badge === 'gold' || profile?.verified_badge === 'blue',
+              badgeType: profile?.verified_badge || 'none',
+              company: profile?.company || '',
+              instruments: Array.isArray(profile?.instruments) ? profile.instruments : [],
+              genres: Array.isArray(profile?.genres) ? profile.genres : [],
+              gear: Array.isArray(profile?.gear) ? profile.gear : []
+            };
+            setCurrentUser(u);
+            setStoredItem(STORAGE_KEYS.CURRENT_USER, u);
           });
         }
       });

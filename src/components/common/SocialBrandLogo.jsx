@@ -196,16 +196,24 @@ export default function SocialBrandLogo({ type, url, showName = true }) {
 
   const handleClick = (e) => {
     e.preventDefault();
-    if (url) {
-      const fullUrl = url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
+    if (url && typeof url === 'string') {
+      const trimmed = url.trim();
+      if (trimmed.startsWith('javascript:') || trimmed.startsWith('data:')) return;
+      const fullUrl = trimmed.startsWith('http://') || trimmed.startsWith('https://') ? trimmed : `https://${trimmed}`;
       window.open(fullUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
+  const safeHref = url && typeof url === 'string' && !url.trim().startsWith('javascript:') && !url.trim().startsWith('data:')
+    ? (url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`)
+    : '#';
+
   return (
     <a
-      href={url}
+      href={safeHref}
       onClick={handleClick}
+      target="_blank"
+      rel="noopener noreferrer"
       title={`Ouvrir la page ${config.name}`}
       style={{
         display: 'inline-flex',

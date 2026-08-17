@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import InboxView from './components/messaging/instagram/InboxView';
-import MessageThread from './components/messaging/instagram/MessageThread';
+const InboxView = React.lazy(() => import('./components/messaging/instagram/InboxView'));
+const MessageThread = React.lazy(() => import('./components/messaging/instagram/MessageThread'));
 import { directChatService } from './services/directChatService';
 
 import { Plus, Volume2, User } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import AuthScreen from './components/auth/AuthScreen';
-import TopBar from './components/navigation/TopBar';
+const TopBar = React.lazy(() => import('./components/navigation/TopBar'));
 const GlobalUserSearchModal = React.lazy(() => import('./components/navigation/GlobalUserSearchModal'));
-import BottomNav from './components/navigation/BottomNav';
+const BottomNav = React.lazy(() => import('./components/navigation/BottomNav'));
 import UserAvatar from './components/common/UserAvatar';
 import StoryBar from './components/feed/StoryBar';
 const StoryViewer = React.lazy(() => import('./components/feed/StoryViewer'));
@@ -23,8 +23,8 @@ const PublicProfileModal = React.lazy(() => import('./components/profile/PublicP
 const SwipeMatching = React.lazy(() => import('./components/matching/SwipeMatching'));
 const ChatList = React.lazy(() => import('./components/messaging/ChatList'));
 const ChatRoom = React.lazy(() => import('./components/messaging/ChatRoom'));
-import EphemeralModal from './components/messaging/EphemeralModal';
-import VideoCallScreen from './components/messaging/VideoCallScreen';
+const EphemeralModal = React.lazy(() => import('./components/messaging/EphemeralModal'));
+const VideoCallScreen = React.lazy(() => import('./components/messaging/VideoCallScreen'));
 const NewChatModal = React.lazy(() => import('./components/messaging/NewChatModal'));
 const CallHistoryModal = React.lazy(() => import('./components/messaging/CallHistoryModal'));
 const ProServicesView = React.lazy(() => import('./components/services/ProServicesView'));
@@ -34,13 +34,13 @@ const CourseDetailsModal = React.lazy(() => import('./components/services/Course
 const EventTicketModal = React.lazy(() => import('./components/services/EventTicketModal'));
 const ProfileView = React.lazy(() => import('./components/premium/ProfileView'));
 const PaywallModal = React.lazy(() => import('./components/premium/PaywallModal'));
-import NotificationsDrawer from './components/notifications/NotificationsDrawer';
-import TopNotificationBanner from './components/notifications/TopNotificationBanner';
+const NotificationsDrawer = React.lazy(() => import('./components/notifications/NotificationsDrawer'));
+const TopNotificationBanner = React.lazy(() => import('./components/notifications/TopNotificationBanner'));
 import AppSplashScreen from './components/common/AppSplashScreen';
-import GlobalAudioPlayer from './components/audio/GlobalAudioPlayer';
+const GlobalAudioPlayer = React.lazy(() => import('./components/audio/GlobalAudioPlayer'));
 import PWAInstallPrompt from './components/common/PWAInstallPrompt';
 import PullToRefresh from './components/common/PullToRefresh';
-import { getStoredItem, setStoredItem, STORAGE_KEYS } from './services/mockData';
+import { getStoredItem, setStoredItem, STORAGE_KEYS, isTestArtifact } from './services/mockData';
 import { soundEngine } from './services/audioService';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { useGlobalPresence } from './hooks/useGlobalPresence';
@@ -601,7 +601,7 @@ function MainApp() {
 
       const loadInitialData = async () => {
         // Check cache version to force clean old formats
-        const CACHE_VERSION = 'v5'; // Bumped to force complete reset and purge deleted stories
+        const CACHE_VERSION = 'v10'; // Bumped to force complete purge and guarantee clean virgin production state
         const storedVersion = localStorage.getItem('stagelink_cache_version');
         if (storedVersion !== CACHE_VERSION) {
           localStorage.removeItem(STORAGE_KEYS.CHATS);
@@ -612,11 +612,18 @@ function MainApp() {
           localStorage.setItem('stagelink_cache_version', CACHE_VERSION);
         }
 
-        let loadedPosts = getStoredItem(STORAGE_KEYS.POSTS, []);
-        let loadedStories = getStoredItem(STORAGE_KEYS.STORIES, []);
+        let loadedPosts = getStoredItem(STORAGE_KEYS.POSTS, []).filter(p => !isTestArtifact(p));
+        let loadedStories = getStoredItem(STORAGE_KEYS.STORIES, []).filter(s => !isTestArtifact(s));
         let loadedMatches = getStoredItem(STORAGE_KEYS.MATCHES, []);
         let loadedUsers = getStoredItem(STORAGE_KEYS.USERS, []);
         let loadedChats = getStoredItem(STORAGE_KEYS.CHATS, []);
+
+        // Optimistic UI: Render the app instantly from local cache while Supabase fetches in the background
+        setAllUsers(loadedUsers);
+        setPosts(loadedPosts);
+        setStories(loadedStories);
+        setMatches(loadedMatches);
+        setChats(loadedChats);
 
         if (isSupabaseConfigured()) {
           try {
@@ -674,7 +681,7 @@ function MainApp() {
               if (simpleRes.data) supaPosts = simpleRes.data;
             }
 
-            if (supaPosts && supaPosts.length > 0) {
+            if (Array.isArray(supaPosts)) {
               const userLookup = new Map((loadedUsers || []).map(u => [u.id, u]));
               loadedPosts = supaPosts.map(p => {
                 const authorProfile = userLookup.get(p.user_id) || p.profiles || {};
@@ -712,6 +719,7 @@ function MainApp() {
                   timeAgo: 'Récemment'
                 };
               });
+              setPosts(loadedPosts);
               setStoredItem(STORAGE_KEYS.POSTS, loadedPosts);
             }
 
@@ -788,6 +796,7 @@ function MainApp() {
                 return (now - storyTimestamp) < ONE_DAY_MS;
               });
               loadedStories = [...localUnsynced, ...mappedSupa];
+              setStories(loadedStories);
               setStoredItem(STORAGE_KEYS.STORIES, loadedStories);
             }
 
@@ -1083,7 +1092,7 @@ function MainApp() {
             if (simpleRes.data) supaPosts = simpleRes.data;
           }
 
-          if (supaPosts && supaPosts.length > 0) {
+          if (Array.isArray(supaPosts)) {
             const freshPosts = supaPosts.map(p => {
               const authorProfile = userLookup.get(p.user_id) || p.profiles || {};
               const isCurrentUser = p.user_id === currentUser?.id;
@@ -1093,6 +1102,16 @@ function MainApp() {
               const isVerified = isCurrentUser ? currentUser.verified : (authorProfile.verified || authorProfile.verified_badge === 'gold' || authorProfile.verified_badge === 'blue' || p.profiles?.verified_badge === 'gold');
               const badgeType = isCurrentUser ? currentUser.badgeType : (authorProfile.badgeType || authorProfile.verified_badge || p.profiles?.verified_badge || 'none');
 
+              let textContent = p.content || '';
+              let proServiceData = null;
+              if (textContent.includes('___PRO_SERVICE___:')) {
+                const parts = textContent.split('___PRO_SERVICE___:');
+                textContent = parts[0].trim();
+                try {
+                  proServiceData = JSON.parse(parts[1]);
+                } catch(e) {}
+              }
+
               return {
                 id: p.id,
                 userId: p.user_id,
@@ -1101,7 +1120,8 @@ function MainApp() {
                 userAvatar: authorAvatar,
                 isVerified: isVerified,
                 badgeType: badgeType,
-                text: p.content || '',
+                text: textContent,
+                proServiceData: proServiceData,
                 image: p.media_url || null,
                 hasAudio: Boolean(p.audio_url),
                 audioTitle: p.audio_title || 'Extrait Audio',
@@ -1119,8 +1139,9 @@ function MainApp() {
                 timeAgo: 'Récemment'
               };
             });
-            setPosts(freshPosts);
-            setStoredItem(STORAGE_KEYS.POSTS, freshPosts);
+            const sanitizedPosts = freshPosts.filter(p => !isTestArtifact(p));
+            setPosts(sanitizedPosts);
+            setStoredItem(STORAGE_KEYS.POSTS, sanitizedPosts);
           }
 
           // 3. Sync Live Stories with resilient fallback
@@ -1461,9 +1482,45 @@ function MainApp() {
 
           postsSub = supabase
             .channel('realtime:posts_interactions')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => syncPostsStoriesAndProfiles())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload) => {
+              if (payload.eventType === 'DELETE') {
+                const deletedId = payload.old?.id;
+                if (deletedId) {
+                  setPosts(prev => {
+                    const updated = (prev || []).filter(p => p.id !== deletedId);
+                    setStoredItem(STORAGE_KEYS.POSTS, updated);
+                    return updated;
+                  });
+                }
+              }
+              syncPostsStoriesAndProfiles().catch(() => {});
+            })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'post_likes' }, () => syncPostsStoriesAndProfiles())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'post_comments' }, () => syncPostsStoriesAndProfiles())
+            .on('broadcast', { event: 'new_post' }, (payload) => {
+              if (payload.payload && payload.payload.id) {
+                const incomingPost = payload.payload;
+                if (isTestArtifact(incomingPost)) return;
+                setPosts(prev => {
+                  if ((prev || []).some(p => p.id === incomingPost.id)) return prev;
+                  const updated = [incomingPost, ...(prev || [])];
+                  setStoredItem(STORAGE_KEYS.POSTS, updated);
+                  return updated;
+                });
+              }
+              syncPostsStoriesAndProfiles().catch(() => {});
+            })
+            .on('broadcast', { event: 'delete_post' }, (payload) => {
+              if (payload.payload && payload.payload.id) {
+                const deletedId = payload.payload.id;
+                setPosts(prev => {
+                  const updated = (prev || []).filter(p => p.id !== deletedId);
+                  setStoredItem(STORAGE_KEYS.POSTS, updated);
+                  return updated;
+                });
+              }
+              syncPostsStoriesAndProfiles().catch(() => {});
+            })
             .subscribe();
 
           storiesSub = supabase
@@ -2439,6 +2496,13 @@ function MainApp() {
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('posts').delete().eq('id', postId);
+        try {
+          supabase.channel('realtime:posts_interactions').send({
+            type: 'broadcast',
+            event: 'delete_post',
+            payload: { id: postId }
+          });
+        } catch (be) {}
       } catch (e) {
         console.warn('Supabase post deletion note:', e.message);
       }
@@ -2607,18 +2671,32 @@ function MainApp() {
       setPosts(updated);
       setStoredItem(STORAGE_KEYS.POSTS, updated);
 
+      let textContent = newPostData.text || '';
+      if (newPostData.proServiceData) {
+        textContent += `\n\n___PRO_SERVICE___:${JSON.stringify(newPostData.proServiceData)}`;
+      }
+
       // Save post directly to Supabase Database for all users
       if (isSupabaseConfigured()) {
         try {
-          await supabase.from('posts').insert({
+          const { error } = await supabase.from('posts').insert({
             id: postUuid,
             user_id: currentUser.id,
-            content: newPostData.text || '',
+            content: textContent,
             media_url: finalMediaUrl,
             audio_url: finalAudioUrl,
-            audio_title: newPostData.audioTitle || null,
-            metadata: newPostData.proServiceData ? { proServiceData: newPostData.proServiceData } : null
+            audio_title: newPostData.audioTitle || null
           });
+          if (error) console.error("Post insert error:", error);
+
+          // Broadcast instant realtime notification to other connected clients / devices
+          try {
+            supabase.channel('realtime:posts_interactions').send({
+              type: 'broadcast',
+              event: 'new_post',
+              payload: newPost
+            });
+          } catch (be) {}
         } catch (pe) {
           console.warn('Supabase post creation note:', pe?.message || pe);
         }
@@ -2668,15 +2746,16 @@ function MainApp() {
       const rawMedia = storyData.storyMedia || storyData.mediaUrl || storyData.media || null;
       let finalMediaUrl = rawMedia;
 
-      // Safe Media Upload with fast 4s timeout
+      // Handle media upload
       if (rawMedia && typeof rawMedia === 'string' && rawMedia.startsWith('data:')) {
         try {
+          // Increase timeout to 30 seconds for video uploads
           const uploadPromise = uploadChatMediaToSupabase(rawMedia, `story_${Date.now()}`);
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Upload timeout')), 4000));
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Le délai de téléchargement du fichier a expiré. Réessayez.')), 30000));
           finalMediaUrl = await Promise.race([uploadPromise, timeoutPromise]);
         } catch (uploadError) {
-          console.warn('Story upload media fallback to raw data:', uploadError?.message || uploadError);
-          finalMediaUrl = rawMedia;
+          console.error('Story media upload failed:', uploadError);
+          throw new Error("Impossible d'uploader le média. Vérifiez votre connexion.");
         }
       }
 
@@ -2714,75 +2793,72 @@ function MainApp() {
         time: 'À l\'instant'
       };
 
-      // Optimistic instant UI update
+      // Save story directly to Supabase Database for real-time sync with all users
+      if (isSupabaseConfigured() && currentUser?.id) {
+        // Ensure profile exists in profiles table so foreign key constraint is satisfied
+        try {
+          await supabase.from('profiles').upsert({
+            id: currentUser.id,
+            full_name: currentUser.name || 'Artiste StageLink',
+            avatar_url: currentUser.avatar || '',
+            role: currentUser.role || 'Artiste'
+          }, { onConflict: 'id' });
+        } catch (pe) {
+          console.warn('Profile upsert check note:', pe);
+        }
+
+        const storyPayload = {
+          id: storyUuid,
+          user_id: currentUser.id,
+          media_url: finalMediaUrl,
+          caption: storyData.caption || '',
+          privacy_type: privacyType,
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        };
+
+        let { error: insertErr } = await supabase.from('stories').insert(storyPayload);
+        
+        // Graceful fallback if the SQL migration (privacy_type column) hasn't been run yet
+        if (insertErr) {
+           console.warn('Initial story insert failed, trying legacy payload...', insertErr.message || insertErr);
+           delete storyPayload.privacy_type;
+           const fallback = await supabase.from('stories').insert(storyPayload);
+           if (fallback.error) {
+              console.error('Legacy story insert failed:', fallback.error);
+              throw new Error("Impossible de sauvegarder la story dans la base de données.");
+           }
+        }
+
+        if (storyData.audienceRules && storyData.audienceRules.length > 0 && privacyType !== 'all_contacts') {
+           const rulesToInsert = storyData.audienceRules.map(targetId => ({
+               story_id: storyUuid,
+               target_user_id: targetId
+           }));
+           const { error: rulesErr } = await supabase.from('story_audience_rules').insert(rulesToInsert);
+           if (rulesErr) console.warn('story_audience_rules note:', rulesErr.message);
+        }
+
+        // Broadcast instant realtime notification to other connected clients
+        try {
+          supabase.channel('realtime:stories_interactions').send({
+            type: 'broadcast',
+            event: 'new_story',
+            payload: newStory
+          });
+        } catch (be) {}
+
+        // Silent non-blocking background sync
+        syncPostsStoriesAndProfiles().catch(() => {});
+      } else {
+        throw new Error("Utilisateur non connecté ou configuration Supabase manquante.");
+      }
+
+      // Optimistic instant UI update ONLY if db insert succeeds
       setStories(prev => {
         const list = [newStory, ...(prev || []).filter(s => s.id !== storyUuid)];
         setStoredItem(STORAGE_KEYS.STORIES, list);
         return list;
       });
-
-      // Save story directly to Supabase Database for real-time sync with all users
-      if (isSupabaseConfigured() && currentUser?.id) {
-        try {
-          // Ensure profile exists in profiles table so foreign key constraint is satisfied
-          try {
-            await supabase.from('profiles').upsert({
-              id: currentUser.id,
-              full_name: currentUser.name || 'Artiste StageLink',
-              avatar_url: currentUser.avatar || '',
-              role: currentUser.role || 'Artiste'
-            }, { onConflict: 'id' });
-          } catch (pe) {
-            console.warn('Profile upsert check note:', pe);
-          }
-
-          const storyPayload = {
-            id: storyUuid,
-            user_id: currentUser.id,
-            media_url: finalMediaUrl,
-            caption: storyData.caption || '',
-            is_video: isVideo,
-            privacy_type: privacyType,
-            expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-          };
-
-          let { error: insertErr } = await supabase.from('stories').insert(storyPayload);
-          
-          // Graceful fallback if the SQL migration (privacy_type column) hasn't been run yet
-          if (insertErr) {
-             console.warn('Initial story insert failed, trying legacy payload...', insertErr.message || insertErr);
-             delete storyPayload.privacy_type;
-             const fallback = await supabase.from('stories').insert(storyPayload);
-             if (fallback.error) {
-                console.warn('Legacy story insert note:', fallback.error.message || fallback.error);
-             }
-          }
-
-          if (storyData.audienceRules && storyData.audienceRules.length > 0 && privacyType !== 'all_contacts') {
-             const rulesToInsert = storyData.audienceRules.map(targetId => ({
-                 story_id: storyUuid,
-                 target_user_id: targetId
-             }));
-             const { error: rulesErr } = await supabase.from('story_audience_rules').insert(rulesToInsert);
-             if (rulesErr) console.warn('story_audience_rules note:', rulesErr.message);
-          }
-
-          // Broadcast instant realtime notification to other connected clients
-          try {
-            supabase.channel('realtime:stories_interactions').send({
-              type: 'broadcast',
-              event: 'new_story',
-              payload: newStory
-            });
-          } catch (be) {}
-
-        } catch (se) {
-          console.warn('Supabase story creation note:', se?.message || se);
-        }
-
-        // Silent non-blocking background sync
-        syncPostsStoriesAndProfiles().catch(() => {});
-      }
 
       // Success Notification Toast
       setToastNotification({
@@ -2796,7 +2872,7 @@ function MainApp() {
       console.error('Critical error in handleCreateStory:', error);
       setToastNotification({
         title: 'Erreur de publication',
-        message: 'Impossible de publier la story. Veuillez réessayer.',
+        message: error.message || 'Impossible de publier la story. Veuillez réessayer.',
         avatar: null
       });
       setTimeout(() => setToastNotification(null), 5000);
@@ -3187,15 +3263,30 @@ function MainApp() {
   };
 
   const handleConnectUser = async (targetUserId) => {
-    if (!isSupabaseConfigured() || !currentUser?.id) return;
-    try {
-      await supabase.from('followers').insert({
-        follower_id: currentUser.id,
-        following_id: targetUserId
-      });
-    } catch (e) {
-      console.warn("Connection error", e);
+    if (!targetUserId || !currentUser?.id || String(targetUserId) === String(currentUser.id)) return;
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('followers').insert({
+          follower_id: currentUser.id,
+          following_id: targetUserId
+        });
+        await supabase.from('notifications').insert({
+          user_id: targetUserId,
+          actor_id: currentUser.id,
+          type: 'follow',
+          reference_id: currentUser.id
+        });
+      } catch (e) {
+        console.warn("Connection error note:", e?.message || e);
+      }
     }
+
+    setToastNotification({
+      title: 'Abonnement enregistré ! 🎵',
+      message: 'Vous suivez désormais cet artiste sur StageLink.',
+      avatar: currentUser?.avatar
+    });
+    setTimeout(() => setToastNotification(null), 4000);
   };
 
   const handleApplyMatch = async (matchCard) => {
@@ -3381,21 +3472,71 @@ function MainApp() {
                 {/* Fast Create Post Bar */}
                 <CreatePostBar onClickOpenModal={() => setIsCreatePostOpen(true)} />
 
-                {posts.map((post) => (
-                  <FeedCard
-                    key={post.id}
-                    post={post}
-                    onLike={handleLikePost}
-                    onFollowUser={handleFollowUser}
-                    onAddComment={handleAddComment}
-                    onDeletePost={handleDeletePost}
-                    onOpenShare={(p) => setSharePost(p)}
-                    onOpenReport={(p) => setReportPost(p)}
-                    onOpenPublicProfile={handleOpenPublicProfile}
-                    onOpenProServiceAction={handleOpenProServiceFromFeed}
-                    onStartChat={handleStartChatWithUser}
-                  />
-                ))}
+                {posts.filter(p => !isTestArtifact(p)).length > 0 ? (
+                  posts.filter(p => !isTestArtifact(p)).map((post) => (
+                    <FeedCard
+                      key={post.id}
+                      post={post}
+                      onLike={handleLikePost}
+                      onFollowUser={handleFollowUser}
+                      onAddComment={handleAddComment}
+                      onDeletePost={handleDeletePost}
+                      onOpenShare={(p) => setSharePost(p)}
+                      onOpenReport={(p) => setReportPost(p)}
+                      onOpenPublicProfile={handleOpenPublicProfile}
+                      onOpenProServiceAction={handleOpenProServiceFromFeed}
+                      onStartChat={handleStartChatWithUser}
+                    />
+                  ))
+                ) : (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '36px 20px',
+                    background: isDarkMode ? '#151D2A' : '#FFFFFF',
+                    borderRadius: '24px',
+                    border: isDarkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid #E2E8F0',
+                    marginTop: '12px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
+                  }}>
+                    <div style={{
+                      width: '60px',
+                      height: '60px',
+                      borderRadius: '50%',
+                      background: 'rgba(0, 102, 255, 0.1)',
+                      color: '#0066FF',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 14px auto'
+                    }}>
+                      <Music size={26} />
+                    </div>
+                    <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: '0 0 6px 0', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
+                      {language === 'en' ? 'Welcome to the Feed!' : 'Bienvenue sur le Feed !'}
+                    </h3>
+                    <p style={{ fontSize: '0.82rem', color: '#64748B', maxWidth: '300px', margin: '0 auto 16px auto', lineHeight: '1.4' }}>
+                      {language === 'en'
+                        ? 'No posts yet. Share your music, beats, and news with the community!'
+                        : 'Aucune publication pour le moment. Partagez vos morceaux, productions et actus avec la communauté !'}
+                    </p>
+                    <button
+                      onClick={() => setIsCreatePostOpen(true)}
+                      style={{
+                        background: '#0066FF',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        borderRadius: '20px',
+                        padding: '10px 20px',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 14px rgba(0, 102, 255, 0.3)'
+                      }}
+                    >
+                      {language === 'en' ? 'Create a Post' : 'Créer une publication'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </PullToRefresh>

@@ -1,24 +1,78 @@
-import React, { useState, useEffect } from 'react';
-import { X, Search, Check, MapPin, Music, MessageSquare } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Search, Check, MapPin, Music, MessageSquare, Loader2 } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
+
+const normalizeStr = (str) => {
+  return String(str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+};
 
 export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onSelectUser, existingUsers, users }) {
   const { currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('All');
   const [remoteUsers, setRemoteUsers] = useState([]);
+  const [isSearchingRemote, setIsSearchingRemote] = useState(false);
 
+  // Fetch initial profiles on modal open so all artists are immediately accessible
+  useEffect(() => {
+    if (!isOpen || !isSupabaseConfigured()) return;
+
+    let isMounted = true;
+    const fetchInitialProfiles = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (data && !error && isMounted) {
+          const mapped = data.map(p => ({
+            id: p.id,
+            name: p.full_name || p.username || 'Artiste',
+            userName: p.username || p.full_name || 'Artiste',
+            full_name: p.full_name || p.username || 'Artiste',
+            username: p.username || '',
+            role: p.role || 'Artiste',
+            userRole: p.role || 'Artiste',
+            avatar: p.avatar_url || '',
+            avatar_url: p.avatar_url || '',
+            userAvatar: p.avatar_url || '',
+            verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+            location: p.location || '',
+            email: p.email || ''
+          }));
+          setRemoteUsers(mapped);
+        }
+      } catch (e) {
+        console.warn('Initial profiles load note for chat modal:', e?.message || e);
+      }
+    };
+
+    fetchInitialProfiles();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen]);
+
+  // Live remote search when user types in searchQuery
   useEffect(() => {
     if (!isOpen || !isSupabaseConfigured() || !searchQuery.trim()) {
-      setRemoteUsers([]);
       return;
     }
 
     const timer = setTimeout(async () => {
+      setIsSearchingRemote(true);
       try {
-        const q = searchQuery.trim();
+        const q = searchQuery.trim().replace(/[,()"]/g, ' ');
+        if (!q) return;
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
@@ -38,28 +92,41 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
             avatar_url: p.avatar_url || '',
             userAvatar: p.avatar_url || '',
             verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
-            location: p.location || ''
+            location: p.location || '',
+            email: p.email || ''
           }));
-          setRemoteUsers(mapped);
+
+          setRemoteUsers(prev => {
+            const combined = [...mapped];
+            (prev || []).forEach(existing => {
+              if (!combined.some(u => u.id === existing.id)) {
+                combined.push(existing);
+              }
+            });
+            return combined;
+          });
         }
       } catch (e) {
         console.warn('Live chat user search note:', e?.message || e);
+      } finally {
+        setIsSearchingRemote(false);
       }
-    }, 300);
+    }, 250);
 
     return () => clearTimeout(timer);
   }, [searchQuery, isOpen]);
 
-  if (!isOpen) return null;
-
   const rawUsers = users || existingUsers || [];
   const safeUsers = Array.isArray(rawUsers) ? rawUsers : [];
-  const combinedUsers = [...safeUsers];
-  remoteUsers.forEach(ru => {
-    if (!combinedUsers.some(u => u.id === ru.id)) {
-      combinedUsers.push(ru);
-    }
-  });
+  const combinedUsers = useMemo(() => {
+    const list = [...safeUsers];
+    remoteUsers.forEach(ru => {
+      if (!list.some(u => u.id === ru.id)) {
+        list.push(ru);
+      }
+    });
+    return list;
+  }, [safeUsers, remoteUsers]);
 
   const handleSelectUser = (user) => {
     const fn = onSelectUser || onStartChatWithUser;
@@ -68,28 +135,34 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
   };
 
   // Search & Role filtering logic
-  const filteredUsers = combinedUsers.filter((user) => {
-    if (!user) return false;
+  const filteredUsers = useMemo(() => {
+    const normQuery = normalizeStr(searchQuery);
 
-    // Exclude current logged-in user from new chat contact list
-    if (currentUser) {
-      if (user.id && currentUser.id && user.id === currentUser.id) return false;
-      if (user.email && currentUser.email && String(user.email).toLowerCase() === String(currentUser.email).toLowerCase()) return false;
-    }
+    return combinedUsers.filter((user) => {
+      if (!user) return false;
 
-    const name = String(user.name || user.userName || '');
-    const role = String(user.role || user.userRole || '');
-    const location = String(user.location || '');
+      // Exclude current logged-in user from new chat contact list
+      if (currentUser) {
+        if (user.id && currentUser.id && String(user.id) === String(currentUser.id)) return false;
+        if (user.email && currentUser.email && String(user.email).toLowerCase() === String(currentUser.email).toLowerCase()) return false;
+      }
 
-    const matchesQuery =
-      name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      location.toLowerCase().includes(searchQuery.toLowerCase());
+      const name = normalizeStr(user.name || user.userName || user.full_name || '');
+      const role = normalizeStr(user.role || user.userRole || '');
+      const location = normalizeStr(user.location || '');
 
-    const matchesRole = filterRole === 'All' || String(role).includes(String(filterRole));
+      const matchesQuery = !normQuery ||
+        name.includes(normQuery) ||
+        role.includes(normQuery) ||
+        location.includes(normQuery);
 
-    return matchesQuery && matchesRole;
-  });
+      const matchesRole = filterRole === 'All' || role.includes(normalizeStr(filterRole));
+
+      return matchesQuery && matchesRole;
+    });
+  }, [combinedUsers, currentUser, searchQuery, filterRole]);
+
+  if (!isOpen) return null;
 
   return (
     <div style={{
@@ -117,7 +190,6 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
         flexDirection: 'column',
         boxShadow: '0 -12px 40px rgba(0,0,0,0.25)'
       }}>
-        {/* Modal Header */}
         {/* Sticky Modal Header */}
         <div style={{
           position: 'sticky',
@@ -171,7 +243,7 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               width: '100%',
-              padding: '12px 14px 12px 42px',
+              padding: '12px 38px 12px 42px',
               borderRadius: '16px',
               border: '1px solid #CBD5E1',
               fontSize: '0.88rem',
@@ -179,11 +251,30 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
               background: '#F8FAFC'
             }}
           />
+          {isSearchingRemote ? (
+            <Loader2 size={16} className="animate-spin" style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: '#0066FF' }} />
+          ) : searchQuery ? (
+            <button
+              onClick={() => setSearchQuery('')}
+              style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                color: '#94A3B8',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={16} />
+            </button>
+          ) : null}
         </div>
 
         {/* Quick Role Filters */}
         <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '10px', scrollbarWidth: 'none' }}>
-          {['All', 'Chanteur', 'Beatmaker', 'Directeur Artistique', 'Ingénieur du Son', 'Guitariste', 'Label'].map((role) => (
+          {['All', 'Chanteur', 'Beatmaker', 'Directeur Artistique', 'Ingénieur du Son', 'Guitariste', 'Label', 'Batteur', 'Producteur'].map((role) => (
             <button
               key={role}
               onClick={() => setFilterRole(role)}
@@ -285,7 +376,11 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
             ))
           ) : (
             <div style={{ textAlign: 'center', padding: '30px 10px', color: '#94A3B8' }}>
-              <p style={{ fontSize: '0.88rem' }}>Aucun utilisateur trouvé pour "{searchQuery}"</p>
+              <p style={{ fontSize: '0.88rem' }}>
+                {searchQuery
+                  ? `Aucun utilisateur trouvé pour "${searchQuery}"`
+                  : 'Aucun utilisateur disponible.'}
+              </p>
             </div>
           )}
         </div>

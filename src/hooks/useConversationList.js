@@ -10,6 +10,7 @@ export function useConversationList(currentUser) {
       const cached = localStorage.getItem(`stagelink_cached_conversations_${currentUser.id}`);
       return cached ? JSON.parse(cached) : [];
     } catch (e) {
+      console.warn("Storage read error (conversations):", e);
       return [];
     }
   });
@@ -20,6 +21,7 @@ export function useConversationList(currentUser) {
       const cached = localStorage.getItem(`stagelink_cached_notes_${currentUser.id}`);
       return cached ? JSON.parse(cached) : [];
     } catch (e) {
+      console.warn("Storage read error (notes):", e);
       return [];
     }
   });
@@ -33,11 +35,13 @@ export function useConversationList(currentUser) {
       const cached = localStorage.getItem(`stagelink_cached_conversations_${currentUser.id}`);
       return !cached || JSON.parse(cached).length === 0;
     } catch (e) {
+      console.warn("Storage read error (initial loading state):", e);
       return true;
     }
   });
 
   const isMountedRef = useRef(true);
+  const initialLoadRef = useRef(conversations.length > 0);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -101,7 +105,9 @@ export function useConversationList(currentUser) {
         setDirectNotes(notes);
         try {
           localStorage.setItem(`stagelink_cached_notes_${currentUser.id}`, JSON.stringify(notes));
-        } catch (e) {}
+        } catch (e) {
+          console.warn("Storage write error (notes):", e);
+        }
       }
 
       if (partErr) throw partErr;
@@ -171,7 +177,9 @@ export function useConversationList(currentUser) {
         setConversations(formatted);
         try {
           localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(formatted));
-        } catch (e) {}
+        } catch (e) {
+          console.warn("Storage write error (conversations):", e);
+        }
       }
     } catch (e) {
       console.warn('Load inbox data note:', e);
@@ -180,17 +188,35 @@ export function useConversationList(currentUser) {
         setIsLoading(false);
       }
     }
-  }, [currentUser?.id, conversations.length]);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     // Initial fetch (silent if we already have cached conversations for 0ms instant display)
-    loadInboxData(conversations.length > 0);
+    loadInboxData(initialLoadRef.current);
     
     const handleRefresh = () => loadInboxData(true);
     window.addEventListener('refresh_conversations', handleRefresh);
+    
+    const handleLocalUpdate = (e) => {
+      if (e.detail?.conversationId) {
+        setConversations(prev => {
+          const nextList = prev.map(c => {
+             if (c.id === e.detail.conversationId) {
+                 return { ...c, unreadCount: e.detail.unreadCount ?? c.unreadCount };
+             }
+             return c;
+          });
+          try { localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(nextList)); } catch(err) {}
+          return nextList;
+        });
+      }
+    };
+    window.addEventListener('update_conversation_local', handleLocalUpdate);
 
     if (!isSupabaseConfigured() || !currentUser?.id) {
-      return () => window.removeEventListener('refresh_conversations', handleRefresh);
+      window.removeEventListener('refresh_conversations', handleRefresh);
+      window.removeEventListener('update_conversation_local', handleLocalUpdate);
+      return;
     }
 
     // Real-time synchronization across all devices and background tabs
@@ -200,8 +226,49 @@ export function useConversationList(currentUser) {
         event: '*',
         schema: 'public',
         table: 'direct_messages'
-      }, () => {
-        loadInboxData(true);
+      }, (payload) => {
+        if (payload.eventType === 'INSERT' && payload.new) {
+          const newMsg = payload.new;
+          setConversations(prev => {
+            const convIdx = prev.findIndex(c => String(c.id) === String(newMsg.conversation_id));
+            if (convIdx === -1) {
+              // New conversation not in list, need to fetch
+              loadInboxData(true);
+              return prev;
+            }
+            
+            const updatedConv = { ...prev[convIdx] };
+            updatedConv.lastMessage = newMsg;
+            updatedConv.updatedAt = newMsg.created_at;
+            if (newMsg.sender_id !== currentUser.id) {
+              updatedConv.unreadCount = (updatedConv.unreadCount || 0) + 1;
+            }
+            
+            // Move to top
+            const nextList = [updatedConv, ...prev.slice(0, convIdx), ...prev.slice(convIdx + 1)];
+            
+            try {
+              localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(nextList));
+            } catch(e) {}
+            
+            return nextList;
+          });
+        } else if (payload.eventType === 'UPDATE' && payload.new) {
+          const updatedMsg = payload.new;
+          setConversations(prev => {
+            const convIdx = prev.findIndex(c => String(c.id) === String(updatedMsg.conversation_id));
+            if (convIdx === -1) return prev;
+            
+            const conv = prev[convIdx];
+            if (conv.lastMessage?.id === updatedMsg.id) {
+               const nextList = [...prev];
+               nextList[convIdx] = { ...conv, lastMessage: updatedMsg };
+               try { localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(nextList)); } catch(e) {}
+               return nextList;
+            }
+            return prev;
+          });
+        }
       })
       .on('postgres_changes', {
         event: '*',
@@ -222,6 +289,7 @@ export function useConversationList(currentUser) {
 
     return () => {
       window.removeEventListener('refresh_conversations', handleRefresh);
+      window.removeEventListener('update_conversation_local', handleLocalUpdate);
       supabase.removeChannel(channel);
     };
   }, [loadInboxData, currentUser?.id]);
@@ -252,7 +320,9 @@ export function useConversationList(currentUser) {
         ];
         try {
           localStorage.setItem(`stagelink_cached_notes_${currentUser.id}`, JSON.stringify(next));
-        } catch (e) {}
+        } catch (e) {
+          console.warn("Storage write error (post note):", e);
+        }
         return next;
       });
     }

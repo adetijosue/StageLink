@@ -134,6 +134,7 @@ export default function PublicProfileModal({
   }, [user]);
 
   const targetUserId = hydratedUser?.id || hydratedUser?.userId || user?.id || user?.userId;
+  const isSelf = currentUser?.id === targetUserId;
 
   // Check if current user is already following this artist
   useEffect(() => {
@@ -385,6 +386,8 @@ export default function PublicProfileModal({
                 <img 
                   src={userAvatarUrl} 
                   alt={userName} 
+                  loading="lazy"
+                  decoding="async"
                   style={{
                     width: '92px',
                     height: '92px',
@@ -524,7 +527,7 @@ export default function PublicProfileModal({
                   transition: 'all 0.2s ease'
                 }}
               >
-                {isFollowing ? <><UserCheck size={18} /> {language === 'en' ? 'Following' : 'Abonné'}</> : <><UserPlus size={18} /> {language === 'en' ? 'Follow' : "S'abonner"}</>}
+                {isFollowing ? <><UserCheck size={18} /> {language === 'en' ? 'Following' : 'Suivi'}</> : <><UserPlus size={18} /> {language === 'en' ? 'Follow' : 'Suivre'}</>}
               </button>
 
               <button 
@@ -583,11 +586,11 @@ export default function PublicProfileModal({
           {/* Social Links Row if present */}
           {(profile.spotifyUrl || profile.instagramUrl || profile.youtubeUrl || profile.tiktokUrl) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              {profile.spotifyUrl && (
+              {profile.spotifyUrl && !profile.spotifyUrl.startsWith('javascript:') && (
                 <a 
                   href={profile.spotifyUrl.startsWith('http') ? profile.spotifyUrl : `https://${profile.spotifyUrl}`} 
                   target="_blank" 
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -606,11 +609,11 @@ export default function PublicProfileModal({
                 </a>
               )}
 
-              {profile.instagramUrl && (
+              {profile.instagramUrl && !profile.instagramUrl.startsWith('javascript:') && (
                 <a 
                   href={profile.instagramUrl.startsWith('http') ? profile.instagramUrl : `https://${profile.instagramUrl}`} 
                   target="_blank" 
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -629,11 +632,11 @@ export default function PublicProfileModal({
                 </a>
               )}
 
-              {profile.youtubeUrl && (
+              {profile.youtubeUrl && !profile.youtubeUrl.startsWith('javascript:') && (
                 <a 
                   href={profile.youtubeUrl.startsWith('http') ? profile.youtubeUrl : `https://${profile.youtubeUrl}`} 
                   target="_blank" 
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -897,6 +900,8 @@ export default function PublicProfileModal({
               <img 
                 src={userAvatarUrl} 
                 alt={userName}
+                loading="lazy"
+                decoding="async"
                 style={{
                   maxWidth: '85vw',
                   maxHeight: '80vh',

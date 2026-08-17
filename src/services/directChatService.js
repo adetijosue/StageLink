@@ -356,7 +356,7 @@ export const directChatService = {
     } catch (_) {}
 
     // Dispatch UI refresh event immediately
-    window.dispatchEvent(new Event('refresh_conversations'));
+    window.dispatchEvent(new CustomEvent('update_conversation_local', { detail: { conversationId, unreadCount: 0 } }));
 
     if (!isSupabaseConfigured()) return;
     try {
@@ -397,7 +397,7 @@ export const directChatService = {
       } catch (be) {}
 
       // 5. SOLUTION RADICALE : Déclenche instantanément la mise à jour de l'icône de notification dans l'Inbox !
-      window.dispatchEvent(new Event('refresh_conversations'));
+      window.dispatchEvent(new CustomEvent('update_conversation_local', { detail: { conversationId, unreadCount: 0 } }));
     } catch (err) {
       console.error('Error marking as read:', err);
     }
