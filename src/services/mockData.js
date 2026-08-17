@@ -10,7 +10,11 @@ const STORAGE_KEYS = {
   STORIES: 'stagelink_stories',
   MATCHES: 'stagelink_matches',
   CHATS: 'stagelink_chats',
-  MUSIC_PROJECTS: 'stagelink_music_projects'
+  MUSIC_PROJECTS: 'stagelink_music_projects',
+  PRO_WORKS: 'stagelink_services_works',
+  PRO_SERVICES: 'stagelink_services_list',
+  PRO_COURSES: 'stagelink_services_courses',
+  PRO_EVENTS: 'stagelink_services_events'
 };
 
 // Clean Virgin Database Seeds for Real Production Users
@@ -58,6 +62,36 @@ export const setStoredItem = (key, value) => {
 
 // Initialize seed storage ONLY IF NOT ALREADY INITIALIZED (preserves user profile edits & custom avatar photos)
 export const initializeStorage = () => {
+  // 1. Permanently purge any legacy mock/fake items from previous versions
+  const serviceKeys = [
+    { key: STORAGE_KEYS.PRO_WORKS, prefix: 'work_' },
+    { key: STORAGE_KEYS.PRO_SERVICES, prefix: 'service_' },
+    { key: STORAGE_KEYS.PRO_COURSES, prefix: 'course_' },
+    { key: STORAGE_KEYS.PRO_EVENTS, prefix: 'event_' }
+  ];
+
+  serviceKeys.forEach(({ key, prefix }) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          // Keep only authentic items created by users with valid timestamps and generated UUID/prefixes
+          const authenticItems = parsed.filter(
+            item => item && item.id && String(item.id).startsWith(prefix) && item.createdAt
+          );
+          localStorage.setItem(key, JSON.stringify(authenticItems));
+        } else {
+          localStorage.setItem(key, JSON.stringify([]));
+        }
+      } else {
+        localStorage.setItem(key, JSON.stringify([]));
+      }
+    } catch (e) {
+      localStorage.setItem(key, JSON.stringify([]));
+    }
+  });
+
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
     setStoredItem(STORAGE_KEYS.USERS, INITIAL_USERS);
   }

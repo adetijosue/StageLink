@@ -22,42 +22,27 @@ export default function ProBusinessStudio({ onShareToFeed, onStartChat, onOpenPr
   const [searchQuery, setSearchQuery] = useState('');
   const [playingId, setPlayingId] = useState(null);
 
-  // Virgin initial state (no fake mock users or hardcoded fake services)
-  const [worksList, setWorksList] = useState(() => {
+  // Clean Virgin state: only retain authentic items created by real users
+  const sanitizeList = (key, prefix) => {
     try {
-      const saved = localStorage.getItem('stagelink_services_works');
-      return saved ? JSON.parse(saved) : [];
+      const saved = localStorage.getItem(key);
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+      // Eliminate any legacy mock items (like 'w1', 'w2', 's1', 'c1', 'e1')
+      const authentic = parsed.filter(
+        item => item && item.id && String(item.id).startsWith(prefix) && item.createdAt
+      );
+      return authentic;
     } catch {
       return [];
     }
-  });
+  };
 
-  const [servicesList, setServicesList] = useState(() => {
-    try {
-      const saved = localStorage.getItem('stagelink_services_list');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [coursesList, setCoursesList] = useState(() => {
-    try {
-      const saved = localStorage.getItem('stagelink_services_courses');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [eventsList, setEventsList] = useState(() => {
-    try {
-      const saved = localStorage.getItem('stagelink_services_events');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [worksList, setWorksList] = useState(() => sanitizeList('stagelink_services_works', 'work_'));
+  const [servicesList, setServicesList] = useState(() => sanitizeList('stagelink_services_list', 'service_'));
+  const [coursesList, setCoursesList] = useState(() => sanitizeList('stagelink_services_courses', 'course_'));
+  const [eventsList, setEventsList] = useState(() => sanitizeList('stagelink_services_events', 'event_'));
 
   // Save changes to localStorage
   useEffect(() => {
