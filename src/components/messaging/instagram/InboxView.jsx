@@ -186,134 +186,134 @@ const InboxView = React.memo(function InboxView({
             <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>{language === 'en' ? 'No conversations found' : 'Aucune discussion trouvée'}</p>
           </div>
         ) : (
-          conversations.map((conv) => (
-            <div
-              key={conv.id}
-              onClick={() => {
-                soundEngine.playPopSound();
-                onSelectConversation(conv);
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '12px',
-                borderRadius: '18px',
-                background: 'var(--card-bg)',
-                marginBottom: '8px',
-                cursor: 'pointer',
-                border: '1px solid var(--border-light)',
-                transition: 'transform 0.1s ease',
-                boxShadow: conv.unreadCount > 0 ? '0 4px 12px rgba(0, 102, 255, 0.08)' : 'none'
-              }}
-            >
-              {(() => {
-                const partnerId = conv.partner?.id || conv.participant?.id;
-                const isOnline = Boolean(partnerId && onlineUserIds.includes(String(partnerId)));
+          conversations.map((conv) => {
+            const partnerId = conv.partner?.id || conv.participant?.id || conv.participantId || conv.partnerId;
+            const isOnline = Boolean(partnerId && onlineUserIds.includes(String(partnerId)));
+            const lastMsg = conv.lastMessage;
+            const isMine = lastMsg?.sender_id === currentUser?.id;
 
-                return (
-                  <div
-                    onClick={(e) => {
-                      if (onOpenProfile && conv.participant) {
-                        e.stopPropagation();
-                        onOpenProfile(conv.participant);
-                      }
+            return (
+              <div
+                key={conv.id}
+                onClick={() => {
+                  soundEngine.playPopSound();
+                  onSelectConversation(conv);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px',
+                  borderRadius: '18px',
+                  background: 'var(--card-bg)',
+                  marginBottom: '8px',
+                  cursor: 'pointer',
+                  border: '1px solid var(--border-light)',
+                  transition: 'transform 0.1s ease',
+                  boxShadow: conv.unreadCount > 0 ? '0 4px 12px rgba(0, 102, 255, 0.08)' : 'none'
+                }}
+              >
+                <div
+                  onClick={(e) => {
+                    if (onOpenProfile && conv.participant) {
+                      e.stopPropagation();
+                      onOpenProfile(conv.participant);
+                    }
+                  }}
+                  style={{ position: 'relative', cursor: onOpenProfile && conv.participant ? 'pointer' : 'default', flexShrink: 0 }}
+                >
+                  <UserAvatar
+                    user={{
+                      avatar: conv.avatar,
+                      name: conv.title
                     }}
-                    style={{ position: 'relative', cursor: onOpenProfile && conv.participant ? 'pointer' : 'default', flexShrink: 0 }}
-                  >
-                    <UserAvatar
-                      user={{
-                        avatar: conv.avatar,
-                        name: conv.title
-                      }}
-                      size={50}
-                    />
-                    <span
-                      title={isOnline ? t('online_status') : t('offline_status')}
-                      style={{
-                        position: 'absolute',
-                        bottom: 2,
-                        right: 2,
-                        width: '13px',
-                        height: '13px',
-                        borderRadius: '50%',
-                        background: isOnline ? '#10B981' : '#94A3B8',
-                        border: '2.5px solid var(--card-bg, #FFFFFF)',
-                        boxShadow: isOnline ? '0 0 8px rgba(16, 185, 129, 0.45)' : 'none',
-                        transition: 'all 0.25s ease'
-                      }}
-                    />
-                  </div>
-                );
-              })()}
-
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <h4 style={{
-                    fontSize: '0.92rem',
-                    fontWeight: conv.unreadCount > 0 ? 800 : 700,
-                    color: 'var(--text-dark)',
-                    margin: 0,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {conv.title}
-                  </h4>
-                  {conv.lastMessage && (
-                    <span style={{ fontSize: '0.7rem', color: '#94A3B8', flexShrink: 0 }}>
-                      {new Date(conv.lastMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  )}
+                    size={50}
+                  />
+                  <span
+                    title={isOnline ? t('online_status') : t('offline_status')}
+                    style={{
+                      position: 'absolute',
+                      bottom: 2,
+                      right: 2,
+                      width: '13px',
+                      height: '13px',
+                      borderRadius: '50%',
+                      background: isOnline ? '#10B981' : '#94A3B8',
+                      border: '2.5px solid var(--card-bg, #FFFFFF)',
+                      boxShadow: isOnline ? '0 0 8px rgba(16, 185, 129, 0.45)' : 'none',
+                      transition: 'all 0.25s ease'
+                    }}
+                  />
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', gap: '8px' }}>
-                  <div style={{
-                    fontSize: '0.8rem',
-                    color: conv.unreadCount > 0 ? '#0066FF' : '#64748B',
-                    fontWeight: conv.unreadCount > 0 ? 700 : 400,
-                    margin: 0,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}>
-                    {conv.lastMessage ? (
-                      <>
-                        {conv.lastMessage.sender_id === currentUser?.id && (
-                          <MessageStatusTicks
-                            status={conv.lastMessage.status || (conv.lastMessage.read ? 'read' : 'sent')}
-                            isRead={conv.lastMessage.status === 'read' || conv.lastMessage.read === true}
-                            isRecipientOnline={partnerUser?.id ? onlineUserIds.includes(partnerUser.id) : false}
-                            size={13}
-                          />
-                        )}
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {conv.lastMessage.message_type === 'audio'
-                            ? (language === 'en' ? '🎙️ Voice note' : '🎙️ Note vocale')
-                            : conv.lastMessage.message_type === 'image'
-                            ? (language === 'en' ? '📷 Photo' : '📷 Photo')
-                            : (conv.lastMessage.content || (language === 'en' ? 'Message' : 'Message'))}
-                        </span>
-                      </>
-                    ) : (language === 'en' ? 'New conversation' : 'Nouvelle discussion')}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <h4 style={{
+                      fontSize: '0.92rem',
+                      fontWeight: conv.unreadCount > 0 ? 800 : 700,
+                      color: 'var(--text-dark)',
+                      margin: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {conv.title}
+                    </h4>
+                    {lastMsg && (
+                      <span style={{ fontSize: '0.7rem', color: '#94A3B8', flexShrink: 0 }}>
+                        {new Date(lastMsg.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
                   </div>
 
-                  {conv.unreadCount > 0 && (
-                    <span style={{
-                      width: '10px',
-                      height: '10px',
-                      borderRadius: '50%',
-                      background: '#0066FF',
-                      flexShrink: 0
-                    }} />
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', gap: '8px' }}>
+                    <div style={{
+                      fontSize: '0.8rem',
+                      color: conv.unreadCount > 0 ? '#0066FF' : '#64748B',
+                      fontWeight: conv.unreadCount > 0 ? 700 : 400,
+                      margin: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}>
+                      {lastMsg ? (
+                        <>
+                          {isMine && (
+                            <MessageStatusTicks
+                              status={lastMsg.status || (lastMsg.read ? 'read' : 'sent')}
+                              isRead={lastMsg.status === 'read' || lastMsg.read === true}
+                              isRecipientOnline={isOnline}
+                              size={13}
+                            />
+                          )}
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {lastMsg.message_type === 'audio'
+                              ? (language === 'en' ? '🎙️ Voice note' : '🎙️ Note vocale')
+                              : lastMsg.message_type === 'image'
+                              ? (language === 'en' ? '📷 Photo' : '📷 Photo')
+                              : (lastMsg.content || (language === 'en' ? 'Message' : 'Message'))}
+                          </span>
+                        </>
+                      ) : (language === 'en' ? 'New conversation' : 'Nouvelle discussion')}
+                    </div>
+
+                    {conv.unreadCount > 0 && (
+                      <span style={{
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '50%',
+                        background: '#0066FF',
+                        flexShrink: 0
+                      }} />
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

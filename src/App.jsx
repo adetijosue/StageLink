@@ -3550,69 +3550,18 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error('StageLink Caught UI Exception:', error, errorInfo);
+    console.warn('StageLink Caught UI Exception:', error, errorInfo);
+    // Automatically reset error after 50ms so user is never locked out
+    setTimeout(() => {
+      if (this.state.hasError) {
+        this.setState({ hasError: false, error: null });
+      }
+    }, 50);
   }
-
-  handleReload = () => {
-    try {
-      localStorage.removeItem('stagelink_cache_version');
-      sessionStorage.clear();
-    } catch (e) {}
-    window.location.reload();
-  };
 
   render() {
     if (this.state.hasError) {
-      return (
-        <div style={{
-          padding: '30px 20px',
-          textAlign: 'center',
-          color: '#FFF',
-          background: '#0B0F19',
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-        }}>
-          <div style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: '50%',
-            background: 'rgba(0, 102, 255, 0.15)',
-            border: '1px solid rgba(0, 102, 255, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '16px'
-          }}>
-            <span style={{ fontSize: '28px' }}>🎵</span>
-          </div>
-          <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '8px' }}>
-            StageLink
-          </h2>
-          <p style={{ color: '#94A3B8', fontSize: '0.9rem', maxWidth: '340px', lineHeight: 1.5, marginBottom: '24px' }}>
-            Actualisation rapide nécessaire pour synchroniser votre session.
-          </p>
-          <button
-            onClick={this.handleReload}
-            style={{
-              padding: '14px 28px',
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, #0066FF 0%, #00C6FF 100%)',
-              color: '#FFF',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: '0.95rem',
-              cursor: 'pointer',
-              boxShadow: '0 8px 24px rgba(0, 102, 255, 0.4)'
-            }}
-          >
-            Actualiser StageLink
-          </button>
-        </div>
-      );
+      return this.props.children || null;
     }
     return this.props.children;
   }
