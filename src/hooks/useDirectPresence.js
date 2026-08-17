@@ -1,9 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
+import { presenceService } from '../services/presenceService';
 
-export function useDirectPresence(conversationId, currentUser) {
+export function useDirectPresence(conversationId, currentUser, partnerId) {
   const [typingUsers, setTypingUsers] = useState(new Map());
-  const [isOnline, setIsOnline] = useState(false);
+  const [isConvOnline, setIsConvOnline] = useState(false);
+  const [isGlobalOnline, setIsGlobalOnline] = useState(() => {
+    return partnerId ? presenceService.isUserOnline(partnerId) : false;
+  });
+
   const typingTimeoutRef = useRef(null);
   const channelRef = useRef(null);
   const currentUserRef = useRef(currentUser);
@@ -11,8 +16,26 @@ export function useDirectPresence(conversationId, currentUser) {
 
   const currentUserId = currentUser?.id;
   const currentUserName = currentUser?.name || currentUser?.full_name;
-  const currentUserAvatar = currentUser?.avatar || currentUser?.avatar_url;
 
+  // 1. Subscribe to Global App Presence for partnerId
+  useEffect(() => {
+    if (!partnerId) {
+      setIsGlobalOnline(false);
+      return;
+    }
+
+    // Set initial state
+    setIsGlobalOnline(presenceService.isUserOnline(partnerId));
+
+    // Listen to global presence changes
+    const unsubscribe = presenceService.subscribe(() => {
+      setIsGlobalOnline(presenceService.isUserOnline(partnerId));
+    });
+
+    return unsubscribe;
+  }, [partnerId]);
+
+  // 2. Track Conversation-level channel for typing indicators
   useEffect(() => {
     if (!conversationId || !currentUserId || !isSupabaseConfigured()) return;
 
@@ -57,11 +80,15 @@ export function useDirectPresence(conversationId, currentUser) {
       }
     });
 
-    // Track online presence
+    // Track online presence in this specific thread
     channel.on('presence', { event: 'sync' }, () => {
       const presenceState = channel.presenceState();
-      const onlineIds = Object.keys(presenceState);
-      setIsOnline(onlineIds.length > 1);
+      const onlineKeys = Object.keys(presenceState);
+      if (partnerId) {
+        setIsConvOnline(onlineKeys.includes(String(partnerId)));
+      } else {
+        setIsConvOnline(onlineKeys.length > 1);
+      }
     });
 
     channel.subscribe(async (status) => {
@@ -79,7 +106,7 @@ export function useDirectPresence(conversationId, currentUser) {
         supabase.removeChannel(channelRef.current);
       }
     };
-  }, [conversationId, currentUserId, currentUserName]);
+  }, [conversationId, currentUserId, currentUserName, partnerId]);
 
   /**
    * Broadcast typing event (debounced)
@@ -124,6 +151,8 @@ export function useDirectPresence(conversationId, currentUser) {
     ? `${typingArray.map((u) => u.name?.split(' ')[0]).join(', ')} écrit...`
     : null;
 
+  const isOnline = isGlobalOnline || isConvOnline;
+
   return {
     typingUsers: typingArray,
     typingText,
@@ -131,3 +160,4 @@ export function useDirectPresence(conversationId, currentUser) {
     sendTypingEvent
   };
 }
+

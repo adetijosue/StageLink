@@ -38,6 +38,7 @@ import PullToRefresh from './components/common/PullToRefresh';
 import { getStoredItem, setStoredItem, STORAGE_KEYS } from './services/mockData';
 import { soundEngine } from './services/audioService';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
+import { useGlobalPresence } from './hooks/useGlobalPresence';
 
 const INITIAL_COMMUNITY_USERS = [];
 import { generateUUID } from './utils/uuid';
@@ -55,48 +56,47 @@ const dataURLtoFile = (dataurl, filename = 'media_upload') => {
     while (n--) {
       u8arr[n] = bstr.charCodeAt(n);
     }
-    const ext = mime.split('/')[1] || 'jpg';
-    return new File([u8arr], `${filename}.${ext}`, { type: mime });
+    return new File([u8arr], `${filename}.${mime.split('/')[1] || 'jpg'}`, { type: mime });
   } catch (e) {
+    console.error('DataURL conversion error:', e);
     return null;
   }
 };
 
-const uploadChatMediaToSupabase = async (dataUrl, fileName) => {
-  if (!dataUrl || !isSupabaseConfigured()) return dataUrl;
-  if (!dataUrl.startsWith('data:')) return dataUrl; // Already an HTTP URL
+// Safe wrapper for Supabase storage upload that falls back to compressed Base64 Data URL if bucket/RLS fails
+const safeUploadToStorage = async (bucketName, filePath, dataUrl) => {
+  if (!dataUrl) return '';
+  
+  // 1. Always compress the image client-side first
+  const optimizedDataUrl = await compressImage(dataUrl, { maxWidth: 1200, maxHeight: 1200, quality: 0.82 });
+  
+  if (!isSupabaseConfigured()) {
+    return optimizedDataUrl;
+  }
 
   try {
-    // 1. Client-side compression for images
-    let optimizedDataUrl = dataUrl;
-    if (dataUrl.startsWith('data:image')) {
-      optimizedDataUrl = await compressImage(dataUrl, 1080, 1920, 0.78);
-    }
-
-    const file = dataURLtoFile(optimizedDataUrl, fileName || `media_${Date.now()}`);
+    const file = dataURLtoFile(optimizedDataUrl);
     if (!file) return optimizedDataUrl;
 
-    const fileExt = (file.name && file.name.includes('.')) ? file.name.split('.').pop() : 'jpg';
-    const filePath = `chat_uploads/${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-
-    let bucketName = 'chat_media';
     let uploadedSuccessfully = false;
+    const { error: uploadError } = await supabase.storage.from(bucketName).upload(filePath, file, {
+      upsert: true,
+      contentType: file.type
+    });
 
-    // Try chat_media bucket
-    const { error: uploadErr } = await supabase.storage.from(bucketName).upload(filePath, file, { upsert: true });
-    if (!uploadErr) {
+    if (!uploadError) {
       uploadedSuccessfully = true;
     } else {
-      // Try media bucket
-      bucketName = 'media';
-      const { error: err2 } = await supabase.storage.from(bucketName).upload(filePath, file, { upsert: true });
-      if (!err2) {
+      console.warn(`Storage upload attempt 1 failed (${bucketName}):`, uploadError.message);
+      // Fallback: try fallback bucket 'posts' or 'stories' if targeted bucket is restricted
+      const fallbackBucket = bucketName === 'stories' ? 'posts' : 'stories';
+      const { error: retryError } = await supabase.storage.from(fallbackBucket).upload(filePath, file, {
+        upsert: true,
+        contentType: file.type
+      });
+      if (!retryError) {
         uploadedSuccessfully = true;
-      } else {
-        // Try public bucket
-        bucketName = 'public';
-        const { error: err3 } = await supabase.storage.from(bucketName).upload(filePath, file, { upsert: true });
-        if (!err3) uploadedSuccessfully = true;
+        bucketName = fallbackBucket;
       }
     }
 
@@ -116,10 +116,15 @@ const uploadChatMediaToSupabase = async (dataUrl, fileName) => {
   }
 };
 
+const uploadChatMediaToSupabase = async (dataUrl, fileName) => {
+  return safeUploadToStorage('chat_media', `uploads/${fileName || Date.now()}`, dataUrl);
+};
+
 
 function MainApp() {
   const { isAuthenticated, currentUser, updateUserProfile } = useAuth();
   const { t } = useLanguage();
+  useGlobalPresence(currentUser);
 
   // Theme & Global Audio States
   const [isDarkMode, setIsDarkMode] = useState(() => {

@@ -4,6 +4,7 @@ import UserAvatar from '../../common/UserAvatar';
 
 import { useConversationList } from '../../../hooks/useConversationList';
 import { soundEngine } from '../../../services/audioService';
+import { presenceService } from '../../../services/presenceService';
 
 const InboxView = React.memo(function InboxView({
   currentUser,
@@ -12,6 +13,15 @@ const InboxView = React.memo(function InboxView({
   onOpenCallHistoryModal,
   onOpenProfile
 }) {
+  const [onlineUserIds, setOnlineUserIds] = React.useState(() => presenceService.getOnlineUserIds());
+
+  React.useEffect(() => {
+    const unsubscribe = presenceService.subscribe((ids) => {
+      setOnlineUserIds(ids);
+    });
+    return unsubscribe;
+  }, []);
+
   const {
     conversations,
     directNotes,
@@ -188,23 +198,42 @@ const InboxView = React.memo(function InboxView({
                 boxShadow: conv.unreadCount > 0 ? '0 4px 12px rgba(0, 102, 255, 0.08)' : 'none'
               }}
             >
-              <div
-                onClick={(e) => {
-                  if (onOpenProfile && conv.participant) {
-                    e.stopPropagation();
-                    onOpenProfile(conv.participant);
-                  }
-                }}
-                style={{ cursor: onOpenProfile && conv.participant ? 'pointer' : 'default' }}
-              >
-                <UserAvatar
-                  user={{
-                    avatar: conv.avatar,
-                    name: conv.title
-                  }}
-                  size={50}
-                />
-              </div>
+              {(() => {
+                const partnerId = conv.partner?.id || conv.participant?.id;
+                const isOnline = Boolean(partnerId && onlineUserIds.includes(String(partnerId)));
+
+                return (
+                  <div
+                    onClick={(e) => {
+                      if (onOpenProfile && conv.participant) {
+                        e.stopPropagation();
+                        onOpenProfile(conv.participant);
+                      }
+                    }}
+                    style={{ position: 'relative', cursor: onOpenProfile && conv.participant ? 'pointer' : 'default', flexShrink: 0 }}
+                  >
+                    <UserAvatar
+                      user={{
+                        avatar: conv.avatar,
+                        name: conv.title
+                      }}
+                      size={50}
+                    />
+                    {isOnline && (
+                      <span style={{
+                        position: 'absolute',
+                        bottom: 2,
+                        right: 2,
+                        width: '13px',
+                        height: '13px',
+                        borderRadius: '50%',
+                        background: '#10B981',
+                        border: '2.5px solid var(--card-bg, #FFFFFF)'
+                      }} />
+                    )}
+                  </div>
+                );
+              })()}
 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

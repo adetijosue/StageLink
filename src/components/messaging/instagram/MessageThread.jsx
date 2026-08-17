@@ -103,6 +103,7 @@ export default function MessageThread({
   const partnerUsername = activePartner.username || '';
   const partnerAvatar = activePartner.avatar_url || activePartner.avatar || activePartner.userAvatar || '';
   const partnerRole = activePartner.role || activePartner.userRole || activePartner.metier || 'Artiste';
+  const partnerId = activePartner.id || activePartner.userId;
 
   const {
     messages,
@@ -115,7 +116,7 @@ export default function MessageThread({
     toggleVanishMode
   } = useChatThread({ conversationId, currentUser, partner: activePartner });
 
-  const { typingText, isOnline, sendTypingEvent } = useDirectPresence(conversationId, currentUser);
+  const { typingText, isOnline, sendTypingEvent } = useDirectPresence(conversationId, currentUser, partnerId);
 
   const messagesEndRef = useRef(null);
   const threadContainerRef = useRef(null);
