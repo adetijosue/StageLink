@@ -357,6 +357,7 @@ function FeedCard({
               background: pro.proType === 'work' ? 'linear-gradient(90deg, #0066FF, #0047FF)' :
                           pro.proType === 'service' ? 'linear-gradient(90deg, #10B981, #059669)' :
                           pro.proType === 'course' ? 'linear-gradient(90deg, #0066FF, #0284C7)' :
+                          pro.proType === 'job' ? 'linear-gradient(90deg, #8B5CF6, #6D28D9)' :
                           'linear-gradient(90deg, #F59E0B, #D97706)',
               color: '#FFFFFF',
               display: 'flex',
@@ -370,10 +371,12 @@ function FeedCard({
               {pro.proType === 'work' ? <ShoppingBag size={14} /> :
                pro.proType === 'service' ? <Sliders size={14} /> :
                pro.proType === 'course' ? <GraduationCap size={14} /> :
+               pro.proType === 'job' ? <Award size={14} /> :
                <Calendar size={14} />}
               {pro.proType === 'work' ? 'ŒUVRE & BEAT EN VENTE' :
                pro.proType === 'service' ? 'PRESTATION STUDIO & MIX' :
                pro.proType === 'course' ? 'FORMATION & MASTERCLASS' :
+               pro.proType === 'job' ? 'OFFRE D\'EMPLOI & CASTING' :
                'ÉVÉNEMENT LIVE PRO'}
             </span>
             <span style={{ background: 'rgba(255,255,255,0.22)', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem' }}>
@@ -402,7 +405,7 @@ function FeedCard({
                   fontSize: '1.8rem',
                   flexShrink: 0
                 }}>
-                  {pro.icon || '🎵'}
+                  {pro.icon || (pro.proType === 'job' ? '💼' : '🎵')}
                 </div>
               )}
 
@@ -411,10 +414,11 @@ function FeedCard({
                   {pro.title}
                 </h4>
                 <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '0 0 4px 0' }}>
-                  {pro.author || pro.provider || pro.instructor || pro.organizer}
+                  {pro.author || pro.provider || pro.instructor || pro.organizer || pro.company}
                   {pro.genre ? ` • ${pro.genre}` : ''}
                   {pro.delivery ? ` • ${pro.delivery}` : ''}
                   {pro.duration ? ` • ${pro.duration}` : ''}
+                  {pro.location ? ` • ${pro.location}` : ''}
                   {pro.date ? ` • ${pro.date}` : ''}
                 </p>
                 <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#10B981' }}>
@@ -435,7 +439,12 @@ function FeedCard({
                 type="button"
                 onClick={() => {
                   soundEngine?.playPopSound?.();
-                  if (onOpenProServiceAction) {
+                  if (pro.proType === 'job' && onStartChat) {
+                    onStartChat(
+                      { id: pro.userId, name: pro.author || pro.company || 'Recruteur', avatar: pro.authorAvatar || pro.cover },
+                      `Bonjour, je souhaite postuler à votre offre de job : "${pro.title}". Voici mon profil et mes compétences.`
+                    );
+                  } else if (onOpenProServiceAction) {
                     onOpenProServiceAction(pro);
                   }
                 }}
@@ -447,6 +456,7 @@ function FeedCard({
                   background: pro.proType === 'work' ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)' :
                               pro.proType === 'service' ? 'linear-gradient(135deg, #0066FF 0%, #0047FF 100%)' :
                               pro.proType === 'course' ? 'linear-gradient(135deg, #0066FF 0%, #0284C7 100%)' :
+                              pro.proType === 'job' ? 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)' :
                               'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
                   color: '#FFFFFF',
                   fontWeight: 800,
@@ -462,6 +472,7 @@ function FeedCard({
                 {pro.proType === 'work' ? `Acheter l'Œuvre (${pro.price})` :
                  pro.proType === 'service' ? `Commander (${pro.price})` :
                  pro.proType === 'course' ? `S'inscrire (${pro.price})` :
+                 pro.proType === 'job' ? `Postuler à l'offre (${pro.price})` :
                  `Réserver Billet (${pro.price})`}
                 <ChevronRight size={15} />
               </button>

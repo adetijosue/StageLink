@@ -7,9 +7,7 @@ import {
   MapPin, 
   RotateCcw, 
   MessageCircle, 
-  User, 
   Users, 
-  Music, 
   Disc, 
   Headphones, 
   Mic, 
@@ -17,9 +15,11 @@ import {
   Award, 
   RefreshCw, 
   Flame, 
-  ExternalLink 
+  ExternalLink,
+  Bookmark
 } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
+import { soundEngine } from '../../services/audioService';
 
 const SwipeMatching = React.memo(function SwipeMatching({ 
   matches = [], 
@@ -31,7 +31,10 @@ const SwipeMatching = React.memo(function SwipeMatching({
   const [activeFilter, setActiveFilter] = useState('all');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showMatchSuccess, setShowMatchSuccess] = useState(null);
-  const [appliedIds, setAppliedIds] = useState(() => {
+  const [favoriteToast, setFavoriteToast] = useState(null);
+
+  // Stored Match IDs
+  const [matchedIds, setMatchedIds] = useState(() => {
     try {
       const saved = localStorage.getItem('stagelink_applied_matches');
       return saved ? JSON.parse(saved) : [];
@@ -40,7 +43,17 @@ const SwipeMatching = React.memo(function SwipeMatching({
     }
   });
 
-  // Touch & Drag Gesture States
+  // Stored Favorite Artist IDs
+  const [favoriteIds, setFavoriteIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('stagelink_favorite_artists');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Touch & Mouse Drag Gesture States
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
@@ -49,13 +62,17 @@ const SwipeMatching = React.memo(function SwipeMatching({
   // Filter real user match cards based on musical categories
   const filteredMatches = useMemo(() => {
     return (matches || []).filter(card => {
-      // Don't show current logged in user
+      // Exclude logged in user
       if (currentUser && (card.userId === currentUser.id || card.id === `match_${currentUser.id}`)) {
         return false;
       }
 
-      if (activeFilter === 'applied') {
-        return appliedIds.includes(card.id) || appliedIds.includes(card.userId);
+      if (activeFilter === 'matched') {
+        return matchedIds.includes(card.id) || matchedIds.includes(card.userId);
+      }
+
+      if (activeFilter === 'favorites') {
+        return favoriteIds.includes(card.id) || favoriteIds.includes(card.userId);
       }
 
       const roleStr = `${card.role || ''} ${card.category || ''} ${(card.skills || []).join(' ')}`.toLowerCase();
@@ -72,41 +89,65 @@ const SwipeMatching = React.memo(function SwipeMatching({
 
       return true;
     });
-  }, [matches, activeFilter, appliedIds, currentUser]);
+  }, [matches, activeFilter, matchedIds, favoriteIds, currentUser]);
 
   const currentCard = filteredMatches[currentIndex] || filteredMatches[0];
+  const isCurrentFavorite = currentCard && (favoriteIds.includes(currentCard.id) || favoriteIds.includes(currentCard.userId));
 
-  // Save applied IDs to localStorage
+  // Save matched IDs to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem('stagelink_applied_matches', JSON.stringify(appliedIds));
+      localStorage.setItem('stagelink_applied_matches', JSON.stringify(matchedIds));
     } catch (e) {}
-  }, [appliedIds]);
+  }, [matchedIds]);
+
+  // Save favorite IDs to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('stagelink_favorite_artists', JSON.stringify(favoriteIds));
+    } catch (e) {}
+  }, [favoriteIds]);
 
   // Confetti trigger
   const triggerConfetti = () => {
     try {
       confetti({
-        particleCount: 90,
-        spread: 80,
+        particleCount: 85,
+        spread: 75,
         origin: { y: 0.6 }
       });
     } catch (e) {}
   };
 
-  // Perform Match Action
+  // Perform Match, Cancel, or Favorite Action
   const handleAction = (type) => {
     if (!currentCard) return;
 
-    if (type === 'apply' || type === 'like' || type === 'superlike') {
+    const targetId = currentCard.id || currentCard.userId;
+
+    if (type === 'match') {
+      soundEngine?.playPopSound?.();
       triggerConfetti();
       setShowMatchSuccess(currentCard);
 
-      const targetId = currentCard.id || currentCard.userId;
-      if (targetId && !appliedIds.includes(targetId)) {
-        setAppliedIds(prev => [...prev, targetId]);
+      if (targetId && !matchedIds.includes(targetId)) {
+        setMatchedIds(prev => [...prev, targetId]);
       }
       if (onApplyMatch) onApplyMatch(currentCard);
+    } else if (type === 'favorite') {
+      soundEngine?.playPopSound?.();
+      const isFav = favoriteIds.includes(targetId);
+      if (isFav) {
+        setFavoriteIds(prev => prev.filter(id => id !== targetId));
+        setFavoriteToast(`Retiré des favoris`);
+      } else {
+        setFavoriteIds(prev => [...prev, targetId]);
+        setFavoriteToast(`⭐ ${currentCard.title || currentCard.name} ajouté aux favoris !`);
+      }
+      setTimeout(() => setFavoriteToast(null), 2000);
+      return; // Keep on current card when toggling favorite
+    } else if (type === 'cancel' || type === 'pass') {
+      soundEngine?.playPopSound?.();
     }
 
     // Move to next card
@@ -119,6 +160,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
   };
 
   const handleRewind = () => {
+    soundEngine?.playPopSound?.();
     if (currentIndex > 0) {
       setCurrentIndex((prev) => prev - 1);
     } else if (filteredMatches.length > 0) {
@@ -126,51 +168,79 @@ const SwipeMatching = React.memo(function SwipeMatching({
     }
   };
 
-  // Native Touch Handlers for Drag Swiping
-  const handleTouchStart = (e) => {
-    const touch = e.touches[0];
-    dragStartRef.current = { x: touch.clientX, y: touch.clientY };
+  // -------------------------------------------------------------
+  // Touch & Mouse Drag Handlers for Native Swiping
+  // -------------------------------------------------------------
+  const handleStartDrag = (clientX, clientY) => {
+    dragStartRef.current = { x: clientX, y: clientY };
     setIsDragging(true);
   };
 
-  const handleTouchMove = (e) => {
+  const handleMoveDrag = (clientX, clientY) => {
     if (!isDragging) return;
-    const touch = e.touches[0];
-    const deltaX = touch.clientX - dragStartRef.current.x;
-    const deltaY = touch.clientY - dragStartRef.current.y;
+    const deltaX = clientX - dragStartRef.current.x;
+    const deltaY = clientY - dragStartRef.current.y;
     setDragOffset({ x: deltaX, y: deltaY });
   };
 
-  const handleTouchEnd = () => {
+  const handleEndDrag = () => {
     if (!isDragging) return;
     setIsDragging(false);
 
-    if (dragOffset.x > 90) {
-      // Swiped Right -> Match / Like
-      handleAction('apply');
-    } else if (dragOffset.x < -90) {
-      // Swiped Left -> Pass / Dislike
-      handleAction('dislike');
-    } else if (dragOffset.y < -100) {
-      // Swiped Up -> Super Like
-      handleAction('superlike');
+    if (dragOffset.x > 75) {
+      // Swiped Right -> MATCHER
+      handleAction('match');
+    } else if (dragOffset.x < -75) {
+      // Swiped Left -> ANNULER / PASSER
+      handleAction('cancel');
+    } else if (dragOffset.y < -80) {
+      // Swiped Up -> FAVORIS / SAUVEGARDER
+      handleAction('favorite');
+      setDragOffset({ x: 0, y: 0 });
     } else {
       // Reset position
       setDragOffset({ x: 0, y: 0 });
     }
   };
 
-  // Dynamic card transform based on drag
+  // Touch Events
+  const handleTouchStart = (e) => {
+    const t = e.touches[0];
+    handleStartDrag(t.clientX, t.clientY);
+  };
+  const handleTouchMove = (e) => {
+    if (!isDragging) return;
+    const t = e.touches[0];
+    handleMoveDrag(t.clientX, t.clientY);
+  };
+  const handleTouchEnd = () => handleEndDrag();
+
+  // Mouse Events (Desktop)
+  const handleMouseDown = (e) => {
+    handleStartDrag(e.clientX, e.clientY);
+  };
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    handleMoveDrag(e.clientX, e.clientY);
+  };
+  const handleMouseUp = () => handleEndDrag();
+  const handleMouseLeave = () => {
+    if (isDragging) handleEndDrag();
+  };
+
+  // Dynamic card transforms & stamp opacities
   const rotation = dragOffset.x * 0.08;
-  const matchOpacity = Math.min(1, Math.max(0, dragOffset.x / 75));
-  const passOpacity = Math.min(1, Math.max(0, -dragOffset.x / 75));
+  const matchOpacity = Math.min(1, Math.max(0, dragOffset.x / 65));
+  const cancelOpacity = Math.min(1, Math.max(0, -dragOffset.x / 65));
+  const favoriteOpacity = Math.min(1, Math.max(0, -dragOffset.y / 70));
 
   const filterTabs = [
     { id: 'all', label: 'Tous', icon: <Users size={14} /> },
     { id: 'producers', label: 'Producteurs', icon: <Disc size={14} /> },
     { id: 'singers', label: 'Chanteurs & Musiciens', icon: <Mic size={14} /> },
     { id: 'engineers', label: 'Ingénieurs & Studios', icon: <Headphones size={14} /> },
-    { id: 'applied', label: 'Mes Matchs', icon: <Flame size={14} /> }
+    { id: 'matched', label: 'Mes Matchs', icon: <Flame size={14} /> },
+    { id: 'favorites', label: 'Favoris', icon: <Star size={14} /> }
   ];
 
   return (
@@ -181,9 +251,33 @@ const SwipeMatching = React.memo(function SwipeMatching({
       gap: '14px',
       maxWidth: '600px',
       margin: '0 auto',
-      width: '100%'
+      width: '100%',
+      position: 'relative'
     }}>
-      {/* 1. Header Banner & Filter Pills */}
+      {/* Favorite Toast Notification */}
+      {favoriteToast && (
+        <div style={{
+          position: 'fixed',
+          top: '80px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(15, 23, 42, 0.95)',
+          backdropFilter: 'blur(12px)',
+          color: '#FACC15',
+          padding: '10px 20px',
+          borderRadius: '24px',
+          fontSize: '0.86rem',
+          fontWeight: 800,
+          boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+          border: '1px solid rgba(250, 204, 21, 0.5)',
+          zIndex: 100,
+          animation: 'fadeIn 0.2s ease'
+        }}>
+          {favoriteToast}
+        </div>
+      )}
+
+      {/* 1. Header Banner */}
       <div style={{
         background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0066FF 100%)',
         borderRadius: '24px',
@@ -237,7 +331,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
           Match Pro • Collaborations
         </h2>
         <p style={{ fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.8)', margin: 0, lineHeight: 1.3 }}>
-          Connectez-vous directement avec des artistes, producteurs et ingénieurs réels.
+          Glissez vers la droite pour <strong>Matcher</strong> ou vers la gauche pour <strong>Annuler</strong>.
         </p>
       </div>
 
@@ -290,6 +384,10 @@ const SwipeMatching = React.memo(function SwipeMatching({
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseLeave}
             style={{
               position: 'relative',
               borderRadius: '28px',
@@ -311,40 +409,65 @@ const SwipeMatching = React.memo(function SwipeMatching({
                 left: '24px',
                 border: '4px solid #10B981',
                 color: '#10B981',
-                borderRadius: '12px',
+                borderRadius: '14px',
                 padding: '6px 14px',
-                fontSize: '1.2rem',
+                fontSize: '1.25rem',
                 fontWeight: 900,
                 textTransform: 'uppercase',
                 transform: 'rotate(-15deg)',
                 opacity: matchOpacity,
                 zIndex: 20,
-                background: 'rgba(255,255,255,0.85)',
-                backdropFilter: 'blur(4px)'
+                background: 'rgba(255,255,255,0.92)',
+                backdropFilter: 'blur(6px)',
+                boxShadow: '0 8px 24px rgba(16, 185, 129, 0.3)'
               }}>
                 MATCHER 🤝
               </div>
             )}
 
-            {passOpacity > 0.1 && (
+            {cancelOpacity > 0.1 && (
               <div style={{
                 position: 'absolute',
                 top: '24px',
                 right: '24px',
                 border: '4px solid #EF4444',
                 color: '#EF4444',
-                borderRadius: '12px',
+                borderRadius: '14px',
                 padding: '6px 14px',
-                fontSize: '1.2rem',
+                fontSize: '1.25rem',
                 fontWeight: 900,
                 textTransform: 'uppercase',
                 transform: 'rotate(15deg)',
-                opacity: passOpacity,
+                opacity: cancelOpacity,
                 zIndex: 20,
-                background: 'rgba(255,255,255,0.85)',
-                backdropFilter: 'blur(4px)'
+                background: 'rgba(255,255,255,0.92)',
+                backdropFilter: 'blur(6px)',
+                boxShadow: '0 8px 24px rgba(239, 68, 68, 0.3)'
               }}>
-                PASSER ✕
+                ANNULER ✕
+              </div>
+            )}
+
+            {favoriteOpacity > 0.15 && (
+              <div style={{
+                position: 'absolute',
+                top: '24px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                border: '4px solid #F59E0B',
+                color: '#F59E0B',
+                borderRadius: '14px',
+                padding: '6px 16px',
+                fontSize: '1.25rem',
+                fontWeight: 900,
+                textTransform: 'uppercase',
+                opacity: favoriteOpacity,
+                zIndex: 20,
+                background: 'rgba(255,255,255,0.92)',
+                backdropFilter: 'blur(6px)',
+                boxShadow: '0 8px 24px rgba(245, 158, 11, 0.3)'
+              }}>
+                FAVORI ⭐
               </div>
             )}
 
@@ -495,7 +618,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
               )}
             </div>
 
-            {/* Action Bar: Dislike, Rewind, Superlike, Match */}
+            {/* Action Bar: Annuler (✕), Précédent (🔄), Favoris (⭐), Matcher (🤝) */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -504,10 +627,10 @@ const SwipeMatching = React.memo(function SwipeMatching({
               borderTop: '1px solid var(--border-light)',
               background: 'var(--bg-light)'
             }}>
-              {/* Dislike / Pass Button */}
+              {/* Annuler / Passer (✕) */}
               <button
-                onClick={() => handleAction('dislike')}
-                title="Passer au profil suivant"
+                onClick={() => handleAction('cancel')}
+                title="Annuler / Passer au profil suivant"
                 style={{
                   width: '50px',
                   height: '50px',
@@ -523,16 +646,16 @@ const SwipeMatching = React.memo(function SwipeMatching({
                   transition: 'transform 0.15s ease'
                 }}
               >
-                <X size={22} strokeWidth={2.5} />
+                <X size={24} strokeWidth={2.5} />
               </button>
 
-              {/* Rewind Button */}
+              {/* Rewind (🔄) */}
               <button
                 onClick={handleRewind}
                 title="Revenir au profil précédent"
                 style={{
-                  width: '42px',
-                  height: '42px',
+                  width: '44px',
+                  height: '44px',
                   borderRadius: '50%',
                   border: '1px solid var(--border-light)',
                   background: 'var(--card-bg)',
@@ -541,45 +664,46 @@ const SwipeMatching = React.memo(function SwipeMatching({
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  opacity: 0.8
+                  opacity: 0.85
                 }}
               >
                 <RotateCcw size={18} />
               </button>
 
-              {/* Super Like Button */}
+              {/* Favoris / Sauvegarder (⭐) */}
               <button
-                onClick={() => handleAction('superlike')}
-                title="Coup de cœur / Super Match"
+                onClick={() => handleAction('favorite')}
+                title={isCurrentFavorite ? 'Retirer des favoris' : 'Sauvegarder dans les favoris'}
                 style={{
-                  width: '46px',
-                  height: '46px',
+                  width: '48px',
+                  height: '48px',
                   borderRadius: '50%',
-                  border: '2px solid #FDE68A',
-                  background: '#FFFBEB',
+                  border: isCurrentFavorite ? '2px solid #F59E0B' : '1.5px solid #FDE68A',
+                  background: isCurrentFavorite ? '#FEF3C7' : '#FFFBEB',
                   color: '#F59E0B',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(245, 158, 11, 0.15)'
+                  boxShadow: '0 4px 14px rgba(245, 158, 11, 0.2)',
+                  transition: 'all 0.2s ease'
                 }}
               >
-                <Star size={22} fill="#F59E0B" />
+                <Star size={22} fill={isCurrentFavorite ? '#F59E0B' : 'none'} color="#F59E0B" strokeWidth={2.2} />
               </button>
 
-              {/* Direct Match & Message Button */}
+              {/* Matcher (🤝) */}
               <button
-                onClick={() => handleAction('apply')}
-                title="Matcher & envoyer un message"
+                onClick={() => handleAction('match')}
+                title="Matcher et démarrer la collaboration"
                 style={{
-                  padding: '12px 22px',
+                  padding: '12px 24px',
                   borderRadius: '24px',
                   background: 'linear-gradient(135deg, #0066FF 0%, #0044CC 100%)',
                   color: '#FFFFFF',
                   border: 'none',
                   fontWeight: 800,
-                  fontSize: '0.88rem',
+                  fontSize: '0.9rem',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
@@ -632,7 +756,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
             maxWidth: '380px',
             lineHeight: 1.4
           }}>
-            Vous avez parcouru les profils artistiques réels actuels. Les nouveaux producteurs, musiciens et chanteurs inscrits sur StageLink apparaîtront ici automatiquement.
+            Vous avez parcouru les profils artistiques actuels. Les nouveaux producteurs, musiciens et artistes inscrits sur StageLink apparaîtront ici automatiquement.
           </p>
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -723,7 +847,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
             </h2>
 
             <p style={{ fontSize: '0.86rem', color: '#475569', marginBottom: '20px', lineHeight: 1.4 }}>
-              Votre demande de collaboration avec <strong>{showMatchSuccess.title || showMatchSuccess.name}</strong> a été enregistrée et la discussion a été ouverte dans vos messages.
+              Votre connexion avec <strong>{showMatchSuccess.title || showMatchSuccess.name}</strong> a été enregistrée et la discussion a été ouverte dans vos messages.
             </p>
 
             <button
