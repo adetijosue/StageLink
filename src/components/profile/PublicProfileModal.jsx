@@ -133,20 +133,7 @@ export default function PublicProfileModal({
     }
   }, [user]);
 
-  if (isOpen === false || !user) return null;
-
-  const profile = hydratedUser || user;
-
-  // Normalized user fields
-  const userName = profile.name || profile.full_name || profile.userName || profile.title || 'Artiste StageLink';
-  const userAvatarUrl = profile.avatar || profile.avatar_url || profile.userAvatar || profile.image || '';
-  const userRole = profile.role || profile.userRole || profile.category || 'Artiste';
-  const userBio = profile.bio || profile.description || 'Membre vérifié de la communauté musicale StageLink.';
-  const userLocation = profile.location || 'Studio & En ligne';
-  const userCompany = profile.company || profile.studio || 'Artiste Indépendant';
-  const userCover = profile.coverPhoto || profile.cover_url || profile.cover || profile.image || 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800';
-  const isVip = profile.badgeType === 'gold' || profile.badgeType === 'blue' || profile.verified === true;
-  const targetUserId = profile.id || profile.userId;
+  const targetUserId = hydratedUser?.id || hydratedUser?.userId || user?.id || user?.userId;
 
   // Check if current user is already following this artist
   useEffect(() => {
@@ -164,6 +151,20 @@ export default function PublicProfileModal({
         .catch(() => {});
     }
   }, [currentUser, targetUserId]);
+
+  if (isOpen === false || !user) return null;
+
+  const profile = hydratedUser || user;
+
+  // Normalized user fields
+  const userName = profile.name || profile.full_name || profile.userName || profile.title || 'Artiste StageLink';
+  const userAvatarUrl = profile.avatar || profile.avatar_url || profile.userAvatar || profile.image || '';
+  const userRole = profile.role || profile.userRole || profile.category || 'Artiste';
+  const userBio = profile.bio || profile.description || 'Membre vérifié de la communauté musicale StageLink.';
+  const userLocation = profile.location || 'Studio & En ligne';
+  const userCompany = profile.company || profile.studio || 'Artiste Indépendant';
+  const userCover = profile.coverPhoto || profile.cover_url || profile.cover || profile.image || 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800';
+  const isVip = profile.badgeType === 'gold' || profile.badgeType === 'blue' || profile.verified === true;
 
   const handleFollowClick = async () => {
     soundEngine?.playPopSound?.();

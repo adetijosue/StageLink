@@ -1671,6 +1671,12 @@ function MainApp() {
       const handleRefreshConversations = () => {
         updateUnreadDirectMessagesCount();
       };
+      const handleShowToast = (e) => {
+        if (e.detail) {
+          setToastNotification(e.detail);
+          setTimeout(() => setToastNotification(null), 4500);
+        }
+      };
       window.addEventListener('refresh_conversations', handleRefreshConversations);
       window.addEventListener('show_toast', handleShowToast);
       window.addEventListener('visibilitychange', handleVisibilityChange);
