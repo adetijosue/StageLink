@@ -4,6 +4,7 @@ import UserAvatar from '../common/UserAvatar';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
+import { presenceService } from '../../services/presenceService';
 
 export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPublicProfile, onStartChat, onConnectUser, isDarkMode }) {
   const { currentUser } = useAuth();
@@ -12,6 +13,14 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
   const [followedUsers, setFollowedUsers] = useState({});
   const [remoteUsers, setRemoteUsers] = useState([]);
   const [isSearchingRemote, setIsSearchingRemote] = useState(false);
+  const [onlineUserIds, setOnlineUserIds] = useState(() => presenceService.getOnlineUserIds());
+
+  useEffect(() => {
+    const unsubscribe = presenceService.subscribe((ids) => {
+      setOnlineUserIds(ids);
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     if (!isOpen || !isSupabaseConfigured() || !searchQuery.trim()) {
@@ -275,9 +284,28 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
                   transition: 'all 0.15s ease'
                 }}
               >
-                {/* Avatar with Verified Badge */}
-                <div style={{ position: 'relative' }}>
+                {/* Avatar with Verified Badge & Online Status Dot */}
+                <div style={{ position: 'relative', flexShrink: 0 }}>
                   <UserAvatar user={{ avatar: usr.avatar || usr.userAvatar, name: usr.name || usr.userName }} size={48} />
+                  
+                  {/* Realtime Status Dot (Green = Online, Grey = Offline) */}
+                  <span
+                    title={isOnline ? 'En ligne' : 'Hors ligne'}
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      width: '12px',
+                      height: '12px',
+                      borderRadius: '50%',
+                      background: isOnline ? '#10B981' : '#94A3B8',
+                      border: `2px solid ${isDarkMode ? '#0F172A' : '#FFFFFF'}`,
+                      boxShadow: isOnline ? '0 0 6px rgba(16, 185, 129, 0.6)' : 'none',
+                      transition: 'all 0.25s ease',
+                      zIndex: 2
+                    }}
+                  />
+
                   {usr.verified && (
                     <span style={{
                       position: 'absolute',
@@ -292,7 +320,8 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      border: '1.5px solid #FFF'
+                      border: '1.5px solid #FFF',
+                      zIndex: 2
                     }}>
                       <Check size={10} strokeWidth={3} />
                     </span>

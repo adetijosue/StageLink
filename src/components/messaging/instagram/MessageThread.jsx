@@ -187,18 +187,21 @@ export default function MessageThread({
                 }}
                 size={40}
               />
-              {isOnline && (
-                <span style={{
+              <span
+                title={isOnline ? 'En ligne' : 'Hors ligne'}
+                style={{
                   position: 'absolute',
                   bottom: 0,
                   right: 0,
                   width: '12px',
                   height: '12px',
                   borderRadius: '50%',
-                  background: '#10B981',
-                  border: '2px solid #FFF'
-                }} />
-              )}
+                  background: isOnline ? '#10B981' : '#94A3B8',
+                  border: '2px solid #FFF',
+                  boxShadow: isOnline ? '0 0 8px rgba(16, 185, 129, 0.45)' : 'none',
+                  transition: 'all 0.25s ease'
+                }}
+              />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>

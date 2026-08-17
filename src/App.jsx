@@ -43,6 +43,7 @@ import { getStoredItem, setStoredItem, STORAGE_KEYS } from './services/mockData'
 import { soundEngine } from './services/audioService';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { useGlobalPresence } from './hooks/useGlobalPresence';
+import { nativeNotificationService } from './services/nativeNotificationService';
 
 const INITIAL_COMMUNITY_USERS = [];
 import { generateUUID } from './utils/uuid';
@@ -230,25 +231,52 @@ function MainApp() {
     }
   }, [chats, selectedChat]);
 
-  // Native Notifications Setup
+  // Native Notifications Setup & Realtime Listener
   useEffect(() => {
-    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-      Notification.requestPermission();
+    if (currentUser?.id) {
+      nativeNotificationService.initRealtimeNotifications(currentUser, (row, { actorName, actorAvatar }) => {
+        if (row.type === 'message') {
+          soundEngine.playMessageReceivedSound();
+          setToastNotification({
+            title: actorName,
+            message: row.content || 'Nouveau message reçu',
+            avatar: actorAvatar
+          });
+          setTimeout(() => setToastNotification(null), 4500);
+          window.dispatchEvent(new Event('refresh_conversations'));
+        }
+      });
     }
+
+    return () => {
+      nativeNotificationService.cleanup();
+    };
+  }, [currentUser]);
+
+  // Handle clicking a native notification (switch to messages tab)
+  useEffect(() => {
+    const handleOpenChatFromNotif = (e) => {
+      const data = e.detail;
+      if (data?.actorId || data?.conversationId) {
+        setActiveTab('messages');
+      }
+    };
+
+    window.addEventListener('open_chat_conversation', handleOpenChatFromNotif);
+    return () => {
+      window.removeEventListener('open_chat_conversation', handleOpenChatFromNotif);
+    };
   }, []);
 
-  const sendNativeNotification = (title, body) => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      if (document.hidden || !document.hasFocus()) {
-        try {
-          new Notification(title, {
-            body: body
-          });
-        } catch (e) {
-          console.warn('Native notification error:', e);
-        }
-      }
-    }
+  const sendNativeNotification = (title, body, options = {}) => {
+    nativeNotificationService.sendNotification({
+      title,
+      body,
+      icon: options.icon || '/stagelink-logo.png',
+      tag: options.tag,
+      data: options.data,
+      playSound: options.playSound !== false
+    });
   };
 
   const toggleDarkMode = () => {

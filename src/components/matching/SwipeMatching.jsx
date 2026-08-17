@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 import { soundEngine } from '../../services/audioService';
+import { presenceService } from '../../services/presenceService';
 
 const SwipeMatching = React.memo(function SwipeMatching({ 
   matches = [], 
@@ -32,6 +33,14 @@ const SwipeMatching = React.memo(function SwipeMatching({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showMatchSuccess, setShowMatchSuccess] = useState(null);
   const [favoriteToast, setFavoriteToast] = useState(null);
+  const [onlineUserIds, setOnlineUserIds] = useState(() => presenceService.getOnlineUserIds());
+
+  useEffect(() => {
+    const unsubscribe = presenceService.subscribe((ids) => {
+      setOnlineUserIds(ids);
+    });
+    return unsubscribe;
+  }, []);
 
   // Stored Match IDs
   const [matchedIds, setMatchedIds] = useState(() => {
@@ -574,7 +583,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
                   )}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', opacity: 0.9 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', opacity: 0.95, flexWrap: 'wrap' }}>
                   <span style={{
                     background: 'rgba(255, 255, 255, 0.2)',
                     padding: '2px 8px',
@@ -584,6 +593,37 @@ const SwipeMatching = React.memo(function SwipeMatching({
                   }}>
                     {currentCard.role || currentCard.category || 'Artiste'}
                   </span>
+
+                  {/* Realtime Status Badge (Green = Online, Grey = Offline) */}
+                  {(() => {
+                    const cardUserId = currentCard.userId || currentCard.id;
+                    const isCardUserOnline = Boolean(cardUserId && onlineUserIds.includes(String(cardUserId)));
+                    return (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: isCardUserOnline ? 'rgba(16, 185, 129, 0.35)' : 'rgba(148, 163, 184, 0.3)',
+                        color: isCardUserOnline ? '#34D399' : '#E2E8F0',
+                        border: `1px solid ${isCardUserOnline ? 'rgba(16, 185, 129, 0.6)' : 'rgba(148, 163, 184, 0.4)'}`,
+                        borderRadius: '8px',
+                        padding: '2px 7px',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        backdropFilter: 'blur(4px)'
+                      }}>
+                        <span style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          background: isCardUserOnline ? '#10B981' : '#94A3B8',
+                          boxShadow: isCardUserOnline ? '0 0 6px #10B981' : 'none'
+                        }} />
+                        {isCardUserOnline ? 'En ligne' : 'Hors ligne'}
+                      </span>
+                    );
+                  })()}
+
                   {currentCard.location && (
                     <span style={{ fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
                       <MapPin size={12} color="#60A5FA" /> {currentCard.location}

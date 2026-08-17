@@ -225,18 +225,21 @@ const InboxView = React.memo(function InboxView({
                       }}
                       size={50}
                     />
-                    {isOnline && (
-                      <span style={{
+                    <span
+                      title={isOnline ? 'En ligne' : 'Hors ligne'}
+                      style={{
                         position: 'absolute',
                         bottom: 2,
                         right: 2,
                         width: '13px',
                         height: '13px',
                         borderRadius: '50%',
-                        background: '#10B981',
-                        border: '2.5px solid var(--card-bg, #FFFFFF)'
-                      }} />
-                    )}
+                        background: isOnline ? '#10B981' : '#94A3B8',
+                        border: '2.5px solid var(--card-bg, #FFFFFF)',
+                        boxShadow: isOnline ? '0 0 8px rgba(16, 185, 129, 0.45)' : 'none',
+                        transition: 'all 0.25s ease'
+                      }}
+                    />
                   </div>
                 );
               })()}

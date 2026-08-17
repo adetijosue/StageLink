@@ -38,6 +38,7 @@ import ProfileQRCodeModal from './ProfileQRCodeModal';
 import MusicalCVModal from './MusicalCVModal';
 import SocialBrandLogo, { getBrandLogoSVG } from '../common/SocialBrandLogo';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
+import { presenceService } from '../../services/presenceService';
 
 export default function PublicProfileModal({ 
   isOpen = true, 
@@ -55,6 +56,21 @@ export default function PublicProfileModal({
   const [showFullAvatar, setShowFullAvatar] = useState(false);
   const [userPosts, setUserPosts] = useState([]);
   const [activeTab, setActiveTab] = useState('about'); // 'about' | 'works' | 'gear'
+  const [isOnline, setIsOnline] = useState(false);
+
+  // Subscribe to real-time online presence for this user
+  useEffect(() => {
+    const targetId = user?.id || user?.userId;
+    if (!targetId) return;
+
+    setIsOnline(presenceService.isUserOnline(targetId));
+
+    const unsubscribe = presenceService.subscribe(() => {
+      setIsOnline(presenceService.isUserOnline(targetId));
+    });
+
+    return unsubscribe;
+  }, [user]);
 
   // Hydrate user with fresh localStorage / Supabase profile data
   useEffect(() => {
@@ -340,6 +356,24 @@ export default function PublicProfileModal({
                 />
               )}
 
+              {/* Realtime Presence Status Dot (Green = Online, Grey = Offline) */}
+              <span
+                title={isOnline ? 'En ligne' : 'Hors ligne'}
+                style={{
+                  position: 'absolute',
+                  bottom: '4px',
+                  left: '4px',
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  background: isOnline ? '#10B981' : '#94A3B8',
+                  border: '3px solid #FFFFFF',
+                  boxShadow: isOnline ? '0 0 12px rgba(16, 185, 129, 0.65)' : 'none',
+                  transition: 'all 0.25s ease',
+                  zIndex: 10
+                }}
+              />
+
               {isVip && (
                 <div style={{
                   position: 'absolute',
@@ -377,15 +411,41 @@ export default function PublicProfileModal({
               }}>
                 {userName} {isVip && <Crown size={17} color="#F59E0B" fill="#F59E0B" />}
               </h3>
-              <p style={{ 
-                color: 'rgba(255,255,255,0.95)', 
-                fontSize: '0.84rem', 
-                fontWeight: 700,
-                margin: '2px 0 0 0',
-                textShadow: '0 1px 4px rgba(0,0,0,0.7)'
-              }}>
-                {userRole}
-              </p>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', flexWrap: 'wrap' }}>
+                <p style={{ 
+                  color: 'rgba(255,255,255,0.95)', 
+                  fontSize: '0.84rem', 
+                  fontWeight: 700,
+                  margin: 0,
+                  textShadow: '0 1px 4px rgba(0,0,0,0.7)'
+                }}>
+                  {userRole}
+                </p>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  background: isOnline ? 'rgba(16, 185, 129, 0.3)' : 'rgba(148, 163, 184, 0.3)',
+                  color: isOnline ? '#34D399' : '#E2E8F0',
+                  border: `1px solid ${isOnline ? 'rgba(16, 185, 129, 0.5)' : 'rgba(148, 163, 184, 0.4)'}`,
+                  backdropFilter: 'blur(6px)',
+                  borderRadius: '12px',
+                  padding: '2px 8px',
+                  fontSize: '0.70rem',
+                  fontWeight: 800,
+                  textShadow: '0 1px 3px rgba(0,0,0,0.6)'
+                }}>
+                  <span style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: isOnline ? '#10B981' : '#94A3B8',
+                    boxShadow: isOnline ? '0 0 6px #10B981' : 'none'
+                  }} />
+                  {isOnline ? 'En ligne' : 'Hors ligne'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
