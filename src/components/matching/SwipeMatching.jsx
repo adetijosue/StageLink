@@ -159,6 +159,39 @@ const SwipeMatching = React.memo(function SwipeMatching({
     setDragOffset({ x: 0, y: 0 });
   };
 
+  const handleOpenFullProfile = (e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (!currentCard || !onOpenProfile) return;
+    soundEngine?.playPopSound?.();
+
+    const raw = currentCard.rawUser || {};
+    const fullProfileData = {
+      ...raw,
+      ...currentCard,
+      id: currentCard.userId || currentCard.id?.replace('match_', '') || raw.id,
+      userId: currentCard.userId || currentCard.id?.replace('match_', '') || raw.id,
+      name: currentCard.name || currentCard.title || raw.name || raw.full_name || 'Artiste',
+      full_name: currentCard.name || currentCard.title || raw.full_name || raw.name || 'Artiste',
+      userName: currentCard.name || currentCard.title || raw.name || raw.full_name || 'Artiste',
+      avatar: currentCard.avatar || currentCard.image || raw.avatar || raw.avatar_url || '',
+      avatar_url: currentCard.avatar || currentCard.image || raw.avatar_url || raw.avatar || '',
+      userAvatar: currentCard.avatar || currentCard.image || raw.avatar || raw.avatar_url || '',
+      role: currentCard.role || currentCard.category || raw.role || 'Artiste',
+      userRole: currentCard.role || currentCard.category || raw.role || 'Artiste',
+      location: currentCard.location || raw.location || 'Studio & En ligne',
+      company: currentCard.company || raw.company || 'Artiste Indépendant',
+      bio: currentCard.bio || currentCard.description || raw.bio || 'Membre vérifié de la communauté musicale StageLink.',
+      skills: currentCard.skills || raw.skills || [currentCard.role || 'Artiste'],
+      instruments: currentCard.instruments || raw.instruments || currentCard.skills || [currentCard.role || 'Artiste'],
+      coverPhoto: currentCard.cover_url || currentCard.image || raw.cover_url || raw.coverPhoto || 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800',
+      cover_url: currentCard.cover_url || currentCard.image || raw.cover_url || raw.coverPhoto || 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800',
+      verified: currentCard.verified || raw.verified || raw.badgeType === 'gold' || raw.badgeType === 'blue' || false,
+      badgeType: currentCard.badgeType || raw.badgeType || (currentCard.verified ? 'gold' : 'none')
+    };
+
+    onOpenProfile(fullProfileData);
+  };
+
   const handleRewind = () => {
     soundEngine?.playPopSound?.();
     if (currentIndex > 0) {
@@ -598,22 +631,23 @@ const SwipeMatching = React.memo(function SwipeMatching({
               {/* Public Profile Shortcut */}
               {onOpenProfile && (currentCard.rawUser || currentCard.userId) && (
                 <button
-                  onClick={() => onOpenProfile(currentCard.rawUser || { id: currentCard.userId, name: currentCard.name, role: currentCard.role, avatar: currentCard.avatar })}
+                  type="button"
+                  onClick={handleOpenFullProfile}
                   style={{
                     background: 'transparent',
                     border: 'none',
                     color: '#0066FF',
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
+                    fontSize: '0.84rem',
+                    fontWeight: 800,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px',
+                    gap: '6px',
                     cursor: 'pointer',
-                    padding: 0,
-                    marginTop: '2px'
+                    padding: '4px 0',
+                    marginTop: '4px'
                   }}
                 >
-                  <ExternalLink size={14} /> Voir le profil complet de l'artiste
+                  <ExternalLink size={15} /> Voir le profil complet de l'artiste
                 </button>
               )}
             </div>

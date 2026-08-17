@@ -3026,6 +3026,7 @@ function MainApp() {
       {/* Public Profile View Modal */}
       {publicProfileUser && (
         <PublicProfileModal
+          isOpen={Boolean(publicProfileUser)}
           user={publicProfileUser}
           onClose={() => setPublicProfileUser(null)}
           onStartChat={handleStartChatWithUser}
