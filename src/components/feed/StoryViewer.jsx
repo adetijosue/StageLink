@@ -173,6 +173,12 @@ export default function StoryViewer({
     if (newIsLiked) {
       confetti({ particleCount: 35, spread: 60, origin: { y: 0.85 } });
       setLikesCount(prev => prev + 1);
+      const replyHandler = onSendReply || onReplyToInbox;
+      if (replyHandler && !isOwner) {
+        replyHandler(currentStory, '❤️');
+        setReplySent(true);
+        setTimeout(() => setReplySent(false), 3000);
+      }
     } else {
       setLikesCount(prev => Math.max(0, prev - 1));
     }
@@ -501,6 +507,7 @@ export default function StoryViewer({
           ) : (
             <form onSubmit={handleSendReplyToInbox} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               {/* Quick Emoji Reactions */}
+              {/* Quick Emoji Reactions */}
               {!isOwner && (
                 <div style={{
                   position: 'absolute',
@@ -509,33 +516,43 @@ export default function StoryViewer({
                   right: 0,
                   display: 'flex',
                   justifyContent: 'center',
-                  gap: '12px',
+                  gap: '8px',
                   padding: '8px 0',
                   marginBottom: '10px'
                 }}>
-                  {['😂', '😮', '😍', '😢', '👏', '🔥'].map(emoji => (
+                  {['❤️', '🔥', '👏', '😂', '😮', '😢', '😍', '🙌'].map(emoji => (
                     <button
                       key={emoji}
-                      onClick={() => {
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
                         const replyHandler = onSendReply || onReplyToInbox;
                         if (replyHandler) replyHandler(currentStory, emoji);
                         soundEngine.playPopSound();
+                        confetti({
+                          particleCount: 22,
+                          spread: 50,
+                          origin: { y: 0.85 },
+                          scalar: 1.1
+                        });
                         setReplySent(true);
-                        setTimeout(() => setReplySent(false), 2000);
+                        setTimeout(() => setReplySent(false), 3000);
                       }}
                       style={{
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        backdropFilter: 'blur(10px)',
+                        background: 'rgba(255, 255, 255, 0.22)',
+                        backdropFilter: 'blur(12px)',
                         border: '1px solid rgba(255, 255, 255, 0.4)',
                         fontSize: '1.4rem',
-                        padding: '6px 10px',
-                        borderRadius: '24px',
+                        lineHeight: 1,
+                        padding: '6px 8px',
+                        borderRadius: '20px',
                         cursor: 'pointer',
-                        transition: 'transform 0.2s',
-                        color: 'transparent',
-                        textShadow: '0 0 0 white' // Just visual trick for some emojis if needed, or normal:
+                        transition: 'transform 0.15s ease, background 0.15s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
                       }}
-                      onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.2)'}
+                      onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.25)'}
                       onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                     >
                       {emoji}

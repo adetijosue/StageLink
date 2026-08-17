@@ -176,6 +176,39 @@ export default function MessageBubble({
           </div>
         )}
 
+        {/* 1.1 Story Comment / Reaction Context Card */}
+        {message.metadata?.isStoryComment && (
+          <div style={{
+            background: isMine ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.05)',
+            borderRadius: '12px',
+            overflow: 'hidden',
+            marginBottom: '6px',
+            border: `1px solid ${isMine ? 'rgba(255, 255, 255, 0.15)' : 'var(--border-light)'}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '6px 8px'
+          }}>
+            {(message.metadata.storyThumbnail || message.metadata.storyMedia) && (
+              <img
+                src={message.metadata.storyThumbnail || message.metadata.storyMedia}
+                alt="Story"
+                style={{ width: '36px', height: '48px', borderRadius: '6px', objectFit: 'cover', flexShrink: 0 }}
+              />
+            )}
+            <div style={{ fontSize: '0.74rem', minWidth: 0 }}>
+              <div style={{ fontWeight: 700, opacity: 0.95 }}>
+                📸 Réponse à la story
+              </div>
+              {message.metadata?.storyCaption && (
+                <div style={{ fontSize: '0.68rem', opacity: 0.75, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                  {message.metadata.storyCaption}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* 2. Photo / Video Attachment */}
         {message.message_type === 'image' && (
           <div style={{ position: 'relative', borderRadius: '18px', overflow: 'hidden' }}>

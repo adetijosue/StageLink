@@ -1706,7 +1706,7 @@ function MainApp() {
 
       updatedChatsList = updatedChatsList.map((c) => (c.id === targetChat.id ? targetChat : c));
 
-      // Save story reply directly to Supabase Database
+      // Save story reply directly to Supabase Database (both modern direct chat and legacy)
       if (isSupabaseConfigured() && targetUserId && !targetUserId.startsWith('usr_')) {
         try {
           const messageMetadata = {
@@ -1724,26 +1724,44 @@ function MainApp() {
             storyStickers: storyUser.stickers || []
           };
 
-          const { error: storyMsgErr } = await supabase.from('messages').insert({
-            id: msgUuid,
-            sender_id: currentUser.id,
-            receiver_id: targetUserId,
-            content: replyText,
-            media_url: rawMedia || null,
-            metadata: messageMetadata
-          });
-          if (storyMsgErr) {
-             const { error: bareStoryErr } = await supabase.from('messages').insert({
-               id: msgUuid,
-               sender_id: currentUser.id,
-               receiver_id: targetUserId,
-               content: replyText,
-               metadata: messageMetadata
-             });
-             if (bareStoryErr) {
-                console.error('All story reply insert fallbacks failed:', bareStoryErr);
-             }
+          // 1. Direct Messages & Modern Conversation System (Instant notification & sync)
+          try {
+            const conv = await directChatService.getOrCreateDirectConversation(currentUser.id, targetUserId);
+            if (conv && conv.id) {
+              await directChatService.sendMessage({
+                conversationId: conv.id,
+                senderId: currentUser.id,
+                recipientId: targetUserId,
+                content: replyText,
+                messageType: 'text',
+                mediaUrl: rawMedia || null,
+                metadata: messageMetadata
+              });
+            }
+          } catch (dErr) {
+            console.warn('Direct chat story reply note:', dErr?.message || dErr);
           }
+
+          // 2. Legacy Messages table (for backward compatibility)
+          try {
+            const { error: storyMsgErr } = await supabase.from('messages').insert({
+              id: msgUuid,
+              sender_id: currentUser.id,
+              receiver_id: targetUserId,
+              content: replyText,
+              media_url: rawMedia || null,
+              metadata: messageMetadata
+            });
+            if (storyMsgErr) {
+              await supabase.from('messages').insert({
+                id: msgUuid,
+                sender_id: currentUser.id,
+                receiver_id: targetUserId,
+                content: replyText,
+                metadata: messageMetadata
+              });
+            }
+          } catch (me) {}
         } catch (se) {
           console.warn('Supabase story reply insert note:', se?.message || se);
         }
