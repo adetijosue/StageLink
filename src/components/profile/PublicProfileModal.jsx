@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
+  ArrowLeft,
   Check, 
   MapPin, 
   Briefcase, 
@@ -24,7 +25,10 @@ import {
   Award,
   Users,
   Flame,
-  Radio
+  Radio,
+  Sliders,
+  Grid,
+  Layers
 } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 import { useAuth } from '../../context/AuthContext';
@@ -32,7 +36,8 @@ import { soundEngine } from '../../services/audioService';
 import confetti from 'canvas-confetti';
 import ProfileQRCodeModal from './ProfileQRCodeModal';
 import MusicalCVModal from './MusicalCVModal';
-import SocialBrandLogo from '../common/SocialBrandLogo';
+import SocialBrandLogo, { getBrandLogoSVG } from '../common/SocialBrandLogo';
+import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 
 export default function PublicProfileModal({ 
   isOpen = true, 
@@ -42,24 +47,88 @@ export default function PublicProfileModal({
   onConnectUser 
 }) {
   const { currentUser } = useAuth();
+  const [hydratedUser, setHydratedUser] = useState(user || {});
   const [isFollowing, setIsFollowing] = useState(false);
   const [playingTrackId, setPlayingTrackId] = useState(null);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isCvModalOpen, setIsCvModalOpen] = useState(false);
   const [showFullAvatar, setShowFullAvatar] = useState(false);
+  const [userPosts, setUserPosts] = useState([]);
+  const [activeTab, setActiveTab] = useState('about'); // 'about' | 'works' | 'gear'
+
+  // Hydrate user with fresh localStorage / Supabase profile data
+  useEffect(() => {
+    if (!user) return;
+    const targetId = user.id || user.userId;
+
+    let initial = { ...user };
+    try {
+      const storedUsers = JSON.parse(localStorage.getItem('stagelink_users') || '[]');
+      const matchedStored = storedUsers.find(u => u.id === targetId || u.userId === targetId);
+      if (matchedStored) {
+        initial = { ...matchedStored, ...initial };
+      }
+    } catch (e) {}
+
+    setHydratedUser(initial);
+
+    // Fetch live posts by this artist
+    try {
+      const allPosts = JSON.parse(localStorage.getItem('stagelink_posts') || '[]');
+      const filtered = allPosts.filter(p => p.userId === targetId || p.userName === (initial.name || initial.full_name));
+      setUserPosts(filtered);
+    } catch (e) {}
+
+    // Fetch live profile from Supabase
+    if (isSupabaseConfigured() && targetId) {
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', targetId)
+        .single()
+        .then(({ data, error }) => {
+          if (data && !error) {
+            setHydratedUser(prev => ({
+              ...prev,
+              ...data,
+              name: data.full_name || data.username || prev.name,
+              full_name: data.full_name || data.username || prev.full_name,
+              avatar: data.avatar_url || prev.avatar,
+              avatar_url: data.avatar_url || prev.avatar_url,
+              role: data.role || prev.role,
+              bio: data.bio || prev.bio,
+              location: data.location || prev.location,
+              company: data.company || prev.company,
+              instruments: Array.isArray(data.instruments) && data.instruments.length > 0 ? data.instruments : prev.instruments,
+              genres: Array.isArray(data.genres) && data.genres.length > 0 ? data.genres : prev.genres,
+              gear: Array.isArray(data.gear) && data.gear.length > 0 ? data.gear : prev.gear,
+              spotifyUrl: data.spotify_url || data.spotifyUrl || prev.spotifyUrl,
+              instagramUrl: data.instagram_url || data.instagramUrl || prev.instagramUrl,
+              tiktokUrl: data.tiktok_url || data.tiktokUrl || prev.tiktokUrl,
+              youtubeUrl: data.youtube_url || data.youtubeUrl || prev.youtubeUrl,
+              verified: data.verified_badge === 'gold' || data.verified_badge === 'blue' || prev.verified,
+              badgeType: data.verified_badge || prev.badgeType
+            }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user]);
 
   if (isOpen === false || !user) return null;
 
+  const profile = hydratedUser || user;
+
   // Normalized user fields
-  const userName = user.name || user.full_name || user.userName || user.title || 'Artiste StageLink';
-  const userAvatarUrl = user.avatar || user.avatar_url || user.userAvatar || user.image || '';
-  const userRole = user.role || user.userRole || user.category || 'Artiste';
-  const userBio = user.bio || user.description || 'Membre vérifié de la communauté musicale StageLink.';
-  const userLocation = user.location || 'Studio & En ligne';
-  const userCompany = user.company || user.studio || 'Artiste Indépendant';
-  const userCover = user.coverPhoto || user.cover_url || user.cover || user.image || 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800';
-  const isVip = user.badgeType === 'gold' || user.badgeType === 'blue' || user.verified === true;
-  const targetUserId = user.id || user.userId;
+  const userName = profile.name || profile.full_name || profile.userName || profile.title || 'Artiste StageLink';
+  const userAvatarUrl = profile.avatar || profile.avatar_url || profile.userAvatar || profile.image || '';
+  const userRole = profile.role || profile.userRole || profile.category || 'Artiste';
+  const userBio = profile.bio || profile.description || 'Membre vérifié de la communauté musicale StageLink.';
+  const userLocation = profile.location || 'Studio & En ligne';
+  const userCompany = profile.company || profile.studio || 'Artiste Indépendant';
+  const userCover = profile.coverPhoto || profile.cover_url || profile.cover || profile.image || 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800';
+  const isVip = profile.badgeType === 'gold' || profile.badgeType === 'blue' || profile.verified === true;
+  const targetUserId = profile.id || profile.userId;
 
   const isSelf = currentUser && (currentUser.id === targetUserId || currentUser.name === userName);
 
@@ -87,8 +156,8 @@ export default function PublicProfileModal({
   };
 
   const sampleTracks = [
-    { id: 'ptr_1', title: 'Studio Session 2026', genre: userRole || 'Afrobeat', duration: '03:20', plays: '1.4k' },
-    { id: 'ptr_2', title: 'Acoustic Jam Demo', genre: 'Live Production', duration: '02:45', plays: '920' }
+    { id: 'ptr_1', title: 'Studio Production Demo 2026', genre: userRole || 'Afrobeat', duration: '03:20', plays: '1.8k' },
+    { id: 'ptr_2', title: 'Acoustic Jam Session', genre: 'Live Production', duration: '02:45', plays: '1.2k' }
   ];
 
   const instrumentIcons = {
@@ -97,10 +166,10 @@ export default function PublicProfileModal({
     'Batterie': '🥁', 'Saxophone': '🎷', 'Clavier': '🎹', 'Studio': '🎙️'
   };
 
-  const specialtiesList = Array.isArray(user.skills) && user.skills.length > 0
-    ? user.skills
-    : Array.isArray(user.instruments) && user.instruments.length > 0
-    ? user.instruments
+  const specialtiesList = Array.isArray(profile.skills) && profile.skills.length > 0
+    ? profile.skills
+    : Array.isArray(profile.instruments) && profile.instruments.length > 0
+    ? profile.instruments
     : [userRole];
 
   return (
@@ -109,12 +178,12 @@ export default function PublicProfileModal({
         position: 'fixed', 
         inset: 0, 
         zIndex: 1050, 
-        background: 'rgba(15, 23, 42, 0.85)',
-        backdropFilter: 'blur(12px)', 
+        background: 'rgba(15, 23, 42, 0.88)',
+        backdropFilter: 'blur(16px)', 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center', 
-        padding: '16px',
+        padding: '12px',
         animation: 'fadeIn 0.2s ease'
       }} 
       onClick={onClose}
@@ -123,71 +192,99 @@ export default function PublicProfileModal({
         onClick={(e) => e.stopPropagation()} 
         style={{
           width: '100%', 
-          maxWidth: '460px', 
+          maxWidth: '520px', 
           background: 'var(--card-bg, #FFFFFF)', 
           borderRadius: '28px',
-          maxHeight: '92vh', 
+          maxHeight: '94vh', 
           overflowY: 'auto', 
-          boxShadow: '0 25px 60px rgba(0,0,0,0.45)', 
+          boxShadow: '0 25px 60px rgba(0,0,0,0.5)', 
           position: 'relative',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+          border: '1px solid rgba(255, 255, 255, 0.25)',
+          animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+          display: 'flex',
+          flexDirection: 'column'
         }}
       >
-        {/* 1. Header Hero (Cover + Avatar + Close Button) */}
-        <div style={{ position: 'relative', height: '190px', marginBottom: '50px' }}>
+        {/* Top Floating App Bar */}
+        <div style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 30,
+          background: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(12px)',
+          padding: '12px 18px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: '#FFFFFF',
+          borderBottom: '1px solid rgba(255,255,255,0.1)'
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'rgba(255, 255, 255, 0.15)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#FFF',
+              cursor: 'pointer'
+            }}
+            title="Retour"
+          >
+            <ArrowLeft size={18} />
+          </button>
+
+          <span style={{ fontSize: '0.88rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
+            Profil Public • {userName}
+          </span>
+
+          <button
+            onClick={() => setIsQrModalOpen(true)}
+            style={{
+              background: 'rgba(255, 255, 255, 0.15)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#FFF',
+              cursor: 'pointer'
+            }}
+            title="Carte contact QR"
+          >
+            <QrCode size={18} />
+          </button>
+        </div>
+
+        {/* 1. Header Hero (Cover + Avatar) */}
+        <div style={{ position: 'relative', height: '190px', marginBottom: '52px' }}>
           <img
             src={userCover}
             style={{ 
               width: '100%', 
               height: '100%', 
-              objectFit: 'cover', 
-              borderTopLeftRadius: '28px', 
-              borderTopRightRadius: '28px' 
+              objectFit: 'cover' 
             }}
             alt={`Couverture de ${userName}`}
           />
           <div style={{ 
             position: 'absolute', 
             inset: 0, 
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 40%, rgba(15, 23, 42, 0.85) 100%)', 
-            borderTopLeftRadius: '28px', 
-            borderTopRightRadius: '28px' 
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 40%, rgba(15, 23, 42, 0.9) 100%)' 
           }} />
-
-          {/* Close Button */}
-          <button
-            onClick={onClose}
-            style={{
-              position: 'absolute', 
-              top: 14, 
-              right: 14, 
-              zIndex: 20,
-              background: 'rgba(15, 23, 42, 0.75)', 
-              border: '1px solid rgba(255,255,255,0.3)',
-              borderRadius: '50%', 
-              width: '38px', 
-              height: '38px',
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              color: '#FFFFFF', 
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-              backdropFilter: 'blur(8px)',
-              transition: 'transform 0.15s ease'
-            }}
-            title="Fermer le profil"
-          >
-            <X size={20} />
-          </button>
 
           {/* Live Talent Indicator */}
           <div style={{
             position: 'absolute',
             top: 14,
-            left: 14,
-            background: 'rgba(16, 185, 129, 0.9)',
+            left: 16,
+            background: 'rgba(16, 185, 129, 0.92)',
             color: '#FFF',
             padding: '4px 10px',
             borderRadius: '20px',
@@ -205,7 +302,7 @@ export default function PublicProfileModal({
           {/* Avatar & Hero Info */}
           <div style={{ 
             position: 'absolute', 
-            bottom: '-42px', 
+            bottom: '-44px', 
             left: '20px', 
             right: '20px',
             display: 'flex', 
@@ -225,21 +322,21 @@ export default function PublicProfileModal({
                   src={userAvatarUrl} 
                   alt={userName} 
                   style={{
-                    width: '90px',
-                    height: '90px',
+                    width: '92px',
+                    height: '92px',
                     borderRadius: '50%',
                     objectFit: 'cover',
                     border: '4px solid #FFFFFF',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
                     background: '#1E293B'
                   }}
                 />
               ) : (
                 <UserAvatar 
                   user={{ avatar: userAvatarUrl, name: userName }} 
-                  size={90} 
+                  size={92} 
                   border="4px solid #FFFFFF" 
-                  style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }} 
+                  style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }} 
                 />
               )}
 
@@ -251,25 +348,25 @@ export default function PublicProfileModal({
                   background: '#F59E0B',
                   color: '#FFF',
                   borderRadius: '50%',
-                  width: '24px',
-                  height: '24px',
+                  width: '26px',
+                  height: '26px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   border: '2px solid #FFF',
                   boxShadow: '0 2px 8px rgba(245, 158, 11, 0.5)'
                 }}>
-                  <Award size={14} />
+                  <Award size={15} />
                 </div>
               )}
             </div>
 
-            <div style={{ paddingBottom: '46px', flex: 1, minWidth: 0 }}>
+            <div style={{ paddingBottom: '48px', flex: 1, minWidth: 0 }}>
               <h3 style={{ 
-                fontSize: '1.28rem', 
+                fontSize: '1.3rem', 
                 fontWeight: 900, 
                 color: '#FFFFFF', 
-                textShadow: '0 2px 8px rgba(0,0,0,0.7)', 
+                textShadow: '0 2px 8px rgba(0,0,0,0.8)', 
                 margin: 0, 
                 display: 'flex', 
                 alignItems: 'center', 
@@ -282,10 +379,10 @@ export default function PublicProfileModal({
               </h3>
               <p style={{ 
                 color: 'rgba(255,255,255,0.95)', 
-                fontSize: '0.82rem', 
+                fontSize: '0.84rem', 
                 fontWeight: 700,
                 margin: '2px 0 0 0',
-                textShadow: '0 1px 4px rgba(0,0,0,0.6)'
+                textShadow: '0 1px 4px rgba(0,0,0,0.7)'
               }}>
                 {userRole}
               </p>
@@ -309,7 +406,7 @@ export default function PublicProfileModal({
                   background: isFollowing ? '#ECFDF5' : '#0066FF', 
                   color: isFollowing ? '#047857' : '#FFFFFF', 
                   fontWeight: 800, 
-                  fontSize: '0.86rem', 
+                  fontSize: '0.88rem', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
@@ -327,7 +424,7 @@ export default function PublicProfileModal({
                   soundEngine?.playPopSound?.();
                   onClose(); 
                   if (onStartChat) {
-                    onStartChat(user, `Bonjour ${userName}, j'ai découvert votre profil complet sur StageLink et j'aimerais collaborer avec vous !`);
+                    onStartChat(profile, `Bonjour ${userName}, j'ai découvert votre profil complet sur StageLink et j'aimerais collaborer avec vous !`);
                   }
                 }} 
                 style={{ 
@@ -338,7 +435,7 @@ export default function PublicProfileModal({
                   background: 'rgba(0, 102, 255, 0.05)', 
                   color: '#0066FF',
                   fontWeight: 800, 
-                  fontSize: '0.86rem', 
+                  fontSize: '0.88rem', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
@@ -363,8 +460,8 @@ export default function PublicProfileModal({
             color: '#64748B', 
             fontWeight: 600,
             background: 'rgba(0, 102, 255, 0.03)',
-            padding: '8px 12px',
-            borderRadius: '12px',
+            padding: '10px 14px',
+            borderRadius: '14px',
             border: '1px solid rgba(0, 102, 255, 0.1)'
           }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -374,6 +471,80 @@ export default function PublicProfileModal({
               <Briefcase size={14} color="#10B981" /> {userCompany}
             </span>
           </div>
+
+          {/* Social Links Row if present */}
+          {(profile.spotifyUrl || profile.instagramUrl || profile.youtubeUrl || profile.tiktokUrl) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              {profile.spotifyUrl && (
+                <a 
+                  href={profile.spotifyUrl.startsWith('http') ? profile.spotifyUrl : `https://${profile.spotifyUrl}`} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#F0FDF4',
+                    color: '#16A34A',
+                    padding: '6px 12px',
+                    borderRadius: '12px',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    border: '1px solid #BBF7D0'
+                  }}
+                >
+                  <Music size={14} /> Spotify
+                </a>
+              )}
+
+              {profile.instagramUrl && (
+                <a 
+                  href={profile.instagramUrl.startsWith('http') ? profile.instagramUrl : `https://${profile.instagramUrl}`} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#FDF2F8',
+                    color: '#DB2777',
+                    padding: '6px 12px',
+                    borderRadius: '12px',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    border: '1px solid #FBCFE8'
+                  }}
+                >
+                  <Globe size={14} /> Instagram
+                </a>
+              )}
+
+              {profile.youtubeUrl && (
+                <a 
+                  href={profile.youtubeUrl.startsWith('http') ? profile.youtubeUrl : `https://${profile.youtubeUrl}`} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#FEF2F2',
+                    color: '#DC2626',
+                    padding: '6px 12px',
+                    borderRadius: '12px',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                    border: '1px solid #FECACA'
+                  }}
+                >
+                  <Play size={14} /> YouTube
+                </a>
+              )}
+            </div>
+          )}
 
           {/* Bio Description */}
           <div style={{ 
@@ -390,7 +561,7 @@ export default function PublicProfileModal({
               margin: '0 0 6px 0',
               letterSpacing: '0.04em'
             }}>
-              À Propos & Bio
+              Biographie & Présentation
             </h4>
             <p style={{ 
               fontSize: '0.86rem', 
@@ -413,7 +584,7 @@ export default function PublicProfileModal({
               marginBottom: '8px',
               letterSpacing: '0.04em'
             }}>
-              Spécialités & Compétences
+              Spécialités & Instruments
             </h4>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {specialtiesList.map((skill, idx) => (
@@ -437,6 +608,39 @@ export default function PublicProfileModal({
               ))}
             </div>
           </div>
+
+          {/* Musical Genres if available */}
+          {Array.isArray(profile.genres) && profile.genres.length > 0 && (
+            <div>
+              <h4 style={{ 
+                fontSize: '0.76rem', 
+                fontWeight: 800, 
+                textTransform: 'uppercase', 
+                color: '#64748B', 
+                marginBottom: '8px',
+                letterSpacing: '0.04em'
+              }}>
+                Genres Musicaux
+              </h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {profile.genres.map((genre, idx) => (
+                  <span 
+                    key={idx} 
+                    style={{ 
+                      background: '#F1F5F9', 
+                      color: '#475569', 
+                      padding: '4px 10px', 
+                      borderRadius: '10px', 
+                      fontSize: '0.74rem', 
+                      fontWeight: 700
+                    }}
+                  >
+                    🎸 {genre}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Top Audio Productions / Tracks */}
           <div>
@@ -520,7 +724,7 @@ export default function PublicProfileModal({
                 cursor: 'pointer'
               }}
             >
-              <FileText size={16} /> VOIR EPK / CV
+              <FileText size={16} /> VOIR EPK / CV MUSICAL
             </button>
 
             <button 
@@ -604,8 +808,8 @@ export default function PublicProfileModal({
         </div>
       )}
 
-      <ProfileQRCodeModal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} user={user} isDarkMode={false} />
-      <MusicalCVModal isOpen={isCvModalOpen} onClose={() => setIsCvModalOpen(false)} user={user} isOwnProfile={isSelf} isDarkMode={false} />
+      <ProfileQRCodeModal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} user={profile} isDarkMode={false} />
+      <MusicalCVModal isOpen={isCvModalOpen} onClose={() => setIsCvModalOpen(false)} user={profile} isOwnProfile={isSelf} isDarkMode={false} />
     </div>
   );
 }
