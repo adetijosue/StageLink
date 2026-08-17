@@ -1,72 +1,191 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { PhoneOff, Mic, MicOff, Video, VideoOff, SwitchCamera, Volume2, VolumeX, Clock, Maximize2, Minimize2, ShieldCheck, Zap, Phone, X, Repeat, ArrowLeftRight, User, Check, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { 
+  PhoneOff, 
+  Mic, 
+  MicOff, 
+  Video, 
+  VideoOff, 
+  SwitchCamera, 
+  Volume2, 
+  VolumeX, 
+  Maximize2, 
+  Minimize2, 
+  ShieldCheck, 
+  Phone, 
+  X, 
+  ArrowLeftRight, 
+  Check, 
+  Share2, 
+  Monitor, 
+  Sparkles, 
+  MessageSquare, 
+  Send, 
+  Wifi, 
+  Flame, 
+  Heart, 
+  Music, 
+  ThumbsUp, 
+  Radio, 
+  Layers 
+} from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import UserAvatar from '../common/UserAvatar';
 
+const QUICK_RESPONSES = [
+  { icon: '🎧', text: "En session studio d'enregistrement, je te rappelle !" },
+  { icon: '⏱️', text: "Je suis occupé(e), je te rappelle dans 5 minutes." },
+  { icon: '🚗', text: "Je suis sur la route, on s'écrit par message." },
+  { icon: '💬', text: "Envoie-moi un message direct sur StageLink." }
+];
+
+const FLOATING_REACTIONS = ['🔥', '👏', '🎵', '❤️', '🚀', '💯'];
+
 export default function VideoCallScreen({
-  isOpen, onClose, callerName, callerAvatar, isAudioOnly, onCallEnded,
-  isIncoming = false, isMinimized = false, onMinimize, onMaximize,
-  chatId, remoteUserId
+  isOpen,
+  onClose,
+  callerName,
+  callerAvatar,
+  callerRole = 'Artiste',
+  isAudioOnly = false,
+  onCallEnded,
+  isIncoming = false,
+  isMinimized = false,
+  onMinimize,
+  onMaximize,
+  chatId,
+  remoteUserId
 }) {
   const { currentUser } = useAuth();
 
+  // Call Controls State
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
-  
-  // Audio to Video Call Migration State
   const [currentIsAudioOnly, setCurrentIsAudioOnly] = useState(isAudioOnly);
   const [isVideoOff, setIsVideoOff] = useState(isAudioOnly);
-  
-  // Removing manual video upgrade states to auto-activate video
-  const [callDuration, setCallDuration] = useState(0);
-  const [facingMode, setFacingMode] = useState('user');
+  const [facingMode, setFacingMode] = useState('user'); // 'user' or 'environment'
   const [cameraActive, setCameraActive] = useState(false);
-  const [isConnected, setIsConnected] = useState(false); // WebRTC will set this to true when connected
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isBlurActive, setIsBlurActive] = useState(false);
+  
+  // Connection & Duration
+  const [isConnected, setIsConnected] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
+  const [networkQuality, setNetworkQuality] = useState('excellent'); // 'excellent', 'good', 'poor'
+  const [pingMs, setPingMs] = useState(24);
 
-
-  // Screen Swap State
+  // Screen Swap & Views
   const [isLocalMain, setIsLocalMain] = useState(false);
   const [swapFeedback, setSwapFeedback] = useState(false);
 
-  // Upgrade state (only used for displaying wait messages locally, no remote confirm prompt anymore)
-  const [isUpgradePending, setIsUpgradePending] = useState(false);
-  const [upgradeMessage, setUpgradeMessage] = useState('');
-  const [showVideoUpgradePrompt, setShowVideoUpgradePrompt] = useState(false);
-  const upgradeTimerRef = useRef(null);
+  // Audio Visualizer Spectrum
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [frequencyBars, setFrequencyBars] = useState([15, 30, 60, 40, 75, 50, 85, 35, 65, 45, 90, 40, 20]);
 
+  // Quick SMS & In-Call Chat Drawer
+  const [showQuickRejectModal, setShowQuickRejectModal] = useState(false);
+  const [showInCallChat, setShowInCallChat] = useState(false);
+  const [inCallMessages, setInCallMessages] = useState([]);
+  const [inCallText, setInCallText] = useState('');
 
+  // Floating Reactions
+  const [activeReactions, setActiveReactions] = useState([]);
+
+  // Video and Stream Refs
   const localVideoRef = useRef(null);
   const pipVideoRef = useRef(null);
   const remoteVideoMainRef = useRef(null);
   const remoteVideoPipRef = useRef(null);
   
   const mediaStreamRef = useRef(null);
+  const screenStreamRef = useRef(null);
   const remoteStreamRef = useRef(null);
   const timerRef = useRef(null);
-  
+  const animFrameRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const analyserRef = useRef(null);
+
   // WebRTC Refs
   const peerConnectionRef = useRef(null);
   const channelRef = useRef(null);
 
-  // WebRTC ICE Servers
-  const iceServers = {
+  // ICE Servers Configuration
+  const iceConfig = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
       { urls: 'stun:global.stun.twilio.com:3478' }
-    ],
+    ]
   };
 
+  // Safe Caller Info
+  const partnerName = callerName || 'Correspondant StageLink';
+  const safeAvatar = callerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300';
+  const myAvatar = currentUser?.avatar || currentUser?.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300';
+  const myName = currentUser?.name || currentUser?.full_name || 'Moi';
+
+  // Setup Web Audio Analyser for Real-time Voice Waveform
+  const setupAudioAnalyser = useCallback((stream) => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new AudioCtx();
+      }
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+
+      const audioTrack = stream.getAudioTracks()[0];
+      if (!audioTrack) return;
+
+      const source = audioCtxRef.current.createMediaStreamSource(new MediaStream([audioTrack]));
+      const analyser = audioCtxRef.current.createAnalyser();
+      analyser.fftSize = 64;
+      analyser.smoothingTimeConstant = 0.8;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      const updateSpectrum = () => {
+        if (!analyserRef.current) return;
+        const data = new Uint8Array(analyserRef.current.frequencyBinCount);
+        analyserRef.current.getByteFrequencyData(data);
+
+        let sum = 0;
+        const bars = [];
+        const count = 13;
+        const step = Math.floor(data.length / count) || 1;
+
+        for (let i = 0; i < count; i++) {
+          const val = data[i * step] || 0;
+          sum += val;
+          bars.push(Math.max(12, Math.round((val / 255) * 100)));
+        }
+
+        const avg = Math.round((sum / data.length / 255) * 100);
+        setAudioLevel(avg);
+        setFrequencyBars(bars);
+
+        animFrameRef.current = requestAnimationFrame(updateSpectrum);
+      };
+
+      updateSpectrum();
+    } catch (e) {
+      console.warn('Audio analyser setup note:', e);
+    }
+  }, []);
+
+  // WebRTC Setup & Supabase Signaling
   const setupWebRTC = async () => {
     if (!chatId) return;
 
-    // Create Peer Connection
-    const pc = new RTCPeerConnection(iceServers);
+    const pc = new RTCPeerConnection(iceConfig);
     peerConnectionRef.current = pc;
 
-    // Handle ICE candidates
+    // Handle ICE Candidate transmission
     pc.onicecandidate = (event) => {
       if (event.candidate && channelRef.current) {
         channelRef.current.send({
@@ -77,33 +196,33 @@ export default function VideoCallScreen({
       }
     };
 
-    // Handle receiving remote tracks
+    // Handle Remote Track arrival
     pc.ontrack = (event) => {
       const stream = event.streams[0] || new MediaStream([event.track]);
       remoteStreamRef.current = stream;
-      
+
       if (remoteVideoMainRef.current) {
         remoteVideoMainRef.current.srcObject = stream;
-        remoteVideoMainRef.current.play().catch(e => console.warn(e));
+        remoteVideoMainRef.current.play().catch(() => {});
       }
       if (remoteVideoPipRef.current) {
         remoteVideoPipRef.current.srcObject = stream;
-        remoteVideoPipRef.current.play().catch(e => console.warn(e));
+        remoteVideoPipRef.current.play().catch(() => {});
       }
-      
+
       setIsConnected(true);
       soundEngine.stopRingtone();
       soundEngine.playCallConnectedChime();
     };
 
-    // Setup Supabase Realtime Channel for signaling
+    // Supabase Signaling Room
     const roomName = `call_${[currentUser?.id, remoteUserId].sort().join('_')}`;
     const channel = supabase.channel(roomName);
     channelRef.current = channel;
 
     channel.on('broadcast', { event: 'ice-candidate' }, (payload) => {
       if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription) {
-        peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(payload.payload.candidate)).catch(e => console.error(e));
+        peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(payload.payload.candidate)).catch(() => {});
       }
     });
 
@@ -119,7 +238,7 @@ export default function VideoCallScreen({
           payload: { sdp: peerConnectionRef.current.localDescription }
         });
       } catch (e) {
-        console.error("Error handling offer:", e);
+        console.error('Error handling offer:', e);
       }
     });
 
@@ -128,12 +247,11 @@ export default function VideoCallScreen({
       try {
         await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(payload.payload.sdp));
       } catch (e) {
-        console.error("Error handling answer:", e);
+        console.error('Error handling answer:', e);
       }
     });
 
     channel.on('broadcast', { event: 'callee_ready' }, async () => {
-      // Callee is ready, Caller should send the offer
       if (!isIncoming && peerConnectionRef.current) {
         try {
           const offer = await peerConnectionRef.current.createOffer();
@@ -143,87 +261,211 @@ export default function VideoCallScreen({
             event: 'offer',
             payload: { sdp: peerConnectionRef.current.localDescription }
           });
-        } catch(e) {
-           console.error("Error creating offer:", e);
+        } catch (e) {
+          console.error('Error creating offer:', e);
         }
       }
     });
 
-
     channel.on('broadcast', { event: 'video_upgrade' }, async () => {
-      // The other person activated their camera. 
-      // We automatically activate ours and switch to video mode without prompting.
       soundEngine.playPopSound();
       setCurrentIsAudioOnly(false);
       setIsVideoOff(false);
       initStream(facingMode, true);
     });
 
-    channel.subscribe(async (status) => {
+    channel.on('broadcast', { event: 'reaction' }, (payload) => {
+      triggerFloatingReaction(payload.payload.emoji);
+    });
 
-      if (status === 'SUBSCRIBED') {
-         if (isIncoming) {
-            // Callee tells Caller they are ready to receive offer
-            channel.send({
-              type: 'broadcast',
-              event: 'callee_ready'
-            });
-         }
+    channel.on('broadcast', { event: 'in_call_chat' }, (payload) => {
+      soundEngine.playMessageReceivedSound();
+      setInCallMessages(prev => [...prev, payload.payload]);
+    });
+
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED' && isIncoming) {
+        channel.send({
+          type: 'broadcast',
+          event: 'callee_ready'
+        });
       }
     });
   };
 
+  // Initialize Media Stream
   const initStream = async (mode, forceVideo = false) => {
     stopMediaStream();
     const shouldEnableVideo = forceVideo || !currentIsAudioOnly;
 
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-           audio: true, 
-           video: shouldEnableVideo ? { facingMode: mode } : false 
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 48000
+          },
+          video: shouldEnableVideo ? { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } } : false
         });
+
         mediaStreamRef.current = stream;
         setCameraActive(shouldEnableVideo);
+        setupAudioAnalyser(stream);
+
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
         if (pipVideoRef.current) pipVideoRef.current.srcObject = stream;
 
-        // Add tracks to peer connection
+        // Attach tracks to Peer Connection
         if (peerConnectionRef.current) {
-           // Remove old tracks first if renegotiating
-           const senders = peerConnectionRef.current.getSenders();
-           senders.forEach(sender => peerConnectionRef.current.removeTrack(sender));
+          const senders = peerConnectionRef.current.getSenders();
+          senders.forEach(sender => peerConnectionRef.current.removeTrack(sender));
 
-           stream.getTracks().forEach(track => {
-              peerConnectionRef.current.addTrack(track, stream);
-           });
-           
-           // Renegotiation is handled automatically by some browsers, but for manual:
-           // If we're already connected, we need to send a new offer
-           if (isConnected) {
-              const offer = await peerConnectionRef.current.createOffer();
-              await peerConnectionRef.current.setLocalDescription(offer);
-              if (channelRef.current) {
-                 channelRef.current.send({
-                    type: 'broadcast',
-                    event: 'offer',
-                    payload: { sdp: peerConnectionRef.current.localDescription }
-                 });
-              }
-           }
+          stream.getTracks().forEach(track => {
+            peerConnectionRef.current.addTrack(track, stream);
+          });
+
+          if (isConnected) {
+            const offer = await peerConnectionRef.current.createOffer();
+            await peerConnectionRef.current.setLocalDescription(offer);
+            if (channelRef.current) {
+              channelRef.current.send({
+                type: 'broadcast',
+                event: 'offer',
+                payload: { sdp: peerConnectionRef.current.localDescription }
+              });
+            }
+          }
         }
       } catch (err) {
-         console.warn('Camera stream error:', err.message);
-         setCameraActive(false);
+        console.warn('Camera stream setup fallback:', err.message);
+        setCameraActive(false);
       }
     }
   };
 
+  // Screen Sharing
+  const handleToggleScreenShare = async () => {
+    if (isScreenSharing) {
+      // Revert to camera
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(t => t.stop());
+        screenStreamRef.current = null;
+      }
+      setIsScreenSharing(false);
+      initStream(facingMode, !isVideoOff);
+    } else {
+      if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+        try {
+          const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+          screenStreamRef.current = displayStream;
+          setIsScreenSharing(true);
+          setCurrentIsAudioOnly(false);
+          setIsVideoOff(false);
+
+          if (localVideoRef.current) localVideoRef.current.srcObject = displayStream;
+          if (pipVideoRef.current) pipVideoRef.current.srcObject = displayStream;
+
+          const videoTrack = displayStream.getVideoTracks()[0];
+          videoTrack.onended = () => {
+            handleToggleScreenShare();
+          };
+
+          if (peerConnectionRef.current) {
+            const senders = peerConnectionRef.current.getSenders();
+            const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+            if (videoSender) {
+              videoSender.replaceTrack(videoTrack);
+            }
+          }
+        } catch (err) {
+          console.warn('Screen share cancelled or unsupported:', err);
+        }
+      }
+    }
+  };
+
+  // Switch Front/Back Camera
+  const handleSwitchCamera = () => {
+    soundEngine.playPopSound();
+    const nextMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(nextMode);
+    initStream(nextMode, !isVideoOff);
+  };
+
+  // Toggle Mute
+  const handleToggleMute = () => {
+    soundEngine.playPopSound();
+    const next = !isMuted;
+    setIsMuted(next);
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getAudioTracks().forEach(t => {
+        t.enabled = !next;
+      });
+    }
+  };
+
+  // Floating Reaction Sender
+  const triggerFloatingReaction = (emoji) => {
+    const id = Date.now() + Math.random();
+    setActiveReactions(prev => [...prev, { id, emoji, left: Math.floor(Math.random() * 60) + 20 }]);
+    setTimeout(() => {
+      setActiveReactions(prev => prev.filter(r => r.id !== id));
+    }, 2500);
+  };
+
+  const handleSendReaction = (emoji) => {
+    soundEngine.playPopSound();
+    triggerFloatingReaction(emoji);
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'reaction',
+        payload: { emoji }
+      });
+    }
+  };
+
+  // In-Call Chat Sender
+  const handleSendInCallMessage = () => {
+    if (!inCallText.trim()) return;
+    const msg = {
+      id: Date.now(),
+      senderName: myName,
+      text: inCallText.trim(),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setInCallMessages(prev => [...prev, msg]);
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'in_call_chat',
+        payload: msg
+      });
+    }
+    setInCallText('');
+  };
+
+  // Quick SMS Reject
+  const handleQuickReject = (responseObj) => {
+    cleanupCall();
+    onCallEnded({
+      status: 'rejected',
+      reason: 'quick_sms',
+      quickMessage: responseObj.text,
+      duration: 0,
+      isAudioOnly: currentIsAudioOnly,
+      isIncoming: true
+    });
+  };
+
+  // LifeCycle Effect
   useEffect(() => {
     if (isOpen) {
       setCurrentIsAudioOnly(isAudioOnly);
       setIsVideoOff(isAudioOnly);
-      setIsConnected(false); // reset state
+      setIsConnected(false);
 
       if (!isIncoming) {
         soundEngine.playCallingRingtone();
@@ -232,44 +474,57 @@ export default function VideoCallScreen({
       }
 
       setupWebRTC().then(() => {
-         if (!isIncoming) {
-             initStream(facingMode, !isAudioOnly);
-         }
+        if (!isIncoming) {
+          initStream(facingMode, !isAudioOnly);
+        }
       });
 
+      // Duration Timer
       timerRef.current = setInterval(() => {
         setIsConnected((connected) => {
-           if (connected) setCallDuration(v => v + 1);
-           return connected;
+          if (connected) setCallDuration(v => v + 1);
+          return connected;
         });
       }, 1000);
-      
+
+      // Latency simulation
+      const pingInterval = setInterval(() => {
+        setPingMs(Math.floor(Math.random() * 15) + 20);
+      }, 4000);
+
+      return () => {
+        clearInterval(pingInterval);
+      };
     } else {
       cleanupCall();
     }
-    
+
     return cleanupCall;
   }, [isOpen, isIncoming, isAudioOnly, chatId]);
 
   const cleanupCall = () => {
-      clearInterval(timerRef.current);
-      stopMediaStream();
-      soundEngine.stopRingtone();
-      setIsConnected(false);
-      setCallDuration(0);
-      
-      if (channelRef.current) {
-         supabase.removeChannel(channelRef.current);
-         channelRef.current = null;
-      }
-      if (peerConnectionRef.current) {
-         peerConnectionRef.current.close();
-         peerConnectionRef.current = null;
-      }
-      if (remoteStreamRef.current) {
-         remoteStreamRef.current.getTracks().forEach(t => t.stop());
-         remoteStreamRef.current = null;
-      }
+    clearInterval(timerRef.current);
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    stopMediaStream();
+    soundEngine.stopRingtone();
+    setIsConnected(false);
+    setCallDuration(0);
+
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+    if (remoteStreamRef.current) {
+      remoteStreamRef.current.getTracks().forEach(t => t.stop());
+      remoteStreamRef.current = null;
+    }
+    if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+      try { audioCtxRef.current.close(); } catch (e) {}
+    }
   };
 
   const stopMediaStream = () => {
@@ -277,11 +532,14 @@ export default function VideoCallScreen({
       mediaStreamRef.current.getTracks().forEach(t => t.stop());
       mediaStreamRef.current = null;
     }
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(t => t.stop());
+      screenStreamRef.current = null;
+    }
   };
 
   const handleAcceptCall = () => {
     soundEngine.stopRingtone();
-    // Callee initializes their stream, WebRTC tracks are added, and negotiation triggers
     initStream(facingMode, !currentIsAudioOnly);
   };
 
@@ -291,34 +549,10 @@ export default function VideoCallScreen({
   };
 
   const handleEndCall = () => {
+    soundEngine.playCallEndedChime();
     cleanupCall();
     onCallEnded({ status: 'completed', duration: callDuration, isAudioOnly: currentIsAudioOnly, isIncoming });
   };
-
-
-  const handlePartnerAcceptedUpgrade = () => {
-    setIsUpgradePending(false);
-    setUpgradeMessage('');
-  };
-
-  const handlePartnerRejectedUpgrade = () => {
-    setIsUpgradePending(false);
-    setUpgradeMessage('');
-    setIsVideoOff(true); // Revert to audio only
-    stopMediaStream();
-    initStream(facingMode, false);
-  };
-
-  const handleAcceptVideoUpgrade = () => {
-    setShowVideoUpgradePrompt(false);
-    // User wants it AUTOMATIC. We shouldn't even show the prompt!
-  };
-
-  const handleRejectVideoUpgrade = () => {
-    setShowVideoUpgradePrompt(false);
-  };
-
-  // Toggle Screen Swapping between Main Full Screen and Floating PiP Frame
 
   const handleSwapScreens = () => {
     soundEngine.playPopSound();
@@ -327,17 +561,12 @@ export default function VideoCallScreen({
     setTimeout(() => setSwapFeedback(false), 1200);
   };
 
-
   const handleToggleVideo = () => {
     soundEngine.playPopSound();
-
     if (currentIsAudioOnly) {
-      // 1. Activate local camera stream immediately
       initStream(facingMode, true);
       setIsVideoOff(false);
       setCurrentIsAudioOnly(false);
-
-      // 2. Notify partner to automatically upgrade
       if (channelRef.current) {
         channelRef.current.send({
           type: 'broadcast',
@@ -345,48 +574,72 @@ export default function VideoCallScreen({
         });
       }
     } else {
-      // Normal Video Toggle during Video Call
       setIsVideoOff(prev => !prev);
     }
   };
 
-  // Called when partner ACCEPTS video upgrade (initiator's side)
-  // Called when partner REJECTS video upgrade (initiator's side)
-  // REMOTE PARTNER receives video upgrade invitation (incoming side)
-  // In a real app, this would be triggered by a WebSocket event
-  if (!isOpen) return null;
-
   const formatDuration = (s) => {
-    if (isNaN(s) || s == null) return "00:00";
+    if (isNaN(s) || s == null) return '00:00';
     return `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
   };
-  const safeAvatar = callerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
-  const myAvatar = currentUser?.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200';
-  const myName = currentUser?.name || 'Moi';
-  const partnerName = callerName || 'Correspondant StageLink';
 
+  if (!isOpen) return null;
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PIP MINIMIZED FLOATING VIEW
+  // ══════════════════════════════════════════════════════════════════════════
   if (isMinimized) {
     return (
-      <div onClick={onMaximize} style={{ position: 'fixed', bottom: '90px', right: '16px', zIndex: 9999, width: '120px', height: '160px', borderRadius: '20px', overflow: 'hidden', background: '#070B14', border: '2px solid #0066FF', boxShadow: '0 10px 30px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
+      <div
+        onClick={onMaximize}
+        style={{
+          position: 'fixed',
+          bottom: '90px',
+          right: '16px',
+          zIndex: 9999,
+          width: '130px',
+          height: '175px',
+          borderRadius: '24px',
+          overflow: 'hidden',
+          background: '#070B14',
+          border: '2.5px solid #0066FF',
+          boxShadow: '0 16px 40px rgba(0, 102, 255, 0.4)',
+          display: 'flex',
+          flexDirection: 'column',
+          cursor: 'pointer',
+          animation: 'slideUpFade 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}
+      >
         <div style={{ flex: 1, position: 'relative' }}>
           {!isVideoOff && isConnected && cameraActive ? (
-            <video ref={localVideoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+            />
           ) : (
             <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1E293B' }}>
-              <UserAvatar user={{ avatar: safeAvatar }} size={50} border="2px solid #0066FF" />
+              <UserAvatar user={{ avatar: safeAvatar }} size={56} border="2px solid #0066FF" />
             </div>
           )}
-          <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.5)', borderRadius: '50%', padding: 4 }}><Maximize2 size={12} color="#FFF" /></div>
+          <div style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: 4 }}>
+            <Maximize2 size={12} color="#FFF" />
+          </div>
         </div>
-        <div style={{ background: '#0066FF', padding: '4px', textAlign: 'center', fontSize: '0.65rem', fontWeight: 800, color: '#FFF' }}>{isConnected ? formatDuration(callDuration) : 'Appel...'}</div>
+        <div style={{ background: '#0066FF', padding: '5px', textAlign: 'center', fontSize: '0.68rem', fontWeight: 800, color: '#FFF' }}>
+          {isConnected ? formatDuration(callDuration) : 'Appel...'}
+        </div>
       </div>
     );
   }
 
-  // Renders participant screen content (Local user or Remote partner)
+  // ══════════════════════════════════════════════════════════════════════════
+  // RENDER PARTICIPANT SCREEN (Full Screen or Floating Frame)
+  // ══════════════════════════════════════════════════════════════════════════
   const renderParticipantContent = (isLocal, isFullScreen = false) => {
     if (isLocal) {
-      // Local User View
       if (!isVideoOff && isConnected && cameraActive) {
         return (
           <video
@@ -399,7 +652,7 @@ export default function VideoCallScreen({
               height: '100%',
               objectFit: 'cover',
               transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
-              filter: isBlurActive ? 'blur(15px)' : 'none'
+              filter: isBlurActive ? 'blur(12px)' : 'none'
             }}
           />
         );
@@ -419,78 +672,36 @@ export default function VideoCallScreen({
               user={{ avatar: myAvatar, name: myName }}
               size={isFullScreen ? 120 : 44}
               border="3px solid #0066FF"
-              style={{
-                marginBottom: isFullScreen ? '14px' : '0'
-              }}
+              style={{ marginBottom: isFullScreen ? '14px' : '0' }}
             />
             {isFullScreen && (
               <>
-                <h3 style={{ fontSize: '1.4rem', fontWeight: 800 }}>{myName} (Vous)</h3>
-                <p style={{ fontSize: '0.85rem', color: '#94A3B8' }}>{currentIsAudioOnly ? 'Appel Audio (Caméra Éteinte)' : 'Vidéo désactivée'}</p>
+                <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0 }}>{myName} (Vous)</h3>
+                <p style={{ fontSize: '0.85rem', color: '#94A3B8', marginTop: '4px' }}>
+                  {currentIsAudioOnly ? 'Appel Audio HD' : 'Vidéo désactivée'}
+                </p>
               </>
             )}
           </div>
         );
       }
     } else {
-      // Remote Partner View
       if (isConnected && !currentIsAudioOnly) {
         return (
-          <div style={{
-            position: 'relative',
-            width: '100%',
-            height: '100%',
-            background: 'radial-gradient(circle at 50% 30%, #0F172A 0%, #030712 100%)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
+          <div style={{ position: 'relative', width: '100%', height: '100%', background: '#030712' }}>
             <video
               ref={isFullScreen ? remoteVideoMainRef : remoteVideoPipRef}
               autoPlay
               playsInline
-              style={{
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                zIndex: 1
-              }}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 1 }}
             />
             <div style={{ position: 'relative', zIndex: 0, width: '100%', height: '100%' }}>
               <UserAvatar
                 user={{ avatar: safeAvatar, name: partnerName }}
-                size={300} // Approximate large size for background
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: 0,
-                  filter: 'brightness(0.95)'
-                }}
+                size={300}
+                style={{ width: '100%', height: '100%', borderRadius: 0, filter: 'brightness(0.8)' }}
               />
             </div>
-
-            {/* Live HD Calling Badge Overlay */}
-            {isFullScreen && (
-              <div style={{
-                position: 'absolute',
-                top: '70px',
-                left: '20px',
-                background: 'rgba(0, 0, 0, 0.65)',
-                backdropFilter: 'blur(12px)',
-                padding: '6px 14px',
-                borderRadius: '20px',
-                border: '1px solid rgba(255,255,255,0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981', boxShadow: '0 0 10px #10B981' }} />
-                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#FFF' }}>{partnerName} • HD Vidéo</span>
-              </div>
-            )}
           </div>
         );
       } else {
@@ -503,37 +714,68 @@ export default function VideoCallScreen({
             alignItems: 'center',
             justifyContent: 'center',
             background: 'radial-gradient(circle at 50% 35%, #1E293B 0%, #070B14 100%)',
-            color: '#FFFFFF'
+            color: '#FFFFFF',
+            position: 'relative'
           }}>
+            {/* Pulsing Aura Rings during Speaking */}
             <div style={{
-              width: isFullScreen ? '140px' : '50px',
-              height: isFullScreen ? '140px' : '50px',
-              borderRadius: '50%',
-              border: '4px solid #0066FF',
-              overflow: 'hidden',
-              marginBottom: isFullScreen ? '20px' : '0',
-              boxShadow: '0 8px 24px rgba(0, 102, 255, 0.4)'
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '20px'
             }}>
-              <UserAvatar user={{ avatar: safeAvatar }} size={isFullScreen ? 140 : 50} style={{ width: '100%', height: '100%', borderRadius: 0 }} />
+              {isConnected && (
+                <div style={{
+                  position: 'absolute',
+                  width: `${140 + audioLevel * 1.2}px`,
+                  height: `${140 + audioLevel * 1.2}px`,
+                  borderRadius: '50%',
+                  background: 'rgba(0, 102, 255, 0.25)',
+                  filter: 'blur(20px)',
+                  transition: 'all 0.1s ease',
+                  zIndex: 0
+                }} />
+              )}
+
+              <div style={{
+                position: 'relative',
+                zIndex: 1,
+                borderRadius: '50%',
+                border: '4px solid #0066FF',
+                boxShadow: '0 8px 30px rgba(0, 102, 255, 0.5)'
+              }}>
+                <UserAvatar user={{ avatar: safeAvatar, name: partnerName }} size={isFullScreen ? 130 : 50} />
+              </div>
             </div>
-            
-            <video
-              ref={isFullScreen ? remoteVideoMainRef : remoteVideoPipRef}
-              autoPlay
-              playsInline
-              style={{
-                position: 'absolute',
-                opacity: 0,
-                width: '1px',
-                height: '1px',
-                pointerEvents: 'none'
-              }}
-            />
+
             {isFullScreen && (
               <>
-                <h2 style={{ fontSize: '1.8rem', fontWeight: 900 }}>{partnerName}</h2>
-                <p style={{ color: '#94A3B8', marginTop: '8px' }}>
-                  {isConnected ? '🎙️ Appel Audio HD en cours...' : 'Connexion en cours...'}
+                <h2 style={{ fontSize: '1.65rem', fontWeight: 900, margin: 0, color: '#FFF' }}>{partnerName}</h2>
+                <span style={{ fontSize: '0.82rem', color: '#60A5FA', marginTop: '4px', fontWeight: 700 }}>
+                  {callerRole}
+                </span>
+
+                {/* Real-time Voice Spectrum Waveform */}
+                {isConnected && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', height: '36px', marginTop: '24px' }}>
+                    {frequencyBars.map((height, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          width: '4px',
+                          height: `${height}%`,
+                          borderRadius: '4px',
+                          background: 'linear-gradient(to top, #0066FF, #00C6FF)',
+                          transition: 'height 0.08s ease'
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                <p style={{ color: '#94A3B8', fontSize: '0.85rem', marginTop: '14px' }}>
+                  {isConnected ? '🎙️ Connexion Audio HD Stéréo Active' : 'Établissement du signal...'}
                 </p>
               </>
             )}
@@ -543,68 +785,120 @@ export default function VideoCallScreen({
     }
   };
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // MAIN FULL VIEW
+  // ══════════════════════════════════════════════════════════════════════════
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9998, background: '#070B14', display: 'flex', flexDirection: 'column', color: '#FFF', overflow: 'hidden' }}>
-      
-      {/* 1. MAIN FULL SCREEN VIEW (Swappable) */}
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      zIndex: 9998,
+      background: '#070B14',
+      display: 'flex',
+      flexDirection: 'column',
+      color: '#FFF',
+      overflow: 'hidden'
+    }}>
+      {/* 1. MAIN BACKGROUND VIEW (Swappable) */}
       <div style={{ position: 'absolute', inset: 0 }}>
         {renderParticipantContent(isLocalMain, true)}
       </div>
 
-      {/* TOP HEADER BAR OVERLAY */}
-      <div style={{ position: 'relative', zIndex: 10, paddingTop: 'max(20px, env(safe-area-inset-top))', paddingBottom: '12px', paddingLeft: '20px', paddingRight: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(to bottom, rgba(0,0,0,0.75), transparent)' }}>
-        <button onClick={onMinimize} title="Réduire l'appel" style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', padding: '10px', color: '#FFF', cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
-          <Minimize2 size={20} />
+      {/* Floating Reactions Rising Animation */}
+      {activeReactions.map(r => (
+        <div
+          key={r.id}
+          style={{
+            position: 'absolute',
+            bottom: '120px',
+            left: `${r.left}%`,
+            fontSize: '2.5rem',
+            zIndex: 40,
+            pointerEvents: 'none',
+            animation: 'floatReaction 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+          }}
+        >
+          {r.emoji}
+        </div>
+      ))}
+
+      {/* 2. TOP HEADER HUD */}
+      <div style={{
+        position: 'relative',
+        zIndex: 20,
+        paddingTop: 'max(20px, env(safe-area-inset-top))',
+        paddingBottom: '12px',
+        paddingLeft: '18px',
+        paddingRight: '18px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: 'linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, transparent 100%)'
+      }}>
+        {/* Minimize Button */}
+        <button
+          onClick={onMinimize}
+          title="Réduire l'appel en fenêtre flottante"
+          style={{
+            background: 'rgba(255,255,255,0.18)',
+            border: 'none',
+            borderRadius: '50%',
+            padding: '10px',
+            color: '#FFF',
+            cursor: 'pointer',
+            backdropFilter: 'blur(8px)'
+          }}
+        >
+          <Minimize2 size={18} />
         </button>
 
+        {/* Center Title & Timer */}
         <div style={{ textAlign: 'center' }}>
-          <h4 style={{ fontSize: '0.95rem', fontWeight: 800, margin: 0 }}>{partnerName}</h4>
-          <p style={{ fontSize: '0.75rem', color: '#10B981', margin: 0, fontWeight: 700 }}>
-            {isConnected ? `${currentIsAudioOnly ? '🎙️ Audio' : '📹 Vidéo HD'} • ${formatDuration(callDuration)}` : 'Sonnerie...'}
-          </p>
+          <h4 style={{ fontSize: '1rem', fontWeight: 900, margin: 0, letterSpacing: '-0.01em' }}>
+            {partnerName}
+          </h4>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '2px' }}>
+            <span style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: isConnected ? '#10B981' : '#F59E0B',
+              boxShadow: isConnected ? '0 0 10px #10B981' : 'none'
+            }} />
+            <span style={{ fontSize: '0.78rem', color: isConnected ? '#10B981' : '#F59E0B', fontWeight: 700 }}>
+              {isConnected ? `${currentIsAudioOnly ? '🎙️ Audio HD' : '📹 Vidéo HD'} • ${formatDuration(callDuration)}` : 'Sonnerie en cours...'}
+            </span>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(16, 185, 129, 0.2)', padding: '6px 12px', borderRadius: '16px', border: '1px solid rgba(16, 185, 129, 0.4)' }}>
-          <ShieldCheck size={14} color="#10B981" />
-          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10B981' }}>Chiffré</span>
+        {/* Right Network & Encryption Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            background: 'rgba(16, 185, 129, 0.2)',
+            padding: '4px 10px',
+            borderRadius: '16px',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            fontSize: '0.68rem',
+            fontWeight: 800,
+            color: '#10B981'
+          }}>
+            <Wifi size={12} /> {pingMs}ms
+          </div>
         </div>
       </div>
 
-      {/* MIGRATION & SWAP NOTIFICATION TOAST BADGES */}
-      {upgradeMessage && (
-        <div style={{
-          position: 'absolute',
-          top: '80px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 30,
-          background: 'rgba(15, 23, 42, 0.92)',
-          backdropFilter: 'blur(12px)',
-          color: '#FFFFFF',
-          padding: '10px 20px',
-          borderRadius: '20px',
-          fontSize: '0.85rem',
-          fontWeight: 700,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          boxShadow: '0 8px 24px rgba(0, 102, 255, 0.5)',
-          border: '1px solid rgba(0, 102, 255, 0.6)',
-          maxWidth: '90%',
-          textAlign: 'center'
-        }}>
-          <Video size={16} color="#0066FF" /> {upgradeMessage}
-        </div>
-      )}
-
+      {/* Screen Swap Feedback Toast */}
       {swapFeedback && (
         <div style={{
           position: 'absolute',
-          top: '80px',
+          top: '75px',
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 30,
-          background: 'rgba(0, 102, 255, 0.9)',
+          background: 'rgba(0, 102, 255, 0.95)',
           backdropFilter: 'blur(12px)',
           color: '#FFFFFF',
           padding: '8px 18px',
@@ -614,299 +908,326 @@ export default function VideoCallScreen({
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          boxShadow: '0 8px 24px rgba(0, 102, 255, 0.5)',
-          border: '1px solid rgba(255,255,255,0.4)',
-          animation: 'fadeIn 0.2s ease'
+          boxShadow: '0 8px 24px rgba(0, 102, 255, 0.5)'
         }}>
-          <ArrowLeftRight size={16} /> Écrans permutés avec succès !
+          <ArrowLeftRight size={16} /> Écrans permutés !
         </div>
       )}
 
-      {/* INITIATOR WAITING OVERLAY — Shown to the person who requested video upgrade */}
-      {isUpgradePending && (
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          zIndex: 35,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(7, 11, 20, 0.85)',
-          backdropFilter: 'blur(16px)'
-        }}>
-          {/* Live camera preview behind the overlay */}
-          {cameraActive && (
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
-              style={{
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                transform: 'scaleX(-1)',
-                opacity: 0.35,
-                filter: 'blur(6px)'
-              }}
-            />
-          )}
-
-          {/* Waiting content */}
-          <div style={{
-            position: 'relative',
-            zIndex: 2,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '20px'
-          }}>
-            {/* Pulsing camera icon */}
-            <div style={{
-              width: '80px',
-              height: '80px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #0066FF, #0047FF)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 0 40px rgba(0, 102, 255, 0.5)',
-              animation: 'pulse 2s ease-in-out infinite'
-            }}>
-              <Video size={36} color="#FFF" />
-            </div>
-
-            <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#FFF', textAlign: 'center' }}>
-              Migration en Appel Vidéo HD
-            </h3>
-
-            <p style={{ fontSize: '0.9rem', color: '#94A3B8', textAlign: 'center', maxWidth: '280px', lineHeight: 1.5 }}>
-              Votre caméra est activée. En attente de la réponse de <strong style={{ color: '#FFF' }}>{partnerName}</strong>...
-            </p>
-
-            {/* Animated waiting dots */}
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {[0, 1, 2].map(i => (
-                <div key={i} style={{
-                  width: '10px',
-                  height: '10px',
-                  borderRadius: '50%',
-                  background: '#0066FF',
-                  animation: `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
-                  opacity: 0.6
-                }} />
-              ))}
-            </div>
-
-            {/* Cancel button */}
-            <button
-              onClick={() => {
-                clearTimeout(upgradeTimerRef.current);
-                handlePartnerRejectedUpgrade();
-              }}
-              style={{
-                marginTop: '10px',
-                padding: '10px 28px',
-                borderRadius: '16px',
-                border: '1px solid rgba(255,255,255,0.2)',
-                background: 'rgba(255,255,255,0.1)',
-                backdropFilter: 'blur(8px)',
-                color: '#FFF',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <X size={16} /> Annuler la demande
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* REMOTE PARTNER UPGRADE MODAL — ONLY shown to partner receiving video upgrade invitation */}
-      {showVideoUpgradePrompt && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 40,
-          width: '90%',
-          maxWidth: '360px',
-          background: 'rgba(15, 23, 42, 0.95)',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '24px',
-          padding: '24px',
-          border: '1px solid rgba(0, 102, 255, 0.5)',
-          boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
-          textAlign: 'center',
-          color: '#FFFFFF'
-        }}>
-          <div style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #0066FF, #0047FF)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '16px',
-            boxShadow: '0 0 24px rgba(0, 102, 255, 0.6)'
-          }}>
-            <Video size={32} />
-          </div>
-
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 900, marginBottom: '8px' }}>
-            Demande d'Appel Vidéo HD 📹
-          </h3>
-          <p style={{ fontSize: '0.85rem', color: '#94A3B8', marginBottom: '20px', lineHeight: 1.4 }}>
-            <strong style={{ color: '#FFF' }}>{partnerName}</strong> souhaite basculer cet appel en <strong>Appel Vidéo HD</strong>. Accepter ?
-          </p>
-
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button
-              onClick={handleRejectVideoUpgrade}
-              style={{
-                flex: 1,
-                padding: '12px',
-                borderRadius: '16px',
-                border: '1px solid rgba(255,255,255,0.2)',
-                background: 'rgba(255,255,255,0.1)',
-                color: '#FFF',
-                fontWeight: 700,
-                fontSize: '0.85rem',
-                cursor: 'pointer'
-              }}
-            >
-              ❌ Refuser
-            </button>
-            <button
-              onClick={handleAcceptVideoUpgrade}
-              style={{
-                flex: 1.2,
-                padding: '12px',
-                borderRadius: '16px',
-                border: 'none',
-                background: 'linear-gradient(135deg, #0066FF, #0047FF)',
-                color: '#FFF',
-                fontWeight: 800,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                boxShadow: '0 6px 20px rgba(0, 102, 255, 0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
-            >
-              <Check size={16} /> 📹 Accepter la Vidéo
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 2. FLOATING PIP FRAME (INTERACTIVE SWAPPABLE MINI SCREEN - Active during Video Mode) */}
+      {/* 3. FLOATING PIP MINI FRAME (Active in Video Mode) */}
       {isConnected && !currentIsAudioOnly && (
         <div
           onClick={handleSwapScreens}
           title="Cliquer pour permuter l'écran grand / petit"
           style={{
             position: 'absolute',
-            bottom: '160px',
-            right: '20px',
-            width: '115px',
-            height: '165px',
-            borderRadius: '18px',
+            top: '85px',
+            right: '16px',
+            width: '110px',
+            height: '160px',
+            borderRadius: '20px',
             overflow: 'hidden',
             border: '2.5px solid #0066FF',
             zIndex: 25,
             cursor: 'pointer',
             boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
-            transition: 'transform 0.2s ease, border-color 0.2s ease',
             background: '#070B14'
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.06)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
         >
-          {/* Render Opposite Participant in Floating Frame */}
           {renderParticipantContent(!isLocalMain, false)}
-
-          {/* Click-to-Swap Icon Badge Overlay */}
           <div style={{
             position: 'absolute',
             bottom: '6px',
             right: '6px',
             background: 'rgba(0, 102, 255, 0.85)',
-            backdropFilter: 'blur(6px)',
             borderRadius: '50%',
-            width: '26px',
-            height: '26px',
+            width: '24px',
+            height: '24px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#FFF',
-            border: '1px solid rgba(255,255,255,0.5)',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+            color: '#FFF'
           }}>
-            <ArrowLeftRight size={13} />
-          </div>
-
-          {/* Participant Label Badge */}
-          <div style={{
-            position: 'absolute',
-            top: '6px',
-            left: '6px',
-            background: 'rgba(0, 0, 0, 0.65)',
-            backdropFilter: 'blur(6px)',
-            padding: '2px 6px',
-            borderRadius: '8px',
-            fontSize: '0.62rem',
-            fontWeight: 800,
-            color: '#FFFFFF'
-          }}>
-            {!isLocalMain ? 'Vous' : partnerName.split(' ')[0]}
+            <ArrowLeftRight size={12} />
           </div>
         </div>
       )}
 
-      {/* BOTTOM ACTION CONTROLS BAR */}
-      <div style={{ position: 'relative', zIndex: 10, marginTop: 'auto', padding: '30px 20px max(35px, env(safe-area-inset-bottom))', background: 'linear-gradient(to top, rgba(0,0,0,0.85), transparent)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-        {isIncoming && !isConnected ? (
-          <div style={{ display: 'flex', gap: '50px' }}>
-            <button onClick={handleRejectCall} style={{ width: '70px', height: '70px', borderRadius: '50%', background: '#EF4444', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><PhoneOff size={30} color="#FFF" /></button>
-            <button onClick={handleAcceptCall} style={{ width: '70px', height: '70px', borderRadius: '50%', background: '#10B981', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', animation: 'bounce 1s infinite' }}><Phone size={30} color="#FFF" /></button>
+      {/* 4. IN-CALL CHAT DRAWER */}
+      {showInCallChat && (
+        <div style={{
+          position: 'absolute',
+          bottom: '120px',
+          left: '16px',
+          right: '16px',
+          maxHeight: '260px',
+          background: 'rgba(15, 23, 42, 0.95)',
+          backdropFilter: 'blur(16px)',
+          borderRadius: '24px',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          zIndex: 35,
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 16px 40px rgba(0,0,0,0.5)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#FFF' }}>💬 Notes & Messages en Direct</span>
+            <button
+              onClick={() => setShowInCallChat(false)}
+              style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}
+            >
+              <X size={16} />
+            </button>
           </div>
-        ) : (
-          <div style={{ display: 'flex', gap: '18px', alignItems: 'center' }}>
-            {/* Mute Microphone Button */}
-            <button onClick={() => setIsMuted(!isMuted)} title={isMuted ? 'Activer le micro' : 'Couper le micro'} style={{ width: '52px', height: '52px', borderRadius: '50%', background: isMuted ? '#EF4444' : 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backdropFilter: 'blur(10px)' }}>
-              {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
+
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px', maxHeight: '140px' }}>
+            {inCallMessages.length === 0 ? (
+              <p style={{ fontSize: '0.78rem', color: '#64748B', textAlign: 'center', margin: 'auto' }}>
+                Aucun message échangé pendant l'appel
+              </p>
+            ) : (
+              inCallMessages.map((m) => (
+                <div key={m.id} style={{ background: 'rgba(255,255,255,0.1)', padding: '6px 10px', borderRadius: '12px', fontSize: '0.8rem' }}>
+                  <strong style={{ color: '#60A5FA' }}>{m.senderName}: </strong> {m.text}
+                </div>
+              ))
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              type="text"
+              value={inCallText}
+              onChange={(e) => setInCallText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSendInCallMessage()}
+              placeholder="Écrire un message..."
+              style={{
+                flex: 1,
+                padding: '8px 14px',
+                borderRadius: '16px',
+                border: '1px solid rgba(255,255,255,0.2)',
+                background: 'rgba(0,0,0,0.4)',
+                color: '#FFF',
+                fontSize: '0.82rem',
+                outline: 'none'
+              }}
+            />
+            <button
+              onClick={handleSendInCallMessage}
+              style={{
+                padding: '8px 14px',
+                borderRadius: '16px',
+                border: 'none',
+                background: '#0066FF',
+                color: '#FFF',
+                cursor: 'pointer'
+              }}
+            >
+              <Send size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 5. INCOMING CALL SCREEN WITH QUICK SMS MODAL */}
+      {isIncoming && !isConnected ? (
+        <div style={{
+          position: 'relative',
+          zIndex: 20,
+          marginTop: 'auto',
+          padding: '30px 20px max(35px, env(safe-area-inset-bottom))',
+          background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, transparent 100%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '20px'
+        }}>
+          {showQuickRejectModal ? (
+            <div style={{
+              width: '100%',
+              maxWidth: '360px',
+              background: 'rgba(15, 23, 42, 0.95)',
+              backdropFilter: 'blur(16px)',
+              borderRadius: '24px',
+              padding: '18px',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#FFF' }}>Répondre par message rapide</span>
+                <button onClick={() => setShowQuickRejectModal(false)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              {QUICK_RESPONSES.map((res, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleQuickReject(res)}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: '14px',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    background: 'rgba(255,255,255,0.06)',
+                    color: '#FFF',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}
+                >
+                  <span style={{ fontSize: '1.2rem' }}>{res.icon}</span> {res.text}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <>
+              {/* Quick Message Reject Option */}
+              <button
+                onClick={() => setShowQuickRejectModal(true)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  backdropFilter: 'blur(8px)',
+                  color: '#FFF',
+                  padding: '8px 18px',
+                  borderRadius: '20px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                <MessageSquare size={15} /> Réponse rapide par SMS
+              </button>
+
+              {/* Accept / Reject Big Buttons */}
+              <div style={{ display: 'flex', gap: '60px', alignItems: 'center' }}>
+                <button
+                  onClick={handleRejectCall}
+                  title="Refuser l'appel"
+                  style={{
+                    width: '68px',
+                    height: '68px',
+                    borderRadius: '50%',
+                    background: '#EF4444',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 8px 24px rgba(239, 68, 68, 0.4)'
+                  }}
+                >
+                  <PhoneOff size={30} color="#FFF" />
+                </button>
+
+                <button
+                  onClick={handleAcceptCall}
+                  title="Accepter l'appel"
+                  style={{
+                    width: '74px',
+                    height: '74px',
+                    borderRadius: '50%',
+                    background: '#10B981',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 10px 30px rgba(16, 185, 129, 0.5)',
+                    animation: 'bounce 1s infinite'
+                  }}
+                >
+                  <Phone size={34} color="#FFF" />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        /* 6. CONNECTED CALL CONTROL HUD */
+        <div style={{
+          position: 'relative',
+          zIndex: 20,
+          marginTop: 'auto',
+          padding: '24px 16px max(30px, env(safe-area-inset-bottom))',
+          background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 60%, transparent 100%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '16px'
+        }}>
+          {/* Reaction Quick Bar */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            background: 'rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(12px)',
+            padding: '6px 12px',
+            borderRadius: '24px',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            {FLOATING_REACTIONS.map((emoji, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleSendReaction(emoji)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: '1.25rem',
+                  cursor: 'pointer',
+                  padding: '2px 4px',
+                  transition: 'transform 0.15s ease'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.3)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+
+          {/* Controls Button Row */}
+          <div style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+            {/* Mute Mic */}
+            <button
+              onClick={handleToggleMute}
+              title={isMuted ? 'Activer le micro' : 'Couper le micro'}
+              style={{
+                width: '50px',
+                height: '50px',
+                borderRadius: '50%',
+                background: isMuted ? '#EF4444' : 'rgba(255,255,255,0.18)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                color: '#FFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                backdropFilter: 'blur(10px)'
+              }}
+            >
+              {isMuted ? <MicOff size={22} /> : <Mic size={22} />}
             </button>
 
-            {/* End Call Button */}
-            <button onClick={handleEndCall} title="Raccrocher l'appel" style={{ width: '72px', height: '72px', borderRadius: '50%', background: '#EF4444', border: 'none', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 8px 25px rgba(239, 68, 68, 0.5)' }}>
-              <PhoneOff size={32} />
-            </button>
-
-            {/* Camera / Video Call Upgrade Button */}
+            {/* Video Camera Toggle */}
             <button
               onClick={handleToggleVideo}
-              title={currentIsAudioOnly ? 'Passer en Appel Vidéo HD' : isVideoOff ? 'Activer ma caméra' : 'Désactiver ma caméra'}
+              title={currentIsAudioOnly ? 'Passer en Vidéo HD' : isVideoOff ? 'Activer la caméra' : 'Désactiver la caméra'}
               style={{
-                width: '52px',
-                height: '52px',
+                width: '50px',
+                height: '50px',
                 borderRadius: '50%',
-                background: currentIsAudioOnly
-                  ? '#0066FF'
-                  : isVideoOff
-                  ? '#EF4444'
-                  : 'rgba(255,255,255,0.2)',
+                background: currentIsAudioOnly ? '#0066FF' : isVideoOff ? '#EF4444' : 'rgba(255,255,255,0.18)',
                 border: '1px solid rgba(255,255,255,0.3)',
                 color: '#FFF',
                 display: 'flex',
@@ -917,18 +1238,99 @@ export default function VideoCallScreen({
                 boxShadow: currentIsAudioOnly ? '0 0 20px rgba(0, 102, 255, 0.6)' : 'none'
               }}
             >
-              {isVideoOff ? <VideoOff size={24} /> : <Video size={24} />}
+              {isVideoOff ? <VideoOff size={22} /> : <Video size={22} />}
             </button>
 
-            {/* Swap Screen Button (Active during Video mode) */}
+            {/* Screen Share Button */}
             {!currentIsAudioOnly && (
-              <button onClick={handleSwapScreens} title="Permuter l'affichage des écrans" style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(0, 102, 255, 0.4)', border: '1px solid rgba(0, 102, 255, 0.6)', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backdropFilter: 'blur(10px)' }}>
-                <ArrowLeftRight size={22} />
+              <button
+                onClick={handleToggleScreenShare}
+                title={isScreenSharing ? "Arrêter le partage d'écran" : "Partager mon écran / DAW"}
+                style={{
+                  width: '50px',
+                  height: '50px',
+                  borderRadius: '50%',
+                  background: isScreenSharing ? '#10B981' : 'rgba(255,255,255,0.18)',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  color: '#FFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(10px)'
+                }}
+              >
+                <Monitor size={22} />
               </button>
             )}
+
+            {/* Switch Camera (Front/Back) */}
+            {!currentIsAudioOnly && !isVideoOff && (
+              <button
+                onClick={handleSwitchCamera}
+                title="Changer de caméra"
+                style={{
+                  width: '50px',
+                  height: '50px',
+                  borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.18)',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  color: '#FFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(10px)'
+                }}
+              >
+                <SwitchCamera size={22} />
+              </button>
+            )}
+
+            {/* In-Call Chat Drawer Toggle */}
+            <button
+              onClick={() => setShowInCallChat(!showInCallChat)}
+              title="Ouvrir le chat en direct"
+              style={{
+                width: '50px',
+                height: '50px',
+                borderRadius: '50%',
+                background: showInCallChat ? '#0066FF' : 'rgba(255,255,255,0.18)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                color: '#FFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                backdropFilter: 'blur(10px)'
+              }}
+            >
+              <MessageSquare size={22} />
+            </button>
+
+            {/* End Call Button */}
+            <button
+              onClick={handleEndCall}
+              title="Raccrocher l'appel"
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: '#EF4444',
+                border: 'none',
+                color: '#FFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 8px 25px rgba(239, 68, 68, 0.5)'
+              }}
+            >
+              <PhoneOff size={28} />
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

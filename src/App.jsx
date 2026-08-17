@@ -2517,13 +2517,35 @@ function MainApp() {
       createdAtTimestamp: Date.now()
     };
 
+    const extraMessages = [newMsg];
+    if (callResult.quickMessage) {
+      const quickMsg = {
+        id: `msg_quick_${Date.now() + 50}`,
+        senderId: currentUser ? currentUser.id : 'usr_1',
+        sender: 'current',
+        text: `💬 ${callResult.quickMessage}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        createdAtTimestamp: Date.now() + 50
+      };
+      extraMessages.push(quickMsg);
+
+      if (isSupabaseConfigured() && selectedChat?.participant?.id && currentUser?.id) {
+        supabase.from('messages').insert({
+          sender_id: currentUser.id,
+          receiver_id: selectedChat.participant.id,
+          content: `💬 ${callResult.quickMessage}`,
+          is_read: false
+        }).catch(() => {});
+      }
+    }
+
     const updatedChats = chats.map((c) => {
       if (c.id === (callResult.chatId || selectedChat.id)) {
         return {
           ...c,
-          lastMessage: callNoticeText,
+          lastMessage: callResult.quickMessage ? `💬 ${callResult.quickMessage}` : callNoticeText,
           lastMessageTime: 'À l\'instant',
-          messages: [...c.messages, newMsg]
+          messages: [...c.messages, ...extraMessages]
         };
       }
       return c;
