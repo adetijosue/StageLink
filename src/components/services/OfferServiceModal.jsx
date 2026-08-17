@@ -2,24 +2,27 @@ import React, { useState, useRef } from 'react';
 import { X, Sliders, DollarSign, Clock, ShieldCheck, Image, Headphones, Mic, Radio, Music } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { compressImage } from '../../utils/imageCompressor';
-
-const SERVICE_CATEGORIES = [
-  { id: 'mix', name: 'Mixage Audio Stéréo / Dolby Atmos', icon: '🎚️', defaultPrice: '200' },
-  { id: 'master', name: 'Mastering Analogique Haute Définition', icon: '🎧', defaultPrice: '100' },
-  { id: 'recording', name: 'Session Studio & Enregistrement Voix', icon: '🎙️', defaultPrice: '150' },
-  { id: 'beatmaking', name: 'Composition & Beatmaking sur Mesure', icon: '🎹', defaultPrice: '250' },
-  { id: 'vocal_edit', name: 'Édition Vocale, Melodyne & Harmonies', icon: '✨', defaultPrice: '80' },
-  { id: 'coaching', name: 'Coaching Vocal & Direction Artistique', icon: '🎯', defaultPrice: '120' }
-];
 
 export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, isDarkMode }) {
   const { currentUser } = useAuth();
+  const { t, language } = useLanguage();
+
+  const SERVICE_CATEGORIES = [
+    { id: 'mix', name: language === 'en' ? 'Audio Mixing Stereo / Dolby Atmos' : 'Mixage Audio Stéréo / Dolby Atmos', shortName: language === 'en' ? 'Mixing' : 'Mixage', icon: '🎚️', defaultPrice: '200' },
+    { id: 'master', name: language === 'en' ? 'High-Definition Analog Mastering' : 'Mastering Analogique Haute Définition', shortName: language === 'en' ? 'Mastering' : 'Mastering', icon: '🎧', defaultPrice: '100' },
+    { id: 'recording', name: language === 'en' ? 'Studio Session & Vocal Recording' : 'Session Studio & Enregistrement Voix', shortName: language === 'en' ? 'Recording' : 'Studio', icon: '🎙️', defaultPrice: '150' },
+    { id: 'beatmaking', name: language === 'en' ? 'Custom Composition & Beatmaking' : 'Composition & Beatmaking sur Mesure', shortName: language === 'en' ? 'Beatmaking' : 'Beatmaking', icon: '🎹', defaultPrice: '250' },
+    { id: 'vocal_edit', name: language === 'en' ? 'Vocal Editing, Melodyne & Harmonies' : 'Édition Vocale, Melodyne & Harmonies', shortName: language === 'en' ? 'Vocal Edit' : 'Édition Voix', icon: '✨', defaultPrice: '80' },
+    { id: 'coaching', name: language === 'en' ? 'Vocal Coaching & Artistic Direction' : 'Coaching Vocal & Direction Artistique', shortName: language === 'en' ? 'Coaching' : 'Coaching', icon: '🎯', defaultPrice: '120' }
+  ];
+
   const [selectedCat, setSelectedCat] = useState(SERVICE_CATEGORIES[0]);
   const [customTitle, setCustomTitle] = useState('');
   const [price, setPrice] = useState('200');
   const [priceUnit, setPriceUnit] = useState('titre'); // 'titre' | 'session' | 'heure' | 'projet'
-  const [deliveryTime, setDeliveryTime] = useState('Livraison 48h (2 Révisions incluses)');
+  const [deliveryTime, setDeliveryTime] = useState(language === 'en' ? '48h Delivery (2 Revisions included)' : 'Livraison 48h (2 Révisions incluses)');
   const [description, setDescription] = useState('');
   const [coverImage, setCoverImage] = useState(null);
   const [shareToFeed, setShareToFeed] = useState(true);
@@ -47,14 +50,14 @@ export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, i
       userId: currentUser?.id,
       title: finalTitle,
       category: selectedCat.id,
-      provider: currentUser?.name || 'Studio Partenaire',
+      provider: currentUser?.name || (language === 'en' ? 'Partner Studio' : 'Studio Partenaire'),
       providerAvatar: currentUser?.avatar || '',
       price: `${price} € / ${priceUnit}`,
       priceNum: parseFloat(price) || 0,
       delivery: deliveryTime,
-      rating: 'Nouveau ⭐',
+      rating: language === 'en' ? 'New ⭐' : 'Nouveau ⭐',
       icon: selectedCat.icon,
-      description: description.trim() || `Prestation professionnelle proposée par ${currentUser?.name || 'Artiste / Ingénieur'}. Équipement de pointe et qualité garantie.`,
+      description: description.trim() || (language === 'en' ? `Professional service provided by ${currentUser?.name || 'Artist / Engineer'}. State-of-the-art equipment and guaranteed quality.` : `Prestation professionnelle proposée par ${currentUser?.name || 'Artiste / Ingénieur'}. Équipement de pointe et qualité garantie.`),
       cover: coverImage || currentUser?.avatar || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=600&auto=format&fit=crop&q=80',
       createdAt: new Date().toISOString()
     };
@@ -99,10 +102,10 @@ export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, i
         }}>
           <div>
             <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: isDarkMode ? '#FFFFFF' : '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sliders size={20} color="#10B981" /> Proposer un Service Studio
+              <Sliders size={20} color="#10B981" /> {language === 'en' ? 'Offer a Studio Service' : 'Proposer un Service Studio'}
             </h3>
             <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '2px 0 0 0' }}>
-              Offrez vos prestations aux artistes et labels de la communauté
+              {language === 'en' ? 'Offer your services to artists and labels across the community' : 'Offrez vos prestations aux artistes et labels de la communauté'}
             </p>
           </div>
 
@@ -136,7 +139,7 @@ export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, i
             {/* Quick Category Selector */}
             <div>
               <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '6px' }}>
-                Type de Prestation
+                {language === 'en' ? 'Service Category' : 'Type de Prestation'}
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
                 {SERVICE_CATEGORIES.map((cat) => {
@@ -165,7 +168,7 @@ export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, i
                       }}
                     >
                       <span style={{ fontSize: '1.2rem' }}>{cat.icon}</span>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.2 }}>{cat.name.split(' ')[0]}</span>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.2 }}>{cat.shortName}</span>
                     </button>
                   );
                 })}
@@ -175,14 +178,14 @@ export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, i
             {/* Custom Title */}
             <div>
               <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '6px' }}>
-                Intitulé Exact de l'Offre *
+                {language === 'en' ? 'Exact Offer Title *' : "Intitulé Exact de l'Offre *"}
               </label>
               <input
                 type="text"
                 required
                 value={customTitle}
                 onChange={(e) => setCustomTitle(e.target.value)}
-                placeholder="Ex: Mixage Stéréo Hybride & Dolby Atmos Spatialisé"
+                placeholder={language === 'en' ? 'Ex: Hybrid Stereo Mixing & Spatialized Dolby Atmos' : 'Ex: Mixage Stéréo Hybride & Dolby Atmos Spatialisé'}
                 style={{
                   width: '100%',
                   padding: '10px 14px',
@@ -199,7 +202,7 @@ export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, i
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Tarif (€)
+                  {language === 'en' ? 'Rate (€)' : 'Tarif (€)'}
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
@@ -225,7 +228,7 @@ export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, i
 
               <div>
                 <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Par
+                  {language === 'en' ? 'Per' : 'Par'}
                 </label>
                 <select
                   value={priceUnit}
@@ -240,10 +243,10 @@ export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, i
                     fontSize: '0.82rem'
                   }}
                 >
-                  <option value="titre">Par Titre / Piste</option>
-                  <option value="session">Par Session (4h)</option>
-                  <option value="heure">Par Heure</option>
-                  <option value="projet">Par Projet / EP</option>
+                  <option value="titre">{language === 'en' ? 'Per Track / Song' : 'Par Titre / Piste'}</option>
+                  <option value="session">{language === 'en' ? 'Per Session (4h)' : 'Par Session (4h)'}</option>
+                  <option value="heure">{language === 'en' ? 'Per Hour' : 'Par Heure'}</option>
+                  <option value="projet">{language === 'en' ? 'Per Project / EP' : 'Par Projet / EP'}</option>
                 </select>
               </div>
             </div>
@@ -251,7 +254,7 @@ export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, i
             {/* Delivery Time & Revisions */}
             <div>
               <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Délai de Réalisation & Révisions
+                {language === 'en' ? 'Turnaround Time & Revisions' : 'Délai de Réalisation & Révisions'}
               </label>
               <select
                 value={deliveryTime}
@@ -266,23 +269,23 @@ export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, i
                   fontSize: '0.82rem'
                 }}
               >
-                <option value="Livraison Express 24h (2 Révisions)">Livraison Express 24h (2 Révisions)</option>
-                <option value="Livraison 48h (3 Révisions incluses)">Livraison 48h (3 Révisions incluses)</option>
-                <option value="Livraison 3 à 5 jours ouvrés">Livraison 3 à 5 jours ouvrés</option>
-                <option value="Sur Rendez-vous en Studio">Sur Rendez-vous en Studio</option>
+                <option value="Livraison Express 24h (2 Révisions)">{language === 'en' ? 'Express 24h Delivery (2 Revisions)' : 'Livraison Express 24h (2 Révisions)'}</option>
+                <option value="Livraison 48h (3 Révisions incluses)">{language === 'en' ? '48h Delivery (3 Revisions included)' : 'Livraison 48h (3 Révisions incluses)'}</option>
+                <option value="Livraison 3 à 5 jours ouvrés">{language === 'en' ? '3 to 5 business days' : 'Livraison 3 à 5 jours ouvrés'}</option>
+                <option value="Sur Rendez-vous en Studio">{language === 'en' ? 'By Appointment at Studio' : 'Sur Rendez-vous en Studio'}</option>
               </select>
             </div>
 
             {/* Detailed Description */}
             <div>
               <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Description de la Prestation & Matériel
+                {language === 'en' ? 'Service Description & Gear' : 'Description de la Prestation & Matériel'}
               </label>
               <textarea
                 rows={3}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Décrivez votre expérience, chaîne analogique, plugins utilisés (UAD, FabFilter, SSL), format de livraison..."
+                placeholder={language === 'en' ? 'Describe your experience, analog gear, plugins used (UAD, FabFilter, SSL), delivery format...' : 'Décrivez votre expérience, chaîne analogique, plugins utilisés (UAD, FabFilter, SSL), format de livraison...'}
                 style={{
                   width: '100%',
                   padding: '9px 12px',
@@ -299,7 +302,7 @@ export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, i
             {/* Visual / Studio Image Upload */}
             <div>
               <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Photo du Studio / Visuel du Service
+                {language === 'en' ? 'Studio Photo / Visual' : 'Photo du Studio / Visuel du Service'}
               </label>
               <input
                 type="file"
@@ -326,13 +329,13 @@ export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, i
                 {coverImage ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <img src={coverImage} alt="Studio" style={{ width: '44px', height: '44px', borderRadius: '10px', objectFit: 'cover' }} />
-                    <span style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 700 }}>Photo sélectionnée (Cliquer pour changer)</span>
+                    <span style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 700 }}>{language === 'en' ? 'Photo selected (Click to change)' : 'Photo sélectionnée (Cliquer pour changer)'}</span>
                   </div>
                 ) : (
                   <>
                     <Image size={20} color="#10B981" />
                     <span style={{ fontSize: '0.78rem', color: isDarkMode ? '#CBD5E1' : '#64748B' }}>
-                      Ajouter une photo de studio ou visuel
+                      {language === 'en' ? 'Add studio photo or artwork' : 'Ajouter une photo de studio ou visuel'}
                     </span>
                   </>
                 )}
@@ -357,7 +360,7 @@ export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, i
                 style={{ accentColor: '#10B981', width: '16px', height: '16px', cursor: 'pointer' }}
               />
               <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#10B981' }}>
-                📢 Partager automatiquement dans le fil d'actualité (Feed)
+                {language === 'en' ? '📢 Automatically share in Feed' : '📢 Partager automatiquement dans le fil d\'actualité (Feed)'}
               </span>
             </label>
 
@@ -377,7 +380,7 @@ export default function OfferServiceModal({ isOpen, onClose, onServiceCreated, i
                 marginTop: '4px'
               }}
             >
-              🚀 Mettre en Ligne la Prestation ({price} € / {priceUnit})
+              {language === 'en' ? `🚀 Publish Service (${price} € / ${priceUnit})` : `🚀 Mettre en Ligne la Prestation (${price} € / ${priceUnit})`}
             </button>
           </form>
         </div>

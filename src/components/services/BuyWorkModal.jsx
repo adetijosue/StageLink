@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { X, CheckCircle, Download, ShieldCheck, FileAudio, FileText } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function BuyWorkModal({ isOpen, onClose, work, onPurchaseComplete, isDarkMode }) {
+  const { t, language } = useLanguage();
   const [selectedLicense, setSelectedLicense] = useState('non_exclusive');
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -81,10 +83,10 @@ export default function BuyWorkModal({ isOpen, onClose, work, onPurchaseComplete
                 gap: '8px'
               }}
             >
-              <FileAudio size={20} color="#0066FF" /> Acquérir cette Œuvre
+              <FileAudio size={20} color="#0066FF" /> {language === 'en' ? 'Acquire this Work' : 'Acquérir cette Œuvre'}
             </h3>
             <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '2px 0 0 0' }}>
-              Licence commerciale officielle & téléchargement instantané
+              {language === 'en' ? 'Official commercial license & instant download' : 'Licence commerciale officielle & téléchargement instantané'}
             </p>
           </div>
 
@@ -124,10 +126,10 @@ export default function BuyWorkModal({ isOpen, onClose, work, onPurchaseComplete
               </div>
               <div>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: isDarkMode ? '#FFFFFF' : '#0F172A' }}>
-                  Acquisition Confirmée !
+                  {language === 'en' ? 'Purchase Confirmed!' : 'Acquisition Confirmée !'}
                 </h3>
                 <p style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.5, margin: '6px 0 0 0' }}>
-                  Vous détenez désormais les droits d'exploitation commerciale pour <strong>{work.title}</strong>.
+                  {language === 'en' ? `You now hold the commercial usage rights for ${work.title}.` : `Vous détenez désormais les droits d'exploitation commerciale pour ${work.title}.`}
                 </p>
               </div>
 
@@ -136,7 +138,7 @@ export default function BuyWorkModal({ isOpen, onClose, work, onPurchaseComplete
                   type="button"
                   onClick={() => {
                     soundEngine?.playPopSound?.();
-                    alert(`Téléchargement lancé pour : ${work.title} (WAV 24-bit + Stems ZIP + Contrat PDF)`);
+                    alert(language === 'en' ? `Download initiated for: ${work.title} (WAV 24-bit + Stems ZIP + Contract PDF)` : `Téléchargement lancé pour : ${work.title} (WAV 24-bit + Stems ZIP + Contrat PDF)`);
                     onClose();
                   }}
                   style={{
@@ -156,7 +158,7 @@ export default function BuyWorkModal({ isOpen, onClose, work, onPurchaseComplete
                     boxShadow: '0 4px 14px rgba(0, 102, 255, 0.3)'
                   }}
                 >
-                  <Download size={16} /> Télécharger Fichiers HD + Stems (.ZIP)
+                  <Download size={16} /> {language === 'en' ? 'Download HD Files + Stems (.ZIP)' : 'Télécharger Fichiers HD + Stems (.ZIP)'}
                 </button>
 
                 <button
@@ -174,7 +176,7 @@ export default function BuyWorkModal({ isOpen, onClose, work, onPurchaseComplete
                     cursor: 'pointer'
                   }}
                 >
-                  Fermer
+                  {t('modal_close')}
                 </button>
               </div>
             </div>
@@ -205,7 +207,7 @@ export default function BuyWorkModal({ isOpen, onClose, work, onPurchaseComplete
                     {work.title}
                   </h4>
                   <p style={{ fontSize: '0.74rem', color: '#64748B', margin: 0 }}>
-                    Par {work.author}
+                    {language === 'en' ? 'By' : 'Par'} {work.author}
                   </p>
                 </div>
               </div>
@@ -213,7 +215,7 @@ export default function BuyWorkModal({ isOpen, onClose, work, onPurchaseComplete
               {/* License Option Selector */}
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '8px' }}>
-                  Choisissez votre Type de Licence
+                  {language === 'en' ? 'Choose License Type' : 'Choisissez votre Type de Licence'}
                 </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {/* Non-Exclusive */}
@@ -233,10 +235,10 @@ export default function BuyWorkModal({ isOpen, onClose, work, onPurchaseComplete
                   >
                     <div>
                       <span style={{ fontSize: '0.85rem', fontWeight: 800, color: isDarkMode ? '#FFFFFF' : '#0F172A', display: 'block' }}>
-                        Licence Standard (WAV + MP3)
+                        {language === 'en' ? 'Standard License (WAV + MP3)' : 'Licence Standard (WAV + MP3)'}
                       </span>
                       <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
-                        Streaming Spotify, clips YouTube, jusqu'à 500 000 écoutes
+                        {language === 'en' ? 'Spotify streaming, YouTube videos, up to 500,000 streams' : 'Streaming Spotify, clips YouTube, jusqu\'à 500 000 écoutes'}
                       </span>
                     </div>
                     <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0066FF', flexShrink: 0 }}>
@@ -261,10 +263,10 @@ export default function BuyWorkModal({ isOpen, onClose, work, onPurchaseComplete
                   >
                     <div>
                       <span style={{ fontSize: '0.85rem', fontWeight: 800, color: isDarkMode ? '#FFFFFF' : '#0F172A', display: 'block' }}>
-                        Licence Exclusive + Stems Séparés
+                        {language === 'en' ? 'Exclusive License + Separate Stems' : 'Licence Exclusive + Stems Séparés'}
                       </span>
                       <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
-                        Droits illimités + pistes multipistes séparées + cession totale
+                        {language === 'en' ? 'Unlimited rights + separate multitrack stems + full buyout' : 'Droits illimités + pistes multipistes séparées + cession totale'}
                       </span>
                     </div>
                     <span style={{ fontSize: '0.95rem', fontWeight: 900, color: '#10B981', flexShrink: 0 }}>
@@ -289,7 +291,7 @@ export default function BuyWorkModal({ isOpen, onClose, work, onPurchaseComplete
                 }}
               >
                 <ShieldCheck size={16} flexShrink={0} />
-                Contrat de cession de droits d'auteur généré automatiquement et signé numériquement.
+                {language === 'en' ? 'Copyright assignment contract automatically generated and digitally signed.' : 'Contrat de cession de droits d\'auteur généré automatiquement et signé numériquement.'}
               </div>
 
               {/* Purchase Button */}
@@ -314,7 +316,7 @@ export default function BuyWorkModal({ isOpen, onClose, work, onPurchaseComplete
                   marginTop: '4px'
                 }}
               >
-                <Download size={16} /> Acheter & Télécharger ({selectedLicense === 'exclusive' ? `${exclusivePrice} €` : work.price})
+                <Download size={16} /> {language === 'en' ? `Buy & Download (${selectedLicense === 'exclusive' ? `${exclusivePrice} €` : work.price})` : `Acheter & Télécharger (${selectedLicense === 'exclusive' ? `${exclusivePrice} €` : work.price})`}
               </button>
             </div>
           )}

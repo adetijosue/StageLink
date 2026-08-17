@@ -5,6 +5,7 @@ import AudioCallView from './AudioCallView';
 import VideoCallView from './VideoCallView';
 import InCallControls from './InCallControls';
 import { CALL_STATUS } from '../../hooks/useWebRTCCall';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function CallOverlay({
   callStatus,
@@ -28,6 +29,7 @@ export default function CallOverlay({
   onToggleAudioOutput,
   onSetMinimized
 }) {
+  const { t, language } = useLanguage();
   if (callStatus === CALL_STATUS.IDLE) return null;
 
   const durationFormatted = `${Math.floor(callDuration / 60).toString().padStart(2, '0')}:${(callDuration % 60).toString().padStart(2, '0')}`;
@@ -60,7 +62,7 @@ export default function CallOverlay({
           <UserAvatar
             user={{
               avatar: remoteParticipant?.avatar_url || remoteParticipant?.avatar,
-              name: remoteParticipant?.full_name || remoteParticipant?.name || 'Artiste'
+              name: remoteParticipant?.full_name || remoteParticipant?.name || (language === 'en' ? 'Artist' : 'Artiste')
             }}
             size={36}
           />
@@ -78,7 +80,7 @@ export default function CallOverlay({
 
         <div>
           <h5 style={{ fontSize: '0.78rem', color: '#FFFFFF', fontWeight: 700, margin: 0 }}>
-            {remoteParticipant?.full_name?.split(' ')[0] || 'Appel'}
+            {remoteParticipant?.full_name?.split(' ')[0] || (language === 'en' ? 'Call' : 'Appel')}
           </h5>
           <span style={{ fontSize: '0.7rem', color: '#93C5FD', fontWeight: 600 }}>
             {durationFormatted}
@@ -90,7 +92,7 @@ export default function CallOverlay({
             e.stopPropagation();
             onEndCall();
           }}
-          title="Raccrocher"
+          title={language === 'en' ? 'Hang up' : 'Raccrocher'}
           style={{
             background: '#EF4444',
             color: '#FFFFFF',
@@ -141,7 +143,7 @@ export default function CallOverlay({
             fontWeight: 700
           }}>
             {callType === 'video' ? <Video size={16} /> : <Phone size={16} />}
-            Appel {callType === 'video' ? 'Vidéo' : 'Audio'} Entrant
+            {language === 'en' ? `Incoming ${callType === 'video' ? 'Video' : 'Audio'} Call` : `Appel ${callType === 'video' ? 'Vidéo' : 'Audio'} Entrant`}
           </span>
         </div>
 
@@ -164,7 +166,7 @@ export default function CallOverlay({
           <UserAvatar
             user={{
               avatar: remoteParticipant?.avatar_url || remoteParticipant?.avatar,
-              name: remoteParticipant?.full_name || remoteParticipant?.name || 'Artiste'
+              name: remoteParticipant?.full_name || remoteParticipant?.name || (language === 'en' ? 'Artist' : 'Artiste')
             }}
             size={120}
           />
@@ -177,11 +179,11 @@ export default function CallOverlay({
             marginBottom: '4px',
             textAlign: 'center'
           }}>
-            {remoteParticipant?.full_name || remoteParticipant?.name || 'Artiste StageLink'}
+            {remoteParticipant?.full_name || remoteParticipant?.name || (language === 'en' ? 'StageLink Artist' : 'Artiste StageLink')}
           </h2>
 
           <p style={{ fontSize: '0.92rem', color: '#93C5FD', margin: 0, fontWeight: 600 }}>
-            {remoteParticipant?.role || 'Artiste'}
+            {remoteParticipant?.role || (language === 'en' ? 'Artist' : 'Artiste')}
           </p>
         </div>
 
@@ -266,7 +268,7 @@ export default function CallOverlay({
             fontSize: '0.8rem',
             fontWeight: 700
           }}>
-            {callStatus === CALL_STATUS.INITIATING ? 'Connexion en cours...' : 'Sonnerie...'}
+            {callStatus === CALL_STATUS.INITIATING ? (language === 'en' ? 'Connecting...' : 'Connexion en cours...') : (language === 'en' ? 'Ringing...' : 'Sonnerie...')}
           </span>
         </div>
 
@@ -289,7 +291,7 @@ export default function CallOverlay({
           <UserAvatar
             user={{
               avatar: remoteParticipant?.avatar_url || remoteParticipant?.avatar,
-              name: remoteParticipant?.full_name || remoteParticipant?.name || 'Artiste'
+              name: remoteParticipant?.full_name || remoteParticipant?.name || (language === 'en' ? 'Artist' : 'Artiste')
             }}
             size={120}
           />
@@ -302,11 +304,11 @@ export default function CallOverlay({
             marginBottom: '4px',
             textAlign: 'center'
           }}>
-            {remoteParticipant?.full_name || remoteParticipant?.name || 'Artiste StageLink'}
+            {remoteParticipant?.full_name || remoteParticipant?.name || (language === 'en' ? 'StageLink Artist' : 'Artiste StageLink')}
           </h2>
 
           <p style={{ fontSize: '0.92rem', color: '#93C5FD', margin: 0, fontWeight: 600 }}>
-            {remoteParticipant?.role || 'Artiste'}
+            {remoteParticipant?.role || (language === 'en' ? 'Artist' : 'Artiste')}
           </p>
         </div>
 

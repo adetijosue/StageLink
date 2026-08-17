@@ -1,6 +1,6 @@
-import React from 'react';
 import { Plus, Camera, Pencil, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import UserAvatar from '../common/UserAvatar';
 
 export default function StoryBar({
@@ -11,6 +11,7 @@ export default function StoryBar({
   isUploadingStory = false
 }) {
   const { currentUser } = useAuth();
+  const { t, language } = useLanguage();
 
   // Precise identification of current user stories (Strictly by userId to prevent name collision)
   const isCurrentUserStory = (s) => {
@@ -148,7 +149,7 @@ export default function StoryBar({
           {/* Camera Story Button */}
           <button
             onClick={() => onAddStory && onAddStory()}
-            title="Prendre une photo / vidéo"
+            title={language === 'en' ? 'Take a photo / video' : 'Prendre une photo / vidéo'}
             style={{
               width: '38px',
               height: '38px',
@@ -173,7 +174,7 @@ export default function StoryBar({
               if (onAddTextStory) onAddTextStory();
               else if (onAddStory) onAddStory();
             }}
-            title="Écrire un statut texte"
+            title={language === 'en' ? 'Write a text status' : 'Écrire un statut texte'}
             style={{
               width: '38px',
               height: '38px',
@@ -207,7 +208,7 @@ export default function StoryBar({
         msOverflowStyle: 'none',
         WebkitOverflowScrolling: 'touch'
       }}>
-        {/* CARD 1: 'My status' (Mon statut) */}
+        {/* CARD 1: 'My status' */}
         <div
           style={{
             width: '114px',
@@ -254,7 +255,7 @@ export default function StoryBar({
                 onAddStory();
               }
             }}
-            title="Ajouter un statut"
+            title={language === 'en' ? 'Add status' : 'Ajouter un statut'}
             style={{
               position: 'absolute',
               top: '10px',
@@ -318,7 +319,7 @@ export default function StoryBar({
               color: '#FFFFFF'
             }}>
               <Loader2 size={24} className="animate-spin" style={{ color: '#0066FF' }} />
-              <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>Envoi...</span>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>{language === 'en' ? 'Uploading...' : 'Envoi...'}</span>
             </div>
           )}
 
@@ -346,7 +347,7 @@ export default function StoryBar({
               whiteSpace: 'nowrap',
               textShadow: myLatestStory ? '0 1px 4px rgba(0,0,0,0.6)' : 'none'
             }}>
-              My status
+              {language === 'en' ? 'My status' : 'Mon statut'}
             </span>
           </div>
         </div>
@@ -378,7 +379,7 @@ export default function StoryBar({
               {/* Background Story Thumbnail */}
               {renderCardMedia(story)}
 
-              {/* Top-Left Incrusted Author Avatar with StageLink Blue (if unread) or Cendre/Transparent (if read) */}
+              {/* Top-Left Incrusted Author Avatar */}
               <div style={{
                 position: 'absolute',
                 top: '10px',
@@ -427,7 +428,7 @@ export default function StoryBar({
                   overflow: 'hidden',
                   textShadow: '0 1px 4px rgba(0,0,0,0.8)'
                 }}>
-                  {story.userName || 'Artiste'}
+                  {story.userName || (language === 'en' ? 'Artist' : 'Artiste')}
                 </span>
               </div>
             </div>

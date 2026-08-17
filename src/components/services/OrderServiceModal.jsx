@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { X, CheckCircle, Send, MessageSquare, ShieldCheck, Clock, Sliders } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function OrderServiceModal({ isOpen, onClose, service, onConfirmOrder, isDarkMode }) {
+  const { t, language } = useLanguage();
   const [projectTitle, setProjectTitle] = useState('');
   const [stemsCount, setStemsCount] = useState('8-16');
   const [notes, setNotes] = useState('');
@@ -18,7 +20,7 @@ export default function OrderServiceModal({ isOpen, onClose, service, onConfirmO
       if (onConfirmOrder) {
         onConfirmOrder({
           service,
-          projectTitle: projectTitle || 'Projet Studio',
+          projectTitle: projectTitle || (language === 'en' ? 'Studio Project' : 'Projet Studio'),
           stemsCount,
           notes
         });
@@ -83,10 +85,10 @@ export default function OrderServiceModal({ isOpen, onClose, service, onConfirmO
                 gap: '8px'
               }}
             >
-              <span>{service.icon || '🎚️'}</span> Commander la Prestation
+              <span>{service.icon || '🎚️'}</span> {language === 'en' ? 'Order Studio Service' : 'Commander la Prestation'}
             </h3>
             <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '2px 0 0 0' }}>
-              Direct avec {service.provider}
+              {language === 'en' ? `Directly with ${service.provider}` : `Direct avec ${service.provider}`}
             </p>
           </div>
 
@@ -125,10 +127,10 @@ export default function OrderServiceModal({ isOpen, onClose, service, onConfirmO
                 <CheckCircle size={36} />
               </div>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: isDarkMode ? '#FFFFFF' : '#0F172A' }}>
-                Demande de Prestation Envoyée !
+                {language === 'en' ? 'Service Request Sent!' : 'Demande de Prestation Envoyée !'}
               </h3>
               <p style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.5, margin: 0 }}>
-                {service.provider} a reçu les détails de votre projet. Une discussion directe a été ouverte dans vos messages.
+                {language === 'en' ? `${service.provider} received your project details. A direct discussion has been opened in your messages.` : `${service.provider} a reçu les détails de votre projet. Une discussion directe a été ouverte dans vos messages.`}
               </p>
             </div>
           ) : (
@@ -158,12 +160,12 @@ export default function OrderServiceModal({ isOpen, onClose, service, onConfirmO
               {/* Project Title */}
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Nom de votre Morceau / Projet *
+                  {language === 'en' ? 'Track / Project Name *' : 'Nom de votre Morceau / Projet *'}
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Mon Nouveau Single - Version Finale"
+                  placeholder={language === 'en' ? 'Ex: My New Single - Final Version' : 'Ex: Mon Nouveau Single - Version Finale'}
                   value={projectTitle}
                   onChange={(e) => setProjectTitle(e.target.value)}
                   style={{
@@ -182,7 +184,7 @@ export default function OrderServiceModal({ isOpen, onClose, service, onConfirmO
               {/* Number of Tracks/Stems */}
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Nombre de Pistes / Stems
+                  {language === 'en' ? 'Number of Tracks / Stems' : 'Nombre de Pistes / Stems'}
                 </label>
                 <select
                   value={stemsCount}
@@ -197,21 +199,21 @@ export default function OrderServiceModal({ isOpen, onClose, service, onConfirmO
                     fontSize: '0.84rem'
                   }}
                 >
-                  <option value="1-4">1 à 4 pistes (Voix + Prod Stéréo)</option>
-                  <option value="5-16">5 à 16 pistes (Standard)</option>
-                  <option value="17-32">17 à 32 pistes (Pro Session)</option>
-                  <option value="32+">Plus de 32 pistes (Session Complète)</option>
+                  <option value="1-4">{language === 'en' ? '1 to 4 tracks (Vocals + Stereo Beat)' : '1 à 4 pistes (Voix + Prod Stéréo)'}</option>
+                  <option value="5-16">{language === 'en' ? '5 to 16 tracks (Standard)' : '5 à 16 pistes (Standard)'}</option>
+                  <option value="17-32">{language === 'en' ? '17 to 32 tracks (Pro Session)' : '17 à 32 pistes (Pro Session)'}</option>
+                  <option value="32+">{language === 'en' ? '32+ tracks (Full Multitrack Session)' : 'Plus de 32 pistes (Session Complète)'}</option>
                 </select>
               </div>
 
               {/* Brief & Artistic References */}
               <div>
                 <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Instructions & Références artistiques
+                  {language === 'en' ? 'Instructions & Artistic References' : 'Instructions & Références artistiques'}
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="Partagez vos liens de références (YouTube/Spotify), vos attentes sonores (brillant, spatial, chaud, basses percutantes...)"
+                  placeholder={language === 'en' ? 'Share your reference links (YouTube/Spotify), desired sound expectations (bright, punchy low-end, warm, spatial...)' : 'Partagez vos liens de références (YouTube/Spotify), vos attentes sonores (brillant, spatial, chaud, basses percutantes...)'}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   style={{
@@ -243,7 +245,7 @@ export default function OrderServiceModal({ isOpen, onClose, service, onConfirmO
                 }}
               >
                 <ShieldCheck size={16} flexShrink={0} />
-                Paiement sous séquestre sécurisé. Le prestataire n'est payé qu'après validation de votre commande.
+                {language === 'en' ? 'Secure escrow payment. The service provider is only paid once your order is validated.' : 'Paiement sous séquestre sécurisé. Le prestataire n\'est payé qu\'après validation de votre commande.'}
               </div>
 
               {/* Order Button */}
@@ -267,7 +269,7 @@ export default function OrderServiceModal({ isOpen, onClose, service, onConfirmO
                   marginTop: '4px'
                 }}
               >
-                <Send size={16} /> Confirmer la Commande ({service.price})
+                <Send size={16} /> {language === 'en' ? `Confirm Order (${service.price})` : `Confirmer la Commande (${service.price})`}
               </button>
             </form>
           )}

@@ -2,13 +2,15 @@ import React, { useState, useRef } from 'react';
 import { X, GraduationCap, DollarSign, Clock, BookOpen, Image } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { compressImage } from '../../utils/imageCompressor';
 
 export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, isDarkMode }) {
   const { currentUser } = useAuth();
+  const { t, language } = useLanguage();
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('49');
-  const [duration, setDuration] = useState('4h 30min (12 Modules HD)');
+  const [duration, setDuration] = useState(language === 'en' ? '4h 30min (12 HD Modules)' : '4h 30min (12 Modules HD)');
   const [description, setDescription] = useState('');
   const [level, setLevel] = useState('Tous niveaux');
   const [coverImage, setCoverImage] = useState(null);
@@ -36,14 +38,14 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
       id: `course_${Date.now()}`,
       userId: currentUser?.id,
       title: title.trim(),
-      instructor: currentUser?.name || 'Formateur Certifié',
+      instructor: currentUser?.name || (language === 'en' ? 'Certified Instructor' : 'Formateur Certifié'),
       instructorAvatar: currentUser?.avatar || '',
       price: `${price} €`,
       priceNum: parseFloat(price) || 0,
       duration,
       level,
       description: description.trim(),
-      enrolled: '1er inscrit',
+      enrolled: language === 'en' ? '1st student' : '1er inscrit',
       rating: '5.0 ⭐',
       cover: coverImage || currentUser?.avatar || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=600&auto=format&fit=crop&q=80',
       createdAt: new Date().toISOString()
@@ -89,10 +91,10 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
         }}>
           <div>
             <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: isDarkMode ? '#FFFFFF' : '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <GraduationCap size={20} color="#0066FF" /> Publier une Formation
+              <GraduationCap size={20} color="#0066FF" /> {language === 'en' ? 'Publish a Course' : 'Publier une Formation'}
             </h3>
             <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '2px 0 0 0' }}>
-              Partagez votre savoir-faire et formez la communauté musicale
+              {language === 'en' ? 'Share your expertise and train the music community' : 'Partagez votre savoir-faire et formez la communauté musicale'}
             </p>
           </div>
 
@@ -126,14 +128,14 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
             {/* Title */}
             <div>
               <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '6px' }}>
-                Titre de la Formation / Masterclass *
+                {language === 'en' ? 'Course / Masterclass Title *' : 'Titre de la Formation / Masterclass *'}
               </label>
               <input
                 type="text"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Masterclass : Mixing & Mastering Pro sur FL Studio"
+                placeholder={language === 'en' ? 'Ex: Masterclass: Pro Mixing & Mastering on FL Studio' : 'Ex: Masterclass : Mixing & Mastering Pro sur FL Studio'}
                 style={{
                   width: '100%',
                   padding: '10px 14px',
@@ -150,7 +152,7 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Prix d'Accès (€)
+                  {language === 'en' ? 'Enrollment Price (€)' : "Prix d'Accès (€)"}
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
@@ -176,7 +178,7 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
 
               <div>
                 <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Niveau Requis
+                  {language === 'en' ? 'Skill Level' : 'Niveau Requis'}
                 </label>
                 <select
                   value={level}
@@ -191,10 +193,10 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
                     fontSize: '0.82rem'
                   }}
                 >
-                  <option value="Tous niveaux">Tous niveaux</option>
-                  <option value="Débutant">Débutant</option>
-                  <option value="Intermédiaire">Intermédiaire</option>
-                  <option value="Avancé / Pro">Avancé / Pro</option>
+                  <option value="Tous niveaux">{language === 'en' ? 'All Levels' : 'Tous niveaux'}</option>
+                  <option value="Débutant">{language === 'en' ? 'Beginner' : 'Débutant'}</option>
+                  <option value="Intermédiaire">{language === 'en' ? 'Intermediate' : 'Intermédiaire'}</option>
+                  <option value="Avancé / Pro">{language === 'en' ? 'Advanced / Pro' : 'Avancé / Pro'}</option>
                 </select>
               </div>
             </div>
@@ -202,13 +204,13 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
             {/* Duration */}
             <div>
               <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Format & Durée Totale
+                {language === 'en' ? 'Format & Total Duration' : 'Format & Durée Totale'}
               </label>
               <input
                 type="text"
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
-                placeholder="Ex: 4h 30min (12 Modules Vidéo HD)"
+                placeholder={language === 'en' ? 'Ex: 4h 30min (12 HD Video Modules)' : 'Ex: 4h 30min (12 Modules Vidéo HD)'}
                 style={{
                   width: '100%',
                   padding: '9px 12px',
@@ -224,13 +226,13 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
             {/* Description & Curriculum */}
             <div>
               <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Programme & Objectifs Pédagogiques
+                {language === 'en' ? 'Curriculum & Learning Goals' : 'Programme & Objectifs Pédagogiques'}
               </label>
               <textarea
                 rows={3}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Décrivez les compétences acquises, les projets pratiques et ressources incluses..."
+                placeholder={language === 'en' ? 'Describe skills taught, hands-on projects and included resources...' : 'Décrivez les compétences acquises, les projets pratiques et ressources incluses...'}
                 style={{
                   width: '100%',
                   padding: '9px 12px',
@@ -247,7 +249,7 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
             {/* Cover Upload */}
             <div>
               <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Vignette / Affiche de la Formation
+                {language === 'en' ? 'Course Thumbnail / Poster' : 'Vignette / Affiche de la Formation'}
               </label>
               <input
                 type="file"
@@ -274,13 +276,13 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
                 {coverImage ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <img src={coverImage} alt="Course" style={{ width: '44px', height: '44px', borderRadius: '10px', objectFit: 'cover' }} />
-                    <span style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 700 }}>Vignette sélectionnée (Cliquer pour changer)</span>
+                    <span style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 700 }}>{language === 'en' ? 'Thumbnail selected (Click to change)' : 'Vignette sélectionnée (Cliquer pour changer)'}</span>
                   </div>
                 ) : (
                   <>
                     <Image size={20} color="#0066FF" />
                     <span style={{ fontSize: '0.78rem', color: isDarkMode ? '#CBD5E1' : '#64748B' }}>
-                      Ajouter une affiche / vignette
+                      {language === 'en' ? 'Add a poster / thumbnail' : 'Ajouter une affiche / vignette'}
                     </span>
                   </>
                 )}
@@ -305,7 +307,7 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
                 style={{ accentColor: '#0066FF', width: '16px', height: '16px', cursor: 'pointer' }}
               />
               <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0066FF' }}>
-                📢 Partager automatiquement dans le fil d'actualité (Feed)
+                {language === 'en' ? '📢 Automatically share in Feed' : '📢 Partager automatiquement dans le fil d\'actualité (Feed)'}
               </span>
             </label>
 
@@ -326,7 +328,7 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
                 marginTop: '4px'
               }}
             >
-              🚀 Mettre en Vente la Formation ({price} €)
+              {language === 'en' ? `🚀 Publish Course (${price} €)` : `🚀 Mettre en Vente la Formation (${price} €)`}
             </button>
           </form>
         </div>

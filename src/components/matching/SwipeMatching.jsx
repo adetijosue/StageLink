@@ -21,6 +21,7 @@ import {
 import UserAvatar from '../common/UserAvatar';
 import { soundEngine } from '../../services/audioService';
 import { presenceService } from '../../services/presenceService';
+import { useLanguage } from '../../context/LanguageContext';
 
 const SwipeMatching = React.memo(function SwipeMatching({ 
   matches = [], 
@@ -29,6 +30,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
   onOpenProfile, 
   currentUser 
 }) {
+  const { t, language } = useLanguage();
   const [activeFilter, setActiveFilter] = useState('all');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showMatchSuccess, setShowMatchSuccess] = useState(null);
@@ -277,12 +279,12 @@ const SwipeMatching = React.memo(function SwipeMatching({
   const favoriteOpacity = Math.min(1, Math.max(0, -dragOffset.y / 70));
 
   const filterTabs = [
-    { id: 'all', label: 'Tous', icon: <Users size={14} /> },
-    { id: 'producers', label: 'Producteurs', icon: <Disc size={14} /> },
-    { id: 'singers', label: 'Chanteurs & Musiciens', icon: <Mic size={14} /> },
-    { id: 'engineers', label: 'Ingénieurs & Studios', icon: <Headphones size={14} /> },
-    { id: 'matched', label: 'Mes Matchs', icon: <Flame size={14} /> },
-    { id: 'favorites', label: 'Favoris', icon: <Star size={14} /> }
+    { id: 'all', label: t('filter_all'), icon: <Users size={14} /> },
+    { id: 'producers', label: language === 'en' ? 'Producers' : 'Producteurs', icon: <Disc size={14} /> },
+    { id: 'singers', label: language === 'en' ? 'Singers & Musicians' : 'Chanteurs & Musiciens', icon: <Mic size={14} /> },
+    { id: 'engineers', label: language === 'en' ? 'Sound Engineers & Studios' : 'Ingénieurs & Studios', icon: <Headphones size={14} /> },
+    { id: 'matched', label: language === 'en' ? 'My Matches' : 'Mes Matchs', icon: <Flame size={14} /> },
+    { id: 'favorites', label: language === 'en' ? 'Favorites' : 'Favoris', icon: <Star size={14} /> }
   ];
 
   return (
@@ -343,14 +345,14 @@ const SwipeMatching = React.memo(function SwipeMatching({
               alignItems: 'center',
               gap: '6px'
             }}>
-              <Radio size={12} color="#10B981" /> TALENTS EN DIRECT
+              <Radio size={12} color="#10B981" /> {t('match_live_talents')}
             </span>
           </div>
 
           {onRefreshMatches && (
             <button
               onClick={onRefreshMatches}
-              title="Actualiser les profils réels"
+              title={t('no_matches_refresh')}
               style={{
                 background: 'rgba(255, 255, 255, 0.15)',
                 border: 'none',
@@ -370,10 +372,14 @@ const SwipeMatching = React.memo(function SwipeMatching({
         </div>
 
         <h2 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 4px 0', letterSpacing: '-0.02em' }}>
-          Match Pro • Collaborations
+          {t('match_title')}
         </h2>
         <p style={{ fontSize: '0.82rem', color: 'rgba(255, 255, 255, 0.8)', margin: 0, lineHeight: 1.3 }}>
-          Glissez vers la droite pour <strong>Matcher</strong> ou vers la gauche pour <strong>Annuler</strong>.
+          {language === 'en' ? (
+            <>Swipe right to <strong>Match</strong> or left to <strong>Skip</strong>.</>
+          ) : (
+            <>Glissez vers la droite pour <strong>Matcher</strong> ou vers la gauche pour <strong>Annuler</strong>.</>
+          )}
         </p>
       </div>
 
@@ -463,7 +469,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
                 backdropFilter: 'blur(6px)',
                 boxShadow: '0 8px 24px rgba(16, 185, 129, 0.3)'
               }}>
-                MATCHER 🤝
+                {t('btn_match')} 🤝
               </div>
             )}
 
@@ -486,7 +492,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
                 backdropFilter: 'blur(6px)',
                 boxShadow: '0 8px 24px rgba(239, 68, 68, 0.3)'
               }}>
-                ANNULER ✕
+                {t('btn_skip')} ✕
               </div>
             )}
 
@@ -509,7 +515,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
                 backdropFilter: 'blur(6px)',
                 boxShadow: '0 8px 24px rgba(245, 158, 11, 0.3)'
               }}>
-                FAVORI ⭐
+                {t('btn_favorite')} ⭐
               </div>
             )}
 
@@ -518,124 +524,134 @@ const SwipeMatching = React.memo(function SwipeMatching({
               position: 'relative',
               height: '240px',
               background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
               overflow: 'hidden'
             }}>
-              {currentCard.image || currentCard.cover_url || currentCard.avatar ? (
+              {currentCard.coverUrl || currentCard.banner ? (
                 <img
-                  src={currentCard.image || currentCard.cover_url || currentCard.avatar}
-                  alt={currentCard.title || currentCard.name}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover'
-                  }}
+                  src={currentCard.coverUrl || currentCard.banner}
+                  alt="Cover"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                  <UserAvatar size={90} border="3px solid #0066FF" />
-                </div>
+                <div style={{
+                  width: '100%',
+                  height: '100%',
+                  background: 'linear-gradient(135deg, #1E3A8A 0%, #0F172A 100%)',
+                  opacity: 0.9
+                }} />
               )}
 
-              {/* Gradient Dark Scrim */}
+              {/* Gradient overlay */}
               <div style={{
                 position: 'absolute',
                 inset: 0,
                 background: 'linear-gradient(to top, rgba(15, 23, 42, 0.95) 0%, rgba(15, 23, 42, 0.2) 60%, transparent 100%)'
               }} />
 
-              {/* Verified Badge & Synergy Score */}
-              <div style={{
-                position: 'absolute',
-                top: '14px',
-                right: '14px',
-                background: 'rgba(0, 102, 255, 0.9)',
-                backdropFilter: 'blur(10px)',
-                color: '#FFFFFF',
-                borderRadius: '20px',
-                padding: '6px 12px',
-                fontSize: '0.78rem',
-                fontWeight: 800,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                boxShadow: '0 4px 12px rgba(0, 102, 255, 0.4)'
-              }}>
-                <Flame size={14} color="#FACC15" /> {currentCard.matchPercentage || 94}% Synergie
-              </div>
-
-              {/* Name & Role Overlay in Banner */}
-              <div style={{
-                position: 'absolute',
-                bottom: '14px',
-                left: '18px',
-                right: '18px',
-                color: '#FFFFFF'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <h3 style={{ fontSize: '1.35rem', fontWeight: 900, margin: 0, color: '#FFF' }}>
-                    {currentCard.title || currentCard.name || 'Artiste'}
-                  </h3>
-                  {currentCard.verified && (
-                    <Award size={18} color="#FACC15" />
-                  )}
+              {/* Synergy Score Badge */}
+              {currentCard.synergy && (
+                <div style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  background: 'rgba(0, 102, 255, 0.85)',
+                  backdropFilter: 'blur(8px)',
+                  color: '#FFFFFF',
+                  padding: '6px 12px',
+                  borderRadius: '20px',
+                  fontWeight: 800,
+                  fontSize: '0.8rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: '0 4px 12px rgba(0, 102, 255, 0.3)'
+                }}>
+                  <Flame size={14} color="#FACC15" /> {currentCard.synergy}% {t('match_synergy')}
                 </div>
+              )}
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', opacity: 0.95, flexWrap: 'wrap' }}>
-                  <span style={{
-                    background: 'rgba(255, 255, 255, 0.2)',
-                    padding: '2px 8px',
-                    borderRadius: '8px',
-                    fontSize: '0.75rem',
-                    fontWeight: 700
-                  }}>
-                    {currentCard.role || currentCard.category || 'Artiste'}
-                  </span>
+              {/* Artist Details on Banner Bottom */}
+              <div style={{
+                position: 'absolute',
+                bottom: '16px',
+                left: '20px',
+                right: '20px',
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: '14px'
+              }}>
+                <UserAvatar
+                  user={{
+                    avatar: currentCard.avatar || currentCard.userAvatar || currentCard.avatar_url,
+                    name: currentCard.title || currentCard.name
+                  }}
+                  size={64}
+                  border="3px solid #FFFFFF"
+                />
 
-                  {/* Realtime Status Badge (Green = Online, Grey = Offline) */}
-                  {(() => {
-                    const cardUserId = currentCard.userId || currentCard.id;
-                    const isCardUserOnline = Boolean(cardUserId && onlineUserIds.includes(String(cardUserId)));
-                    return (
-                      <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        background: isCardUserOnline ? 'rgba(16, 185, 129, 0.35)' : 'rgba(148, 163, 184, 0.3)',
-                        color: isCardUserOnline ? '#34D399' : '#E2E8F0',
-                        border: `1px solid ${isCardUserOnline ? 'rgba(16, 185, 129, 0.6)' : 'rgba(148, 163, 184, 0.4)'}`,
-                        borderRadius: '8px',
-                        padding: '2px 7px',
-                        fontSize: '0.72rem',
-                        fontWeight: 800,
-                        backdropFilter: 'blur(4px)'
-                      }}>
-                        <span style={{
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          background: isCardUserOnline ? '#10B981' : '#94A3B8',
-                          boxShadow: isCardUserOnline ? '0 0 6px #10B981' : 'none'
-                        }} />
-                        {isCardUserOnline ? 'En ligne' : 'Hors ligne'}
-                      </span>
-                    );
-                  })()}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <h3 style={{ fontSize: '1.35rem', fontWeight: 900, margin: 0, color: '#FFF' }}>
+                      {currentCard.title || currentCard.name || (language === 'en' ? 'Artist' : 'Artiste')}
+                    </h3>
+                    {currentCard.verified && (
+                      <Award size={18} color="#FACC15" />
+                    )}
+                  </div>
 
-                  {currentCard.location && (
-                    <span style={{ fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <MapPin size={12} color="#60A5FA" /> {currentCard.location}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', opacity: 0.95, flexWrap: 'wrap' }}>
+                    <span style={{
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      padding: '2px 8px',
+                      borderRadius: '8px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700
+                    }}>
+                      {currentCard.role || currentCard.category || (language === 'en' ? 'Artist' : 'Artiste')}
                     </span>
-                  )}
+
+                    {/* Realtime Status Badge (Green = Online, Grey = Offline) */}
+                    {(() => {
+                      const cardUserId = currentCard.userId || currentCard.id;
+                      const isCardUserOnline = Boolean(cardUserId && onlineUserIds.includes(String(cardUserId)));
+                      return (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: isCardUserOnline ? 'rgba(16, 185, 129, 0.35)' : 'rgba(148, 163, 184, 0.3)',
+                          color: isCardUserOnline ? '#34D399' : '#E2E8F0',
+                          border: `1px solid ${isCardUserOnline ? 'rgba(16, 185, 129, 0.6)' : 'rgba(148, 163, 184, 0.4)'}`,
+                          borderRadius: '8px',
+                          padding: '2px 7px',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          backdropFilter: 'blur(4px)'
+                        }}>
+                          <span style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            background: isCardUserOnline ? '#10B981' : '#94A3B8',
+                            boxShadow: isCardUserOnline ? '0 0 6px #10B981' : 'none'
+                          }} />
+                          {isCardUserOnline ? t('online_status') : t('offline_status')}
+                        </span>
+                      );
+                    })()}
+
+                    {currentCard.location && (
+                      <span style={{ fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <MapPin size={12} color="#60A5FA" /> {currentCard.location}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Profile Bio & Skills Info Body */}
             <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {/* Bio description */}
               <p style={{
                 fontSize: '0.88rem',
                 color: 'var(--text-dark)',
@@ -643,7 +659,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
                 margin: 0,
                 opacity: 0.9
               }}>
-                {currentCard.bio || currentCard.description || 'Membre vérifié sur StageLink à la recherche de collaborations artistiques.'}
+                {currentCard.bio || currentCard.description || (language === 'en' ? 'Verified member on StageLink looking for music co-creations.' : 'Membre vérifié sur StageLink à la recherche de collaborations artistiques.')}
               </p>
 
               {/* Musical Skills / Genres Tags */}
@@ -687,12 +703,12 @@ const SwipeMatching = React.memo(function SwipeMatching({
                     marginTop: '4px'
                   }}
                 >
-                  <ExternalLink size={15} /> Voir le profil complet de l'artiste
+                  <ExternalLink size={15} /> {language === 'en' ? 'View full artist profile' : 'Voir le profil complet de l\'artiste'}
                 </button>
               )}
             </div>
 
-            {/* Action Bar: Annuler (✕), Précédent (🔄), Favoris (⭐), Matcher (🤝) */}
+            {/* Action Bar */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -701,10 +717,9 @@ const SwipeMatching = React.memo(function SwipeMatching({
               borderTop: '1px solid var(--border-light)',
               background: 'var(--bg-light)'
             }}>
-              {/* Annuler / Passer (✕) */}
               <button
                 onClick={() => handleAction('cancel')}
-                title="Annuler / Passer au profil suivant"
+                title={t('btn_skip')}
                 style={{
                   width: '50px',
                   height: '50px',
@@ -723,10 +738,9 @@ const SwipeMatching = React.memo(function SwipeMatching({
                 <X size={24} strokeWidth={2.5} />
               </button>
 
-              {/* Rewind (🔄) */}
               <button
                 onClick={handleRewind}
-                title="Revenir au profil précédent"
+                title={language === 'en' ? 'Rewind to previous profile' : 'Revenir au profil précédent'}
                 style={{
                   width: '44px',
                   height: '44px',
@@ -744,10 +758,9 @@ const SwipeMatching = React.memo(function SwipeMatching({
                 <RotateCcw size={18} />
               </button>
 
-              {/* Favoris / Sauvegarder (⭐) */}
               <button
                 onClick={() => handleAction('favorite')}
-                title={isCurrentFavorite ? 'Retirer des favoris' : 'Sauvegarder dans les favoris'}
+                title={isCurrentFavorite ? (language === 'en' ? 'Remove from favorites' : 'Retirer des favoris') : (language === 'en' ? 'Add to favorites' : 'Sauvegarder dans les favoris')}
                 style={{
                   width: '48px',
                   height: '48px',
@@ -766,10 +779,9 @@ const SwipeMatching = React.memo(function SwipeMatching({
                 <Star size={22} fill={isCurrentFavorite ? '#F59E0B' : 'none'} color="#F59E0B" strokeWidth={2.2} />
               </button>
 
-              {/* Matcher (🤝) */}
               <button
                 onClick={() => handleAction('match')}
-                title="Matcher et démarrer la collaboration"
+                title={t('btn_match')}
                 style={{
                   padding: '12px 24px',
                   borderRadius: '24px',
@@ -785,13 +797,13 @@ const SwipeMatching = React.memo(function SwipeMatching({
                   boxShadow: '0 6px 18px rgba(0, 102, 255, 0.35)'
                 }}
               >
-                <MessageCircle size={18} /> Matcher
+                <MessageCircle size={18} /> {t('btn_match')}
               </button>
             </div>
           </div>
         </div>
       ) : (
-        /* Empty State for Real Production */
+        /* Empty State */
         <div style={{
           textAlign: 'center',
           padding: '48px 24px',
@@ -820,7 +832,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
           </div>
 
           <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-dark)', margin: 0 }}>
-            Aucun nouveau profil disponible
+            {t('no_matches_left')}
           </h3>
 
           <p style={{
@@ -830,7 +842,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
             maxWidth: '380px',
             lineHeight: 1.4
           }}>
-            Vous avez parcouru les profils artistiques actuels. Les nouveaux producteurs, musiciens et artistes inscrits sur StageLink apparaîtront ici automatiquement.
+            {language === 'en' ? 'You have browsed all current artist profiles. New producers, musicians and singers on StageLink will appear here automatically.' : 'Vous avez parcouru les profils artistiques actuels. Les nouveaux producteurs, musiciens et artistes inscrits sur StageLink apparaîtront ici automatiquement.'}
           </p>
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -852,7 +864,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
                   boxShadow: '0 4px 12px rgba(0, 102, 255, 0.25)'
                 }}
               >
-                <RefreshCw size={15} /> Actualiser les profils réels
+                <RefreshCw size={15} /> {t('no_matches_refresh')}
               </button>
             )}
 
@@ -872,7 +884,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
                 cursor: 'pointer'
               }}
             >
-              Réinitialiser les filtres
+              {language === 'en' ? 'Reset filters' : 'Réinitialiser les filtres'}
             </button>
           </div>
         </div>
@@ -917,11 +929,15 @@ const SwipeMatching = React.memo(function SwipeMatching({
             </div>
 
             <h2 style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0F172A', marginBottom: '8px' }}>
-              C'est un Match ! 🎉
+              {t('match_success_title')} 🎉
             </h2>
 
             <p style={{ fontSize: '0.86rem', color: '#475569', marginBottom: '20px', lineHeight: 1.4 }}>
-              Votre connexion avec <strong>{showMatchSuccess.title || showMatchSuccess.name}</strong> a été enregistrée et la discussion a été ouverte dans vos messages.
+              {language === 'en' ? (
+                <>Your connection with <strong>{showMatchSuccess.title || showMatchSuccess.name}</strong> was recorded and the conversation is open in your messages.</>
+              ) : (
+                <>Votre connexion avec <strong>{showMatchSuccess.title || showMatchSuccess.name}</strong> a été enregistrée et la discussion a été ouverte dans vos messages.</>
+              )}
             </p>
 
             <button
@@ -939,7 +955,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
                 boxShadow: '0 4px 14px rgba(0, 102, 255, 0.35)'
               }}
             >
-              Continuer l'exploration
+              {t('match_continue')}
             </button>
           </div>
         </div>

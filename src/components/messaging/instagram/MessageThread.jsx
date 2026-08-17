@@ -7,6 +7,7 @@ import ReactionOverlay from './ReactionOverlay';
 import { useChatThread } from '../../../hooks/useChatThread';
 import { useDirectPresence } from '../../../hooks/useDirectPresence';
 import { supabase, isSupabaseConfigured } from '../../../services/supabaseClient';
+import { useLanguage } from '../../../context/LanguageContext';
 
 export default function MessageThread({
   conversationId,
@@ -17,6 +18,7 @@ export default function MessageThread({
   onStartVideoCall,
   onOpenProfile
 }) {
+  const { t, language } = useLanguage();
   const [touchStartX, setTouchStartX] = useState(null);
   const [reactionOverlayData, setReactionOverlayData] = useState(null);
   const [partnerProfile, setPartnerProfile] = useState(partner || null);
@@ -188,7 +190,7 @@ export default function MessageThread({
                 size={40}
               />
               <span
-                title={isOnline ? 'En ligne' : 'Hors ligne'}
+                title={isOnline ? t('online_status') : t('offline_status')}
                 style={{
                   position: 'absolute',
                   bottom: 0,
@@ -235,7 +237,7 @@ export default function MessageThread({
                   fontWeight: typingText ? 700 : 500,
                   whiteSpace: 'nowrap'
                 }}>
-                  {typingText || (isOnline ? 'En ligne' : 'Hors ligne')}
+                  {typingText || (isOnline ? t('online_status') : t('offline_status'))}
                 </span>
               </div>
             </div>
@@ -246,7 +248,7 @@ export default function MessageThread({
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
           <button
             onClick={onStartAudioCall}
-            title="Appel Audio HD"
+            title={language === 'en' ? 'HD Audio Call' : 'Appel Audio HD'}
             style={{
               background: '#EFF6FF',
               color: '#0066FF',
@@ -265,7 +267,7 @@ export default function MessageThread({
 
           <button
             onClick={onStartVideoCall}
-            title="Appel Vidéo HD"
+            title={language === 'en' ? 'HD Video Call' : 'Appel Vidéo HD'}
             style={{
               background: '#EFF6FF',
               color: '#0066FF',
@@ -298,7 +300,7 @@ export default function MessageThread({
           justifyContent: 'center',
           gap: '6px'
         }}>
-          <Flame size={14} color="#F43F5E" /> Mode Éphémère activé — Les messages disparaîtront après lecture
+          <Flame size={14} color="#F43F5E" /> {language === 'en' ? 'Vanish Mode active — Messages disappear after being seen' : 'Mode Éphémère activé — Les messages disparaîtront après lecture'}
         </div>
       )}
 
@@ -437,7 +439,7 @@ export default function MessageThread({
                 zIndex: 10
               }}
             >
-              <Download size={18} /> Télécharger le média
+              <Download size={18} /> {language === 'en' ? 'Download media' : 'Télécharger le média'}
             </button>
           )}
         </div>

@@ -2,16 +2,18 @@ import React, { useState, useRef } from 'react';
 import { X, Calendar, DollarSign, MapPin, Radio, Users, Image } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { compressImage } from '../../utils/imageCompressor';
 
 export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDarkMode }) {
   const { currentUser } = useAuth();
+  const { t, language } = useLanguage();
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('20:00');
   const [price, setPrice] = useState('0');
   const [eventType, setEventType] = useState('Direct Stream HD'); // 'Direct Stream HD' | 'Présentiel Studio' | 'Showcase'
-  const [location, setLocation] = useState('En ligne (StageLink Live Stream)');
+  const [location, setLocation] = useState(language === 'en' ? 'Online (StageLink Live Stream)' : 'En ligne (StageLink Live Stream)');
   const [description, setDescription] = useState('');
   const [coverImage, setCoverImage] = useState(null);
   const [shareToFeed, setShareToFeed] = useState(true);
@@ -34,14 +36,14 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
 
     soundEngine?.playPopSound?.();
 
-    const formattedDate = date ? `${date} à ${time}` : `Ce soir à ${time}`;
-    const formattedPrice = price === '0' || !price ? 'Gratuit' : `${price} €`;
+    const formattedDate = date ? (language === 'en' ? `${date} at ${time}` : `${date} à ${time}`) : (language === 'en' ? `Tonight at ${time}` : `Ce soir à ${time}`);
+    const formattedPrice = price === '0' || !price ? (language === 'en' ? 'Free' : 'Gratuit') : `${price} €`;
 
     const newEvent = {
       id: `event_${Date.now()}`,
       userId: currentUser?.id,
       title: title.trim(),
-      organizer: currentUser?.name || 'Organisateur StageLink',
+      organizer: currentUser?.name || (language === 'en' ? 'StageLink Host' : 'Organisateur StageLink'),
       organizerAvatar: currentUser?.avatar || '',
       date: formattedDate,
       price: formattedPrice,
@@ -49,7 +51,7 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
       type: eventType,
       location,
       description: description.trim(),
-      attendees: '1er inscrit',
+      attendees: language === 'en' ? '1st attendee' : '1er inscrit',
       cover: coverImage || currentUser?.avatar || 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80',
       createdAt: new Date().toISOString()
     };
@@ -94,10 +96,10 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
         }}>
           <div>
             <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: isDarkMode ? '#FFFFFF' : '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Calendar size={20} color="#F59E0B" /> Organiser un Événement
+              <Calendar size={20} color="#F59E0B" /> {language === 'en' ? 'Host an Event' : 'Organiser un Événement'}
             </h3>
             <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '2px 0 0 0' }}>
-              Créez des sessions live listening, masterclasses ou concerts
+              {language === 'en' ? 'Create live listening sessions, masterclasses or showcases' : 'Créez des sessions live listening, masterclasses ou concerts'}
             </p>
           </div>
 
@@ -131,14 +133,14 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
             {/* Title */}
             <div>
               <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '6px' }}>
-                Nom de l'Événement / Session *
+                {language === 'en' ? 'Event / Session Title *' : "Nom de l'Événement / Session *"}
               </label>
               <input
                 type="text"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Live Listening & Pitch Beats devant les Labels"
+                placeholder={language === 'en' ? 'Ex: Live Listening & Beat Pitching before Labels' : 'Ex: Live Listening & Pitch Beats devant les Labels'}
                 style={{
                   width: '100%',
                   padding: '10px 14px',
@@ -155,7 +157,7 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Date
+                  {language === 'en' ? 'Date' : 'Date'}
                 </label>
                 <input
                   type="date"
@@ -175,7 +177,7 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
 
               <div>
                 <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Heure
+                  {language === 'en' ? 'Time' : 'Heure'}
                 </label>
                 <input
                   type="time"
@@ -198,7 +200,7 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Format
+                  {language === 'en' ? 'Format' : 'Format'}
                 </label>
                 <select
                   value={eventType}
@@ -213,16 +215,16 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
                     fontSize: '0.82rem'
                   }}
                 >
-                  <option value="Direct Stream HD">Direct Stream HD</option>
-                  <option value="Webinar Interactif">Webinar Interactif</option>
-                  <option value="Présentiel Studio">Présentiel Studio</option>
-                  <option value="Concert / Showcase">Concert / Showcase</option>
+                  <option value="Direct Stream HD">{language === 'en' ? 'Direct Stream HD' : 'Direct Stream HD'}</option>
+                  <option value="Webinar Interactif">{language === 'en' ? 'Interactive Webinar' : 'Webinar Interactif'}</option>
+                  <option value="Présentiel Studio">{language === 'en' ? 'In-Studio Session' : 'Présentiel Studio'}</option>
+                  <option value="Concert / Showcase">{language === 'en' ? 'Concert / Showcase' : 'Concert / Showcase'}</option>
                 </select>
               </div>
 
               <div>
                 <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Billet (€ ou 0 = Gratuit)
+                  {language === 'en' ? 'Ticket (€ or 0 = Free)' : 'Billet (€ ou 0 = Gratuit)'}
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
@@ -249,13 +251,13 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
             {/* Description */}
             <div>
               <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Description & Déroulement
+                {language === 'en' ? 'Description & Schedule' : 'Description & Déroulement'}
               </label>
               <textarea
                 rows={3}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Présentez les intervenants, le lien de diffusion ou les modalités d'accès..."
+                placeholder={language === 'en' ? 'Introduce the speakers, stream link or venue details...' : 'Présentez les intervenants, le lien de diffusion ou les modalités d\'accès...'}
                 style={{
                   width: '100%',
                   padding: '9px 12px',
@@ -272,7 +274,7 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
             {/* Cover Upload */}
             <div>
               <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Affiche / Visuel de l'Événement
+                {language === 'en' ? 'Event Poster / Visual' : "Affiche / Visuel de l'Événement"}
               </label>
               <input
                 type="file"
@@ -299,13 +301,13 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
                 {coverImage ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <img src={coverImage} alt="Event" style={{ width: '44px', height: '44px', borderRadius: '10px', objectFit: 'cover' }} />
-                    <span style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 700 }}>Affiche sélectionnée (Cliquer pour changer)</span>
+                    <span style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 700 }}>{language === 'en' ? 'Poster selected (Click to change)' : 'Affiche sélectionnée (Cliquer pour changer)'}</span>
                   </div>
                 ) : (
                   <>
                     <Image size={20} color="#F59E0B" />
                     <span style={{ fontSize: '0.78rem', color: isDarkMode ? '#CBD5E1' : '#64748B' }}>
-                      Ajouter une affiche / photo
+                      {language === 'en' ? 'Add a poster / image' : 'Ajouter une affiche / photo'}
                     </span>
                   </>
                 )}
@@ -330,7 +332,7 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
                 style={{ accentColor: '#D97706', width: '16px', height: '16px', cursor: 'pointer' }}
               />
               <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#D97706' }}>
-                📢 Partager automatiquement dans le fil d'actualité (Feed)
+                {language === 'en' ? '📢 Automatically share in Feed' : '📢 Partager automatiquement dans le fil d\'actualité (Feed)'}
               </span>
             </label>
 
@@ -351,7 +353,7 @@ export default function CreateEventModal({ isOpen, onClose, onEventCreated, isDa
                 marginTop: '4px'
               }}
             >
-              🚀 Publier l'Événement
+              {language === 'en' ? '🚀 Publish Event' : "🚀 Publier l'Événement"}
             </button>
           </form>
         </div>

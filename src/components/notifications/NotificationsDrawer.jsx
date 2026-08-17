@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, Heart, Sparkles, MessageCircle, Eye, Trash2, Trash, PhoneIncoming, PhoneMissed, CheckCheck } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 import { soundEngine } from '../../services/audioService';
+import { useLanguage } from '../../context/LanguageContext';
 
 function SwipeableNotificationItem({ item, onClick, onDelete }) {
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -257,47 +258,49 @@ function NotificationsDrawer({
   onDeleteNotification,
   onClearAllNotifications
 }) {
+  const { t, language } = useLanguage();
   if (!isOpen) return null;
 
   const mapNotificationToUI = (n) => {
     if (!n) return null;
     let title, subtitle, icon, iconBg, iconColor, targetTab;
+    const someone = language === 'en' ? 'Someone' : "Quelqu'un";
     switch (n.type) {
       case 'like_post':
-        title = `${n.actorName || "Quelqu'un"} a aimé votre publication.`;
-        subtitle = "Ouvrez le fil d'actualité pour voir.";
+        title = language === 'en' ? `${n.actorName || someone} liked your post.` : `${n.actorName || someone} a aimé votre publication.`;
+        subtitle = language === 'en' ? "Open feed to view." : "Ouvrez le fil d'actualité pour voir.";
         icon = Heart;
         iconBg = '#FEF2F2';
         iconColor = '#EF4444';
         targetTab = 'feed';
         break;
       case 'like_story':
-        title = `${n.actorName || "Quelqu'un"} a aimé votre story.`;
-        subtitle = "Appuyez pour revoir votre story.";
+        title = language === 'en' ? `${n.actorName || someone} liked your story.` : `${n.actorName || someone} a aimé votre story.`;
+        subtitle = language === 'en' ? "Tap to rewatch your story." : "Appuyez pour revoir votre story.";
         icon = Heart;
         iconBg = '#FEF2F2';
         iconColor = '#EF4444';
         targetTab = 'feed';
         break;
       case 'comment_post':
-        title = `${n.actorName || "Quelqu'un"} a commenté votre publication.`;
-        subtitle = "Appuyez pour lire le commentaire.";
+        title = language === 'en' ? `${n.actorName || someone} commented on your post.` : `${n.actorName || someone} a commenté votre publication.`;
+        subtitle = language === 'en' ? "Tap to read comment." : "Appuyez pour lire le commentaire.";
         icon = MessageCircle;
         iconBg = '#ECFDF5';
         iconColor = '#10B981';
         targetTab = 'feed';
         break;
       case 'view_story':
-        title = `${n.actorName || "Quelqu'un"} a vu votre story.`;
-        subtitle = "Regardez qui interagit avec vos statuts.";
+        title = language === 'en' ? `${n.actorName || someone} viewed your story.` : `${n.actorName || someone} a vu votre story.`;
+        subtitle = language === 'en' ? "See who interacts with your statuses." : "Regardez qui interagit avec vos statuts.";
         icon = Eye;
         iconBg = '#EFF6FF';
         iconColor = '#0066FF';
         targetTab = 'feed';
         break;
       case 'message':
-        title = `${n.actorName || "Quelqu'un"} vous a envoyé un message.`;
-        subtitle = "Appuyez pour ouvrir la discussion.";
+        title = language === 'en' ? `${n.actorName || someone} sent you a message.` : `${n.actorName || someone} vous a envoyé un message.`;
+        subtitle = language === 'en' ? "Tap to open chat." : "Appuyez pour ouvrir la discussion.";
         icon = MessageCircle;
         iconBg = '#EEF2FF';
         iconColor = '#4F46E5';
@@ -305,8 +308,8 @@ function NotificationsDrawer({
         break;
       case 'reshare_story':
       case 'reshare_post':
-        title = `${n.actorName || "Quelqu'un"} a partagé votre contenu.`;
-        subtitle = "Votre visibilité augmente !";
+        title = language === 'en' ? `${n.actorName || someone} shared your content.` : `${n.actorName || someone} a partagé votre contenu.`;
+        subtitle = language === 'en' ? "Your visibility is growing!" : "Votre visibilité augmente !";
         icon = Sparkles;
         iconBg = '#FEF3C7';
         iconColor = '#D97706';
@@ -314,15 +317,15 @@ function NotificationsDrawer({
         break;
       case 'incoming_call_audio':
       case 'incoming_call_video':
-        title = `Appel de ${n.actorName || "Quelqu'un"}`;
-        subtitle = "Appuyez pour voir la discussion.";
+        title = language === 'en' ? `Call from ${n.actorName || someone}` : `Appel de ${n.actorName || someone}`;
+        subtitle = language === 'en' ? "Tap to view conversation." : "Appuyez pour voir la discussion.";
         icon = PhoneMissed;
         iconBg = '#FEF2F2';
         iconColor = '#EF4444';
         targetTab = 'discussions';
         break;
       default:
-        title = `${n.actorName || "Quelqu'un"} a interagi avec vous.`;
+        title = language === 'en' ? `${n.actorName || someone} interacted with you.` : `${n.actorName || someone} a interagi avec vous.`;
         subtitle = '';
         icon = Sparkles;
         iconBg = '#EFF6FF';
@@ -333,11 +336,11 @@ function NotificationsDrawer({
     return {
       id: n.id || Math.random().toString(),
       actorId: n.actorId || n.actor_id,
-      actorName: n.actorName || 'Artiste',
+      actorName: n.actorName || (language === 'en' ? 'Artist' : 'Artiste'),
       type: n.type || 'info',
       title,
       subtitle,
-      time: n.time || "À l'instant",
+      time: n.time || (language === 'en' ? 'Just now' : "À l'instant"),
       avatar: n.actorAvatar || '',
       icon: icon || Sparkles,
       iconBg: iconBg || '#EFF6FF',
@@ -412,10 +415,10 @@ function NotificationsDrawer({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
           <div>
             <h3 style={{ fontSize: '1.12rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
-              Notifications & Activité
+              {language === 'en' ? 'Notifications & Activity' : 'Notifications & Activité'}
             </h3>
             <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 500 }}>
-              Glissez vers la gauche (Swipe) pour supprimer
+              {language === 'en' ? 'Swipe left to delete' : 'Glissez vers la gauche (Swipe) pour supprimer'}
             </span>
           </div>
 
@@ -436,10 +439,10 @@ function NotificationsDrawer({
                   alignItems: 'center',
                   gap: '4px'
                 }}
-                title="Tout effacer"
+                title={language === 'en' ? 'Clear all' : 'Tout effacer'}
               >
                 <Trash2 size={13} />
-                <span>Tout effacer</span>
+                <span>{language === 'en' ? 'Clear all' : 'Tout effacer'}</span>
               </button>
             )}
 
@@ -457,7 +460,7 @@ function NotificationsDrawer({
                 justifyContent: 'center',
                 color: '#64748B'
               }}
-              title="Fermer"
+              title={t('modal_close')}
             >
               <X size={18} />
             </button>
@@ -499,10 +502,10 @@ function NotificationsDrawer({
                 <Sparkles size={28} />
               </div>
               <h4 style={{ fontSize: '0.98rem', fontWeight: 800, color: '#1E293B', margin: '0 0 6px 0' }}>
-                Aucune notification
+                {language === 'en' ? 'No notifications' : 'Aucune notification'}
               </h4>
               <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0, maxWidth: '260px', lineHeight: 1.4 }}>
-                Vos nouveaux likes, commentaires, messages et vues de stories apparaîtront ici.
+                {language === 'en' ? 'Your new likes, comments, messages, and story views will appear here.' : 'Vos nouveaux likes, commentaires, messages et vues de stories apparaîtront ici.'}
               </p>
             </div>
           )}

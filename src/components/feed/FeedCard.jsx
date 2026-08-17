@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
 import confetti from 'canvas-confetti';
 import UserAvatar from '../common/UserAvatar';
@@ -23,6 +24,7 @@ function FeedCard({
   onStartChat
 }) {
   const { currentUser } = useAuth();
+  const { t, language } = useLanguage();
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState('');
@@ -190,7 +192,7 @@ function FeedCard({
 
               {/* VIP Gold Badge ONLY for VIP Gold Users */}
               {post.badgeType === 'gold' && (
-                <span title="Membre VIP Gold Officiel" style={{
+                <span title={language === 'en' ? 'Official VIP Gold Member' : 'Membre VIP Gold Officiel'} style={{
                   background: 'linear-gradient(135deg, #F59E0B, #D97706)',
                   color: '#FFFFFF',
                   borderRadius: '50%',
@@ -230,11 +232,11 @@ function FeedCard({
                 >
                   {isFollowing ? (
                     <>
-                      <UserCheck size={13} /> Abonné
+                      <UserCheck size={13} /> {language === 'en' ? 'Following' : 'Abonné'}
                     </>
                   ) : (
                     <>
-                      <UserPlus size={13} /> Suivre
+                      <UserPlus size={13} /> {t('btn_follow')}
                     </>
                   )}
                 </button>
@@ -292,7 +294,7 @@ function FeedCard({
                     cursor: 'pointer'
                   }}
                 >
-                  <Trash2 size={14} /> Supprimer le post
+                  <Trash2 size={14} /> {language === 'en' ? 'Delete post' : 'Supprimer le post'}
                 </button>
               ) : (
                 <button
@@ -316,7 +318,7 @@ function FeedCard({
                     cursor: 'pointer'
                   }}
                 >
-                  <AlertTriangle size={14} /> Signaler le contenu
+                  <AlertTriangle size={14} /> {language === 'en' ? 'Report content' : 'Signaler le contenu'}
                 </button>
               )}
             </div>
@@ -373,14 +375,14 @@ function FeedCard({
                pro.proType === 'course' ? <GraduationCap size={14} /> :
                pro.proType === 'job' ? <Award size={14} /> :
                <Calendar size={14} />}
-              {pro.proType === 'work' ? 'ŒUVRE & BEAT EN VENTE' :
-               pro.proType === 'service' ? 'PRESTATION STUDIO & MIX' :
-               pro.proType === 'course' ? 'FORMATION & MASTERCLASS' :
-               pro.proType === 'job' ? 'OFFRE D\'EMPLOI & CASTING' :
-               'ÉVÉNEMENT LIVE PRO'}
+              {pro.proType === 'work' ? (language === 'en' ? 'WORK & BEAT FOR SALE' : 'ŒUVRE & BEAT EN VENTE') :
+               pro.proType === 'service' ? (language === 'en' ? 'STUDIO SERVICE & MIX' : 'PRESTATION STUDIO & MIX') :
+               pro.proType === 'course' ? (language === 'en' ? 'COURSE & MASTERCLASS' : 'FORMATION & MASTERCLASS') :
+               pro.proType === 'job' ? (language === 'en' ? 'JOB OFFER & CASTING' : 'OFFRE D\'EMPLOI & CASTING') :
+               (language === 'en' ? 'PRO LIVE EVENT' : 'ÉVÉNEMENT LIVE PRO')}
             </span>
             <span style={{ background: 'rgba(255,255,255,0.22)', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem' }}>
-              Offre Officielle StageLink
+              {language === 'en' ? 'Official StageLink Offer' : 'Offre Officielle StageLink'}
             </span>
           </div>
 
@@ -469,11 +471,11 @@ function FeedCard({
                   boxShadow: '0 4px 12px rgba(0,0,0,0.12)'
                 }}
               >
-                {pro.proType === 'work' ? `Acheter l'Œuvre (${pro.price})` :
-                 pro.proType === 'service' ? `Commander (${pro.price})` :
-                 pro.proType === 'course' ? `S'inscrire (${pro.price})` :
-                 pro.proType === 'job' ? `Postuler à l'offre (${pro.price})` :
-                 `Réserver Billet (${pro.price})`}
+                {pro.proType === 'work' ? (language === 'en' ? `Buy Work (${pro.price})` : `Acheter l'Œuvre (${pro.price})`) :
+                 pro.proType === 'service' ? (language === 'en' ? `Order (${pro.price})` : `Commander (${pro.price})`) :
+                 pro.proType === 'course' ? (language === 'en' ? `Enroll (${pro.price})` : `S'inscrire (${pro.price})`) :
+                 pro.proType === 'job' ? (language === 'en' ? `Apply to Job (${pro.price})` : `Postuler à l'offre (${pro.price})`) :
+                 (language === 'en' ? `Book Ticket (${pro.price})` : `Réserver Billet (${pro.price})`)}
                 <ChevronRight size={15} />
               </button>
 
@@ -501,7 +503,7 @@ function FeedCard({
                     gap: '4px'
                   }}
                 >
-                  <MessageSquare size={14} /> Contacter
+                  <MessageSquare size={14} /> {language === 'en' ? 'Contact' : 'Contacter'}
                 </button>
               )}
             </div>
@@ -584,7 +586,7 @@ function FeedCard({
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: '0.82rem', fontWeight: 800, color: isPlayingAudio ? '#FFF' : '#0066FF' }}>
-              {post.audioTitle || 'Message Vocal StageLink'}
+              {post.audioTitle || (language === 'en' ? 'StageLink Voice Message' : 'Message Vocal StageLink')}
             </div>
             {isPlayingAudio && (
               <div style={{ display: 'flex', gap: '3px', marginTop: '4px' }}>
@@ -628,7 +630,7 @@ function FeedCard({
           }}
         >
           <Heart size={18} fill={post.isLiked ? '#EF4444' : 'none'} />
-          <span>{post.likesCount} J'aime</span>
+          <span>{post.likesCount} {language === 'en' ? 'Likes' : 'J\'aime'}</span>
         </button>
 
         <button
@@ -649,7 +651,7 @@ function FeedCard({
           }}
         >
           <MessageSquare size={18} />
-          <span>{post.commentsCount} Commentaires</span>
+          <span>{post.commentsCount} {language === 'en' ? 'Comments' : 'Commentaires'}</span>
         </button>
 
         <button
@@ -670,7 +672,7 @@ function FeedCard({
           }}
         >
           <Share2 size={18} />
-          <span>Partager</span>
+          <span>{language === 'en' ? 'Share' : 'Partager'}</span>
         </button>
       </div>
 
@@ -688,14 +690,14 @@ function FeedCard({
             </div>
           ) : (
             <p style={{ fontSize: '0.78rem', color: '#94A3B8', textAlign: 'center', margin: '8px 0 12px' }}>
-              Aucun commentaire. Soyez le premier à commenter !
+              {language === 'en' ? 'No comments yet. Be the first to comment!' : 'Aucun commentaire. Soyez le premier à commenter !'}
             </p>
           )}
 
           <form onSubmit={handleCommentSubmit} style={{ display: 'flex', gap: '8px' }}>
             <input
               type="text"
-              placeholder="Écrire un commentaire..."
+              placeholder={language === 'en' ? 'Write a comment...' : 'Écrire un commentaire...'}
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               style={{
@@ -732,8 +734,8 @@ function FeedCard({
       {showConfirmDelete && (
         <ConfirmDeleteModal
           isOpen={showConfirmDelete}
-          title="Supprimer la publication"
-          message="Êtes-vous sûr de vouloir supprimer cette publication ? Cette action est irréversible."
+          title={language === 'en' ? 'Delete Post' : 'Supprimer la publication'}
+          message={language === 'en' ? 'Are you sure you want to delete this post? This action cannot be undone.' : 'Êtes-vous sûr de vouloir supprimer cette publication ? Cette action est irréversible.'}
           onConfirm={() => {
             setShowConfirmDelete(false);
             onDeletePost(post.id);

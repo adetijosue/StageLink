@@ -3,11 +3,13 @@ import { X, Search, Check, Sparkles, MapPin, Music, ChevronRight, UserPlus, User
 import UserAvatar from '../common/UserAvatar';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { presenceService } from '../../services/presenceService';
 
 export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPublicProfile, onStartChat, onConnectUser, isDarkMode }) {
   const { currentUser } = useAuth();
+  const { t, language } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('All');
   const [followedUsers, setFollowedUsers] = useState({});
@@ -147,10 +149,10 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
         }}>
           <div>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: isDarkMode ? '#FFFFFF' : '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Search size={20} color="#0066FF" /> Rechercher un Membre
+              <Search size={20} color="#0066FF" /> {t('search_modal_title')}
             </h3>
             <p style={{ fontSize: '0.76rem', color: '#64748B', margin: '2px 0 0 0' }}>
-              Retrouvez rapidement artistes, beatmakers & producteurs
+              {language === 'en' ? 'Quickly find artists, beatmakers & producers' : 'Retrouvez rapidement artistes, beatmakers & producteurs'}
             </p>
           </div>
 
@@ -171,7 +173,7 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
               justifyContent: 'center',
               boxShadow: '0 2px 8px rgba(239, 68, 68, 0.15)'
             }}
-            title="Fermer"
+            title={t('btn_close')}
           >
             <X size={18} color="#EF4444" />
           </button>
@@ -186,7 +188,7 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
               autoFocus
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Nom, rôle (Beatmaker, Chanteuse...), ville..."
+              placeholder={t('search_input_placeholder')}
               style={{
                 width: '100%',
                 padding: '12px 38px 12px 42px',
@@ -228,11 +230,11 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
           WebkitOverflowScrolling: 'touch'
         }}>
           {[
-            { id: 'All', label: 'Tous' },
-            { id: 'Artiste', label: 'Artistes' },
+            { id: 'All', label: t('filter_all') },
+            { id: 'Artiste', label: language === 'en' ? 'Artists' : 'Artistes' },
             { id: 'Beatmaker', label: 'Beatmakers' },
-            { id: 'Producteur', label: 'Producteurs' },
-            { id: 'Ingénieur', label: 'Ingénieurs Son' }
+            { id: 'Producteur', label: language === 'en' ? 'Producers' : 'Producteurs' },
+            { id: 'Ingénieur', label: language === 'en' ? 'Sound Engineers' : 'Ingénieurs Son' }
           ].map((role) => {
             const isSel = filterRole === role.id;
             return (
@@ -290,7 +292,7 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
                   
                   {/* Realtime Status Dot (Green = Online, Grey = Offline) */}
                   <span
-                    title={isOnline ? 'En ligne' : 'Hors ligne'}
+                    title={isOnline ? t('online_status') : t('offline_status')}
                     style={{
                       position: 'absolute',
                       bottom: 0,
@@ -354,7 +356,7 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
                         onConnectUser(usr.id);
                       }
                     }}
-                    title={followedUsers[usr.id] ? "Membre Suivi" : "Se connecter / Suivre"}
+                    title={followedUsers[usr.id] ? t('unfollow') : t('follow')}
                     style={{
                       background: followedUsers[usr.id] ? '#ECFDF5' : '#F1F5F9',
                       color: followedUsers[usr.id] ? '#047857' : '#0F172A',
@@ -369,12 +371,12 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
                       cursor: 'pointer'
                     }}
                   >
-                    {followedUsers[usr.id] ? <><UserCheck size={14} color="#047857" /> Suivi</> : <><UserPlus size={14} color="#0F172A" /> Suivre</>}
+                    {followedUsers[usr.id] ? <><UserCheck size={14} color="#047857" /> {t('unfollow')}</> : <><UserPlus size={14} color="#0F172A" /> {t('follow')}</>}
                   </button>
 
                   <button
                     onClick={(e) => handleStartChatClick(e, usr)}
-                    title="Démarrer une discussion"
+                    title={language === 'en' ? 'Start chat' : 'Démarrer une discussion'}
                     style={{
                       background: '#0066FF',
                       color: '#FFFFFF',
@@ -390,7 +392,7 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
                       boxShadow: '0 4px 10px rgba(0, 102, 255, 0.25)'
                     }}
                   >
-                    <MessageSquare size={14} /> Discuter
+                    <MessageSquare size={14} /> {language === 'en' ? 'Chat' : 'Discuter'}
                   </button>
                 </div>
               </div>
@@ -403,7 +405,7 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
               fontSize: '0.85rem'
             }}>
               <User size={36} color="#CBD5E1" style={{ marginBottom: '8px' }} />
-              <p style={{ margin: 0, fontWeight: 600 }}>Aucun utilisateur ne correspond à votre recherche "{searchQuery}".</p>
+              <p style={{ margin: 0, fontWeight: 600 }}>{language === 'en' ? `No users match your search "${searchQuery}".` : `Aucun utilisateur ne correspond à votre recherche "${searchQuery}".`}</p>
             </div>
           )}
         </div>

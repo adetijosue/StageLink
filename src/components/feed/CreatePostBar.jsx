@@ -1,14 +1,16 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Image, Send } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 
 export default function CreatePostBar({ onClickOpenModal }) {
   const { currentUser } = useAuth();
+  const { t, language } = useLanguage();
 
   if (!currentUser) return null;
 
-  const firstName = currentUser?.name ? currentUser.name.split(' ')[0] : 'vous';
+  const firstName = currentUser?.name ? currentUser.name.split(' ')[0] : (language === 'en' ? 'you' : 'vous');
 
   return (
     <div
@@ -57,7 +59,7 @@ export default function CreatePostBar({ onClickOpenModal }) {
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap'
         }}>
-          Quoi de neuf, {firstName} ?
+          {language === 'en' ? `What's on your mind, ${firstName}?` : `Quoi de neuf, ${firstName} ?`}
         </span>
       </div>
 
@@ -66,7 +68,7 @@ export default function CreatePostBar({ onClickOpenModal }) {
         {/* Photo Button */}
         <button
           type="button"
-          title="Ajouter une photo ou vidéo"
+          title={language === 'en' ? 'Add photo or video' : 'Ajouter une photo ou vidéo'}
           style={{
             width: '34px',
             height: '34px',
@@ -87,7 +89,7 @@ export default function CreatePostBar({ onClickOpenModal }) {
         {/* Publish / Send Action Button */}
         <button
           type="button"
-          title="Publier"
+          title={t('btn_publish')}
           style={{
             width: '34px',
             height: '34px',

@@ -5,6 +5,7 @@ import UserAvatar from '../../common/UserAvatar';
 import { useConversationList } from '../../../hooks/useConversationList';
 import { soundEngine } from '../../../services/audioService';
 import { presenceService } from '../../../services/presenceService';
+import { useLanguage } from '../../../context/LanguageContext';
 
 const InboxView = React.memo(function InboxView({
   currentUser,
@@ -13,6 +14,7 @@ const InboxView = React.memo(function InboxView({
   onOpenCallHistoryModal,
   onOpenProfile
 }) {
+  const { t, language } = useLanguage();
   const [onlineUserIds, setOnlineUserIds] = React.useState(() => presenceService.getOnlineUserIds());
 
   React.useEffect(() => {
@@ -59,13 +61,13 @@ const InboxView = React.memo(function InboxView({
           color: 'var(--text-dark)',
           margin: 0
         }}>
-          Messages
+          {t('messages')}
         </h1>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
             onClick={onOpenCallHistoryModal}
-            title="Historique des appels"
+            title={language === 'en' ? 'Call history' : 'Historique des appels'}
             style={{
               background: '#EFF6FF',
               color: '#0066FF',
@@ -84,7 +86,7 @@ const InboxView = React.memo(function InboxView({
 
           <button
             onClick={onOpenNewChatModal}
-            title="Nouveau message"
+            title={language === 'en' ? 'New message' : 'Nouveau message'}
             style={{
               background: '#0066FF',
               color: '#FFFFFF',
@@ -119,7 +121,7 @@ const InboxView = React.memo(function InboxView({
           <Search size={18} color="#94A3B8" />
           <input
             type="text"
-            placeholder="Rechercher des artistes, groupes..."
+            placeholder={language === 'en' ? 'Search artists, groups...' : 'Rechercher des artistes, groupes...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -142,9 +144,9 @@ const InboxView = React.memo(function InboxView({
         borderBottom: '1px solid var(--border-light)'
       }}>
         {[
-          { id: 'all', label: 'Toutes' },
-          { id: 'unread', label: 'Non lues' },
-          { id: 'groups', label: 'Groupes' }
+          { id: 'all', label: language === 'en' ? 'All' : 'Toutes' },
+          { id: 'unread', label: language === 'en' ? 'Unread' : 'Non lues' },
+          { id: 'groups', label: language === 'en' ? 'Groups' : 'Groupes' }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -180,7 +182,7 @@ const InboxView = React.memo(function InboxView({
             height: '240px',
             color: '#94A3B8'
           }}>
-            <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>Aucune discussion trouvée</p>
+            <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>{language === 'en' ? 'No conversations found' : 'Aucune discussion trouvée'}</p>
           </div>
         ) : (
           conversations.map((conv) => (
@@ -226,7 +228,7 @@ const InboxView = React.memo(function InboxView({
                       size={50}
                     />
                     <span
-                      title={isOnline ? 'En ligne' : 'Hors ligne'}
+                      title={isOnline ? t('online_status') : t('offline_status')}
                       style={{
                         position: 'absolute',
                         bottom: 2,
@@ -277,15 +279,15 @@ const InboxView = React.memo(function InboxView({
                     {conv.lastMessage ? (
                       <>
                         {conv.lastMessage.sender_id === currentUser?.id && (
-                          <span style={{ color: '#94A3B8', fontWeight: 500 }}>Vous : </span>
+                          <span style={{ color: '#94A3B8', fontWeight: 500 }}>{language === 'en' ? 'You: ' : 'Vous : '}</span>
                         )}
                         {conv.lastMessage.message_type === 'audio'
-                          ? '🎙️ Note vocale'
+                          ? (language === 'en' ? '🎙️ Voice note' : '🎙️ Note vocale')
                           : conv.lastMessage.message_type === 'image'
-                          ? '📷 Photo'
-                          : (conv.lastMessage.content || 'Message')}
+                          ? (language === 'en' ? '📷 Photo' : '📷 Photo')
+                          : (conv.lastMessage.content || (language === 'en' ? 'Message' : 'Message'))}
                       </>
-                    ) : 'Nouvelle discussion'}
+                    ) : (language === 'en' ? 'New conversation' : 'Nouvelle discussion')}
                   </p>
 
                   {conv.unreadCount > 0 && (

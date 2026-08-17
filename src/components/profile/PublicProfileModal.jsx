@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { soundEngine } from '../../services/audioService';
 import confetti from 'canvas-confetti';
 import ProfileQRCodeModal from './ProfileQRCodeModal';
@@ -48,6 +49,7 @@ export default function PublicProfileModal({
   onConnectUser 
 }) {
   const { currentUser } = useAuth();
+  const { t, language } = useLanguage();
   const [hydratedUser, setHydratedUser] = useState(user || {});
   const [isFollowing, setIsFollowing] = useState(false);
   const [playingTrackId, setPlayingTrackId] = useState(null);
@@ -249,13 +251,13 @@ export default function PublicProfileModal({
               color: '#FFF',
               cursor: 'pointer'
             }}
-            title="Retour"
+            title={language === 'en' ? 'Back' : 'Retour'}
           >
             <ArrowLeft size={18} />
           </button>
 
           <span style={{ fontSize: '0.88rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
-            Profil Public • {userName}
+            {language === 'en' ? 'Public Profile' : 'Profil Public'} • {userName}
           </span>
 
           <button
@@ -272,7 +274,7 @@ export default function PublicProfileModal({
               color: '#FFF',
               cursor: 'pointer'
             }}
-            title="Carte contact QR"
+            title={language === 'en' ? 'QR Contact Card' : 'Carte contact QR'}
           >
             <QrCode size={18} />
           </button>
@@ -287,7 +289,7 @@ export default function PublicProfileModal({
               height: '100%', 
               objectFit: 'cover' 
             }}
-            alt={`Couverture de ${userName}`}
+            alt={language === 'en' ? `${userName}'s Cover` : `Couverture de ${userName}`}
           />
           <div style={{ 
             position: 'absolute', 
@@ -312,7 +314,7 @@ export default function PublicProfileModal({
             backdropFilter: 'blur(6px)',
             boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)'
           }}>
-            <Radio size={12} /> PROFIL VÉRIFIÉ
+            <Radio size={12} /> {language === 'en' ? 'VERIFIED PROFILE' : 'PROFIL VÉRIFIÉ'}
           </div>
 
           {/* Avatar & Hero Info */}
@@ -331,7 +333,7 @@ export default function PublicProfileModal({
                 setShowFullAvatar(true);
               }}
               style={{ cursor: 'pointer', position: 'relative', flexShrink: 0 }}
-              title="Agrandir l'avatar"
+              title={language === 'en' ? 'Expand avatar' : "Agrandir l'avatar"}
             >
               {userAvatarUrl ? (
                 <img 
@@ -358,7 +360,7 @@ export default function PublicProfileModal({
 
               {/* Realtime Presence Status Dot (Green = Online, Grey = Offline) */}
               <span
-                title={isOnline ? 'En ligne' : 'Hors ligne'}
+                title={isOnline ? (language === 'en' ? 'Online' : 'En ligne') : (language === 'en' ? 'Offline' : 'Hors ligne')}
                 style={{
                   position: 'absolute',
                   bottom: '4px',
@@ -443,7 +445,7 @@ export default function PublicProfileModal({
                     background: isOnline ? '#10B981' : '#94A3B8',
                     boxShadow: isOnline ? '0 0 6px #10B981' : 'none'
                   }} />
-                  {isOnline ? 'En ligne' : 'Hors ligne'}
+                  {isOnline ? (language === 'en' ? 'Online' : 'En ligne') : (language === 'en' ? 'Offline' : 'Hors ligne')}
                 </span>
               </div>
             </div>
@@ -476,7 +478,7 @@ export default function PublicProfileModal({
                   transition: 'all 0.2s ease'
                 }}
               >
-                {isFollowing ? <><UserCheck size={18} /> Abonné</> : <><UserPlus size={18} /> S'abonner</>}
+                {isFollowing ? <><UserCheck size={18} /> {language === 'en' ? 'Following' : 'Abonné'}</> : <><UserPlus size={18} /> {language === 'en' ? 'Follow' : "S'abonner"}</>}
               </button>
 
               <button 
@@ -484,7 +486,7 @@ export default function PublicProfileModal({
                   soundEngine?.playPopSound?.();
                   onClose(); 
                   if (onStartChat) {
-                    onStartChat(profile, `Bonjour ${userName}, j'ai découvert votre profil complet sur StageLink et j'aimerais collaborer avec vous !`);
+                    onStartChat(profile, language === 'en' ? `Hello ${userName}, I discovered your profile on StageLink and would love to collaborate with you!` : `Bonjour ${userName}, j'ai découvert votre profil complet sur StageLink et j'aimerais collaborer avec vous !`);
                   }
                 }} 
                 style={{ 
@@ -504,7 +506,7 @@ export default function PublicProfileModal({
                   transition: 'all 0.2s ease'
                 }}
               >
-                <MessageSquare size={18} /> Message Direct
+                <MessageSquare size={18} /> {language === 'en' ? 'Direct Message' : 'Message Direct'}
               </button>
             </div>
           )}
@@ -621,7 +623,7 @@ export default function PublicProfileModal({
               margin: '0 0 6px 0',
               letterSpacing: '0.04em'
             }}>
-              Biographie & Présentation
+              {language === 'en' ? 'Biography & Presentation' : 'Biographie & Présentation'}
             </h4>
             <p style={{ 
               fontSize: '0.86rem', 
@@ -644,7 +646,7 @@ export default function PublicProfileModal({
               marginBottom: '8px',
               letterSpacing: '0.04em'
             }}>
-              Spécialités & Instruments
+              {language === 'en' ? 'Specialties & Instruments' : 'Spécialités & Instruments'}
             </h4>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {specialtiesList.map((skill, idx) => (
@@ -680,7 +682,7 @@ export default function PublicProfileModal({
                 marginBottom: '8px',
                 letterSpacing: '0.04em'
               }}>
-                Genres Musicaux
+                {language === 'en' ? 'Musical Genres' : 'Genres Musicaux'}
               </h4>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {profile.genres.map((genre, idx) => (
@@ -712,7 +714,7 @@ export default function PublicProfileModal({
               marginBottom: '8px',
               letterSpacing: '0.04em'
             }}>
-              Extraits & Démo Studio
+              {language === 'en' ? 'Studio Demos & Tracks' : 'Extraits & Démo Studio'}
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {sampleTracks.map(tr => (
@@ -755,7 +757,7 @@ export default function PublicProfileModal({
                     </div>
                   </div>
                   <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#10B981' }}>
-                    {tr.plays} écoutes
+                    {tr.plays} {language === 'en' ? 'plays' : 'écoutes'}
                   </span>
                 </div>
               ))}
@@ -784,7 +786,7 @@ export default function PublicProfileModal({
                 cursor: 'pointer'
               }}
             >
-              <FileText size={16} /> VOIR EPK / CV MUSICAL
+              <FileText size={16} /> {language === 'en' ? 'VIEW MUSICAL EPK / RESUME' : 'VOIR EPK / CV MUSICAL'}
             </button>
 
             <button 
@@ -801,7 +803,7 @@ export default function PublicProfileModal({
                 cursor: 'pointer'
               }}
             >
-              <QrCode size={16} /> CARTE CONTACT QR
+              <QrCode size={16} /> {language === 'en' ? 'QR CONTACT CARD' : 'CARTE CONTACT QR'}
             </button>
           </div>
 

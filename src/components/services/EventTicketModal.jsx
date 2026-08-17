@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { X, Calendar, Ticket, CheckCircle, Video, Users, Clock, Share2 } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function EventTicketModal({ isOpen, onClose, event, onBookTicket, isDarkMode }) {
+  const { t, language } = useLanguage();
   const [isBooked, setIsBooked] = useState(false);
 
   if (!isOpen || !event) return null;
@@ -99,7 +101,7 @@ export default function EventTicketModal({ isOpen, onClose, event, onBookTicket,
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0066FF' }}>
-              Organisé par {event.organizer}
+              {language === 'en' ? 'Hosted by' : 'Organisé par'} {event.organizer}
             </span>
             <span style={{ fontSize: '1rem', fontWeight: 900, color: '#10B981' }}>
               {event.price}
@@ -110,7 +112,7 @@ export default function EventTicketModal({ isOpen, onClose, event, onBookTicket,
             <div style={{ background: isDarkMode ? '#1E293B' : '#F8FAFC', borderRadius: '12px', padding: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Video size={18} color="#0066FF" />
               <div>
-                <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block' }}>Format</span>
+                <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block' }}>{language === 'en' ? 'Format' : 'Format'}</span>
                 <span style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#FFF' : '#0F172A' }}>{event.type || 'Live Stream HD'}</span>
               </div>
             </div>
@@ -118,18 +120,18 @@ export default function EventTicketModal({ isOpen, onClose, event, onBookTicket,
             <div style={{ background: isDarkMode ? '#1E293B' : '#F8FAFC', borderRadius: '12px', padding: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Users size={18} color="#10B981" />
               <div>
-                <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block' }}>Participants</span>
-                <span style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#FFF' : '#0F172A' }}>{event.attendees || '86 participants'}</span>
+                <span style={{ fontSize: '0.7rem', color: '#64748B', display: 'block' }}>{language === 'en' ? 'Attendees' : 'Participants'}</span>
+                <span style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#FFF' : '#0F172A' }}>{event.attendees || (language === 'en' ? '86 attendees' : '86 participants')}</span>
               </div>
             </div>
           </div>
 
           <div>
             <h4 style={{ fontSize: '0.84rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', marginBottom: '6px' }}>
-              À propos de la session :
+              {language === 'en' ? 'About this session:' : 'À propos de la session :'}
             </h4>
             <p style={{ fontSize: '0.8rem', color: isDarkMode ? '#94A3B8' : '#64748B', lineHeight: 1.5, margin: 0 }}>
-              Participez à cette session live exclusive pour échanger avec des professionnels de l'industrie, faire écouter vos dernières productions et obtenir des retours personnalisés en direct.
+              {language === 'en' ? 'Join this exclusive live session to network with industry pros, pitch your latest productions and receive personalized live feedback.' : 'Participez à cette session live exclusive pour échanger avec des professionnels de l\'industrie, faire écouter vos dernières productions et obtenir des retours personnalisés en direct.'}
             </p>
           </div>
 
@@ -137,10 +139,10 @@ export default function EventTicketModal({ isOpen, onClose, event, onBookTicket,
             <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
               <CheckCircle size={28} color="#10B981" style={{ margin: '0 auto 6px auto' }} />
               <span style={{ color: '#065F46', fontWeight: 800, fontSize: '0.88rem', display: 'block' }}>
-                Billet Numérique Confirmé !
+                {language === 'en' ? 'Digital Ticket Confirmed!' : 'Billet Numérique Confirmé !'}
               </span>
               <span style={{ color: '#047857', fontSize: '0.75rem', display: 'block', marginTop: '2px' }}>
-                Pass ID: SL-{Math.floor(100000 + Math.random() * 900000)} • Lien du live actif 15 min avant
+                {language === 'en' ? `Pass ID: SL-${Math.floor(100000 + Math.random() * 900000)} • Live link active 15 min prior` : `Pass ID: SL-${Math.floor(100000 + Math.random() * 900000)} • Lien du live actif 15 min avant`}
               </span>
               <button
                 type="button"
@@ -160,7 +162,7 @@ export default function EventTicketModal({ isOpen, onClose, event, onBookTicket,
                   cursor: 'pointer'
                 }}
               >
-                Accéder au Live Stream
+                {language === 'en' ? 'Access Live Stream' : 'Accéder au Live Stream'}
               </button>
             </div>
           ) : (
@@ -185,7 +187,7 @@ export default function EventTicketModal({ isOpen, onClose, event, onBookTicket,
                 marginTop: '6px'
               }}
             >
-              <Ticket size={18} /> Réserver mon Billet ({event.price})
+              <Ticket size={18} /> {language === 'en' ? `Book my Ticket (${event.price})` : `Réserver mon Billet (${event.price})`}
             </button>
           )}
         </div>

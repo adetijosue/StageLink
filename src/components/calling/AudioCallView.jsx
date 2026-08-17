@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import UserAvatar from '../common/UserAvatar';
 import { ShieldCheck, Zap, Activity } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function AudioCallView({
   participant,
@@ -9,6 +10,7 @@ export default function AudioCallView({
   networkQuality,
   isMuted
 }) {
+  const { t, language } = useLanguage();
   const canvasRef = useRef(null);
 
   const durationFormatted = `${Math.floor(callDuration / 60).toString().padStart(2, '0')}:${(callDuration % 60).toString().padStart(2, '0')}`;
@@ -84,7 +86,7 @@ export default function AudioCallView({
         border: '1px solid rgba(255, 255, 255, 0.15)'
       }}>
         <ShieldCheck size={14} color="#10B981" />
-        <span style={{ fontSize: '0.75rem', color: '#E2E8F0', fontWeight: 600 }}>Chiffré de bout en bout</span>
+        <span style={{ fontSize: '0.75rem', color: '#E2E8F0', fontWeight: 600 }}>{language === 'en' ? 'End-to-End Encrypted' : 'Chiffré de bout en bout'}</span>
         <span style={{ color: 'rgba(255,255,255,0.4)' }}>•</span>
         <Zap size={13} color={networkQuality.quality === 'excellent' ? '#10B981' : '#F59E0B'} />
         <span style={{ fontSize: '0.75rem', color: '#E2E8F0', fontWeight: 600 }}>HD Voice</span>
@@ -123,7 +125,7 @@ export default function AudioCallView({
         <UserAvatar
           user={{
             avatar: participant?.avatar_url || participant?.avatar,
-            name: participant?.full_name || participant?.name || 'Artiste'
+            name: participant?.full_name || participant?.name || (language === 'en' ? 'Artist' : 'Artiste')
           }}
           size={110}
         />
@@ -138,7 +140,7 @@ export default function AudioCallView({
         textAlign: 'center',
         textShadow: '0 2px 8px rgba(0,0,0,0.5)'
       }}>
-        {participant?.full_name || participant?.name || 'Artiste StageLink'}
+        {participant?.full_name || participant?.name || (language === 'en' ? 'StageLink Artist' : 'Artiste StageLink')}
       </h2>
 
       <p style={{
@@ -147,7 +149,7 @@ export default function AudioCallView({
         margin: '0 0 18px 0',
         fontWeight: 600
       }}>
-        {participant?.role || 'Artiste'}
+        {participant?.role || (language === 'en' ? 'Artist' : 'Artiste')}
       </p>
 
       {/* Call Timer */}

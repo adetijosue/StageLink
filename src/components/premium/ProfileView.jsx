@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import {
   Camera, Settings, Edit3, Music, Disc, Play, Pause,
   Users, QrCode, FileText, LogOut, MapPin, Briefcase, Crown, Sparkles,
@@ -18,6 +19,7 @@ import { compressImage } from '../../utils/imageCompressor';
 
 export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMode, onSimulateIncomingCall }) {
   const { currentUser, logout, updateUserProfile } = useAuth();
+  const { t, language } = useLanguage();
   const avatarRef = useRef(null);
   const coverRef = useRef(null);
 
@@ -50,7 +52,7 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
     }
   }, [currentUser, activeModal]);
 
-  if (!currentUser) return <div style={{ padding: '60px', textAlign: 'center' }}>Chargement...</div>;
+  if (!currentUser) return <div style={{ padding: '60px', textAlign: 'center' }}>{t('loading')}</div>;
 
   const handleSaveAll = (e) => {
     if (e) e.preventDefault();
@@ -138,7 +140,7 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
 
         <div className="card" style={{ padding: '14px 16px', borderRadius: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-             <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>Profil complété: {score}%</span>
+             <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>{language === 'en' ? `Profile completed: ${score}%` : `Profil complété: ${score}%`}</span>
              <Sparkles size={14} color="#F59E0B" />
           </div>
           <div style={{ width: '100%', height: '8px', background: isDarkMode ? '#1E293B' : '#E2E8F0', borderRadius: '10px', overflow: 'hidden' }}>
@@ -148,21 +150,21 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
 
         <div className="card" style={{ padding: '20px', borderRadius: '24px' }}>
            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <h3 style={{ fontSize: '0.8rem', fontWeight: 900, color: '#64748B' }}>BIO ARTISTIQUE</h3>
+              <h3 style={{ fontSize: '0.8rem', fontWeight: 900, color: '#64748B' }}>{language === 'en' ? 'ARTISTIC BIO' : 'BIO ARTISTIQUE'}</h3>
               <button onClick={() => setActiveModal('edit')} style={{ background: 'none', border: 'none', color: '#0066FF', cursor: 'pointer' }}><Edit3 size={18} /></button>
            </div>
-           <p style={{ fontSize: '0.95rem', lineHeight: 1.6 }}>"{currentUser.bio || 'Appuyez sur modifier...'}"</p>
+           <p style={{ fontSize: '0.95rem', lineHeight: 1.6 }}>"{currentUser.bio || (language === 'en' ? 'Tap edit to add bio...' : 'Appuyez sur modifier...')}"</p>
         </div>
 
         <div className="card" style={{ padding: '18px', borderRadius: '22px' }}>
-           <h3 style={{ fontSize: '0.8rem', fontWeight: 900, color: '#64748B', marginBottom: '12px' }}>INSTRUMENTS & GENRES</h3>
+           <h3 style={{ fontSize: '0.8rem', fontWeight: 900, color: '#64748B', marginBottom: '12px' }}>{language === 'en' ? 'INSTRUMENTS & GENRES' : 'INSTRUMENTS & GENRES'}</h3>
            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
-             {(currentUser.instruments?.length > 0 ? currentUser.instruments : ['Artiste']).map(inst => (
+             {(currentUser.instruments?.length > 0 ? currentUser.instruments : [language === 'en' ? 'Artist' : 'Artiste']).map(inst => (
                <span key={inst} style={{ background: '#EFF6FF', color: '#0066FF', padding: '6px 14px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 800, border: '1px solid #BFDBFE' }}>{instrumentIcons[inst] || '🎵'} {inst}</span>
              ))}
            </div>
            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-             {(currentUser.genres?.length > 0 ? currentUser.genres : ['Tous styles']).map(genre => (
+             {(currentUser.genres?.length > 0 ? currentUser.genres : [language === 'en' ? 'All styles' : 'Tous styles']).map(genre => (
                <span key={genre} style={{ background: isDarkMode ? '#1E293B' : '#F8FAFC', color: isDarkMode ? '#CBD5E1' : '#475569', padding: '5px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700, border: '1px solid var(--border-light)' }}>#{genre}</span>
              ))}
            </div>
@@ -171,16 +173,16 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
         <div style={{ display: 'flex', gap: '12px' }}>
            <button onClick={() => setActiveModal('qr')} className="card" style={{ flex: 1, padding: '18px', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
              <QrCode size={28} color="#0066FF" />
-             <span style={{ fontSize: '0.72rem', fontWeight: 900 }}>CARTE QR</span>
+             <span style={{ fontSize: '0.72rem', fontWeight: 900 }}>{language === 'en' ? 'QR CARD' : 'CARTE QR'}</span>
            </button>
            <button onClick={() => setActiveModal('cv')} className="card" style={{ flex: 1, padding: '18px', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
              <FileText size={28} color="#10B981" />
-             <span style={{ fontSize: '0.72rem', fontWeight: 900 }}>EPK / CV</span>
+             <span style={{ fontSize: '0.72rem', fontWeight: 900 }}>{language === 'en' ? 'EPK / RESUME' : 'EPK / CV'}</span>
            </button>
         </div>
 
-        <button onClick={onSimulateIncomingCall} style={{ width: '100%', padding: '16px', borderRadius: '18px', background: '#ECFDF5', border: '1px solid #10B981', color: '#047857', fontWeight: 900 }}>SIMULER APPEL ENTRANT</button>
-        <button onClick={logout} style={{ width: '100%', padding: '16px', borderRadius: '18px', background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#EF4444', fontWeight: 800 }}>SE DÉCONNECTER</button>
+        <button onClick={onSimulateIncomingCall} style={{ width: '100%', padding: '16px', borderRadius: '18px', background: '#ECFDF5', border: '1px solid #10B981', color: '#047857', fontWeight: 900 }}>{language === 'en' ? 'SIMULATE INCOMING CALL' : 'SIMULER APPEL ENTRANT'}</button>
+        <button onClick={logout} style={{ width: '100%', padding: '16px', borderRadius: '18px', background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#EF4444', fontWeight: 800 }}>{language === 'en' ? 'LOG OUT' : 'SE DÉCONNECTER'}</button>
       </div>
 
       {/* 3. NEW COMPACT BOTTOM-SHEET MODAL FOR EDITING */}
@@ -209,7 +211,7 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-               <h3 style={{ margin: 0, fontWeight: 900 }}>Paramètres de Page</h3>
+               <h3 style={{ margin: 0, fontWeight: 900 }}>{language === 'en' ? 'Page Settings' : 'Paramètres de Page'}</h3>
                <button onClick={() => setActiveModal(null)} style={{ background: isDarkMode ? '#1E293B' : '#F1F5F9', border: 'none', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'inherit' }}>
                   <X size={20} />
                </button>
@@ -217,17 +219,17 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
 
             <form onSubmit={handleSaveAll} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                <div>
-                 <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748B', display: 'block', marginBottom: '5px' }}>NOM D'ARTISTE</label>
+                 <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748B', display: 'block', marginBottom: '5px' }}>{language === 'en' ? 'ARTIST NAME' : "NOM D'ARTISTE"}</label>
                  <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: 'transparent', color: 'inherit', outline: 'none' }} />
                </div>
 
                <div>
-                 <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748B', display: 'block', marginBottom: '5px' }}>BIO / PRÉSENTATION</label>
+                 <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748B', display: 'block', marginBottom: '5px' }}>{language === 'en' ? 'BIO / PRESENTATION' : 'BIO / PRÉSENTATION'}</label>
                  <textarea value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: 'transparent', color: 'inherit', height: '80px', resize: 'none', outline: 'none' }} />
                </div>
 
                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '15px' }}>
-                 <p style={{ fontSize: '0.75rem', fontWeight: 900, color: '#0066FF', marginBottom: '10px' }}>INSTRUMENTS (SÉLECTION)</p>
+                 <p style={{ fontSize: '0.75rem', fontWeight: 900, color: '#0066FF', marginBottom: '10px' }}>{language === 'en' ? 'INSTRUMENTS (SELECTION)' : 'INSTRUMENTS (SÉLECTION)'}</p>
                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {INSTRUMENTS_LIST.map(inst => {
                       const isSelected = formData.instruments.includes(inst);
@@ -241,7 +243,7 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
                </div>
 
                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '15px' }}>
-                 <p style={{ fontSize: '0.75rem', fontWeight: 900, color: '#10B981', marginBottom: '10px' }}>GENRES (SÉLECTION)</p>
+                 <p style={{ fontSize: '0.75rem', fontWeight: 900, color: '#10B981', marginBottom: '10px' }}>{language === 'en' ? 'GENRES (SELECTION)' : 'GENRES (SÉLECTION)'}</p>
                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {GENRES_LIST.map(genre => {
                       const isSelected = formData.genres.includes(genre);
@@ -255,17 +257,17 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
                </div>
 
                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '15px' }}>
-                 <p style={{ fontSize: '0.75rem', fontWeight: 900, color: '#0066FF', marginBottom: '10px' }}>RÉSEAUX SOCIAUX (URL)</p>
+                 <p style={{ fontSize: '0.75rem', fontWeight: 900, color: '#0066FF', marginBottom: '10px' }}>{language === 'en' ? 'SOCIAL NETWORKS (URL)' : 'RÉSEAUX SOCIAUX (URL)'}</p>
                  {['spotify', 'instagram', 'tiktok'].map(p => (
                    <div key={p} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                       <div style={{ width: '22px' }}>{getBrandLogoSVG(p, 20)}</div>
-                      <input placeholder={`Lien ${p}`} value={formData[`${p}Url`]} onChange={e => setFormData({...formData, [`${p}Url`]: e.target.value})} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #E2E8F0', background: 'transparent', color: 'inherit', fontSize: '0.8rem', outline: 'none' }} />
+                      <input placeholder={language === 'en' ? `${p} Link` : `Lien ${p}`} value={formData[`${p}Url`]} onChange={e => setFormData({...formData, [`${p}Url`]: e.target.value})} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #E2E8F0', background: 'transparent', color: 'inherit', fontSize: '0.8rem', outline: 'none' }} />
                    </div>
                  ))}
                </div>
 
                <button type="submit" style={{ marginTop: '10px', padding: '16px', borderRadius: '16px', border: 'none', background: '#0066FF', color: '#FFF', fontWeight: 900, cursor: 'pointer', boxShadow: '0 6px 20px rgba(0,102,255,0.4)' }}>
-                 Enregistrer les modifications
+                 {language === 'en' ? 'Save Changes' : 'Enregistrer les modifications'}
                </button>
             </form>
           </div>

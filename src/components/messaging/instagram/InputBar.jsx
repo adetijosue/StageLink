@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Send, Image, Paperclip, Mic, Eye, X, Trash2, FileText, Film, Music } from 'lucide-react';
 import { useVoiceRecorder } from '../../../hooks/useVoiceRecorder';
 import { soundEngine } from '../../../services/audioService';
+import { useLanguage } from '../../../context/LanguageContext';
 
 export default function InputBar({
   replyingTo,
@@ -9,6 +10,7 @@ export default function InputBar({
   onSendMessage,
   onTyping
 }) {
+  const { t, language } = useLanguage();
   const [inputText, setInputText] = useState('');
   const [isViewOnce, setIsViewOnce] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
@@ -136,8 +138,8 @@ export default function InputBar({
           borderLeft: '3px solid #0066FF'
         }}>
           <div style={{ fontSize: '0.78rem' }}>
-            <span style={{ fontWeight: 700, color: '#0066FF' }}>Répondre à </span>
-            <span style={{ color: 'var(--text-dark)' }}>{replyingTo.content || 'Média'}</span>
+            <span style={{ fontWeight: 700, color: '#0066FF' }}>{language === 'en' ? 'Replying to ' : 'Répondre à '}</span>
+            <span style={{ color: 'var(--text-dark)' }}>{replyingTo.content || (language === 'en' ? 'Media' : 'Média')}</span>
           </div>
           <button
             onClick={onCancelReply}
@@ -208,7 +210,7 @@ export default function InputBar({
               >
                 <Image size={18} />
               </div>
-              Photos & Vidéos
+              {language === 'en' ? 'Photos & Videos' : 'Photos & Vidéos'}
             </button>
 
             <button
@@ -245,7 +247,7 @@ export default function InputBar({
               >
                 <FileText size={18} />
               </div>
-              Documents & Fichiers
+              {language === 'en' ? 'Documents & Files' : 'Documents & Fichiers'}
             </button>
           </div>
         </>
@@ -313,7 +315,7 @@ export default function InputBar({
           border: '1px solid #BFDBFE'
         }}>
           <span style={{ fontSize: '0.85rem', color: '#0066FF', fontWeight: 700 }}>
-            🎙️ Vocal ({audioPreviewData.duration})
+            {language === 'en' ? '🎙️ Voice note' : '🎙️ Vocal'} ({audioPreviewData.duration})
           </span>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
@@ -347,7 +349,7 @@ export default function InputBar({
           {/* Attachment Menu Trigger (Paperclip) */}
           <button
             onClick={() => setShowAttachMenu(!showAttachMenu)}
-            title="Joindre un fichier (Photo, Vidéo, Document)"
+            title={language === 'en' ? 'Attach file (Photo, Video, Document)' : 'Joindre un fichier (Photo, Vidéo, Document)'}
             style={{
               background: showAttachMenu ? 'rgba(0, 102, 255, 0.15)' : 'transparent',
               color: showAttachMenu ? '#0066FF' : '#94A3B8',
@@ -368,7 +370,7 @@ export default function InputBar({
           {/* Quick Photo Button */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            title="Envoyer une Photo ou Vidéo"
+            title={language === 'en' ? 'Send a Photo or Video' : 'Envoyer une Photo ou Vidéo'}
             style={{
               background: 'transparent',
               border: 'none',
@@ -387,7 +389,7 @@ export default function InputBar({
           {/* View Once Ephemeral Toggle */}
           <button
             onClick={() => setIsViewOnce(!isViewOnce)}
-            title={isViewOnce ? 'Vue unique activée' : 'Activer vue unique'}
+            title={isViewOnce ? (language === 'en' ? 'View once enabled' : 'Vue unique activée') : (language === 'en' ? 'Enable view once' : 'Activer vue unique')}
             style={{
               background: isViewOnce ? 'rgba(0, 102, 255, 0.15)' : 'transparent',
               color: isViewOnce ? '#0066FF' : '#94A3B8',
@@ -407,7 +409,7 @@ export default function InputBar({
           {/* Text Input */}
           <input
             type="text"
-            placeholder="Votre message..."
+            placeholder={t('chat_placeholder')}
             value={inputText}
             onChange={handleTextChange}
             onKeyDown={handleKeyDown}

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { X, GraduationCap, CheckCircle, Play, BookOpen, Clock, Award } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function CourseDetailsModal({ isOpen, onClose, course, onEnroll, isDarkMode }) {
+  const { t, language } = useLanguage();
   const [isEnrolled, setIsEnrolled] = useState(false);
 
   if (!isOpen || !course) return null;
@@ -100,7 +102,7 @@ export default function CourseDetailsModal({ isOpen, onClose, course, onEnroll, 
           {/* Metadata Row */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0066FF' }}>
-              Par {course.instructor}
+              {language === 'en' ? 'By' : 'Par'} {course.instructor}
             </span>
             <span style={{ fontSize: '1rem', fontWeight: 900, color: '#10B981' }}>
               {course.price}
@@ -110,33 +112,38 @@ export default function CourseDetailsModal({ isOpen, onClose, course, onEnroll, 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center' }}>
             <div style={{ background: isDarkMode ? '#1E293B' : '#F8FAFC', borderRadius: '12px', padding: '8px 4px' }}>
               <Clock size={16} color="#0066FF" style={{ margin: '0 auto 2px auto' }} />
-              <span style={{ fontSize: '0.72rem', color: '#64748B', display: 'block' }}>Durée</span>
-              <span style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#FFF' : '#0F172A' }}>{course.duration || '4h 30m'}</span>
+              <span style={{ fontSize: '0.72rem', color: '#64748B', display: 'block' }}>{language === 'en' ? 'Duration' : 'Durée'}</span>
+              <span style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#FFF' : '#0F172A' }}>{course.duration || (language === 'en' ? '4h 30m' : '4h 30m')}</span>
             </div>
             <div style={{ background: isDarkMode ? '#1E293B' : '#F8FAFC', borderRadius: '12px', padding: '8px 4px' }}>
               <BookOpen size={16} color="#10B981" style={{ margin: '0 auto 2px auto' }} />
-              <span style={{ fontSize: '0.72rem', color: '#64748B', display: 'block' }}>Programme</span>
-              <span style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#FFF' : '#0F172A' }}>12 Modules</span>
+              <span style={{ fontSize: '0.72rem', color: '#64748B', display: 'block' }}>{language === 'en' ? 'Curriculum' : 'Programme'}</span>
+              <span style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#FFF' : '#0F172A' }}>{language === 'en' ? '12 Modules' : '12 Modules'}</span>
             </div>
             <div style={{ background: isDarkMode ? '#1E293B' : '#F8FAFC', borderRadius: '12px', padding: '8px 4px' }}>
               <Award size={16} color="#F59E0B" style={{ margin: '0 auto 2px auto' }} />
-              <span style={{ fontSize: '0.72rem', color: '#64748B', display: 'block' }}>Certificat</span>
-              <span style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#FFF' : '#0F172A' }}>Inclus</span>
+              <span style={{ fontSize: '0.72rem', color: '#64748B', display: 'block' }}>{language === 'en' ? 'Certificate' : 'Certificat'}</span>
+              <span style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#FFF' : '#0F172A' }}>{language === 'en' ? 'Included' : 'Inclus'}</span>
             </div>
           </div>
 
           {/* Course Modules List */}
           <div>
             <h4 style={{ fontSize: '0.84rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', marginBottom: '8px' }}>
-              Ce que vous allez apprendre :
+              {language === 'en' ? 'What you will learn:' : 'Ce que vous allez apprendre :'}
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {[
+              {(language === 'en' ? [
+                'Mix setup & bus grouping/calibration',
+                'Surgical EQ and dynamic vocal processing',
+                'Stereo imaging, pro reverbs & 3D soundstage placement',
+                'Final mastering optimized for streaming services (LUFS)'
+              ] : [
                 'Configuration du mixage & calibration des bus',
                 'Égalisation chirurgicale et traitement dynamique des voix',
                 'Spatialisation stéréo, réverbes pro et placement 3D',
                 'Mastering final adapté aux plateformes de streaming (LUFS)'
-              ].map((m, i) => (
+              ]).map((m, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', color: isDarkMode ? '#94A3B8' : '#64748B' }}>
                   <CheckCircle size={14} color="#10B981" flexShrink={0} />
                   <span>{m}</span>
@@ -149,13 +156,13 @@ export default function CourseDetailsModal({ isOpen, onClose, course, onEnroll, 
           {isEnrolled ? (
             <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '16px', padding: '14px', textAlign: 'center' }}>
               <span style={{ color: '#065F46', fontWeight: 800, fontSize: '0.88rem', display: 'block', marginBottom: '6px' }}>
-                🎉 Inscription Validée !
+                {language === 'en' ? '🎉 Enrollment Confirmed!' : '🎉 Inscription Validée !'}
               </span>
               <button
                 type="button"
                 onClick={() => {
                   soundEngine?.playPopSound?.();
-                  alert(`Lancement du lecteur vidéo pour le Module 1 de : ${course.title}`);
+                  alert(language === 'en' ? `Launching video player for Module 1 of: ${course.title}` : `Lancement du lecteur vidéo pour le Module 1 de : ${course.title}`);
                   onClose();
                 }}
                 style={{
@@ -172,7 +179,7 @@ export default function CourseDetailsModal({ isOpen, onClose, course, onEnroll, 
                   gap: '6px'
                 }}
               >
-                <Play size={15} fill="#FFF" /> Démarrer la Masterclass
+                <Play size={15} fill="#FFF" /> {language === 'en' ? 'Start Masterclass' : 'Démarrer la Masterclass'}
               </button>
             </div>
           ) : (
@@ -197,7 +204,7 @@ export default function CourseDetailsModal({ isOpen, onClose, course, onEnroll, 
                 marginTop: '6px'
               }}
             >
-              <GraduationCap size={18} /> S'inscrire à la Masterclass ({course.price})
+              <GraduationCap size={18} /> {language === 'en' ? `Enroll in Masterclass (${course.price})` : `S'inscrire à la Masterclass (${course.price})`}
             </button>
           )}
         </div>

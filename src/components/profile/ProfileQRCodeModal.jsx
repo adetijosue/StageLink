@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { X, Copy, Share2, Check, QrCode, ExternalLink, Download, MessageCircle, Send, Smartphone } from 'lucide-react';
 import Logo from '../common/Logo';
 import { soundEngine } from '../../services/audioService';
+import { useLanguage } from '../../context/LanguageContext';
 
 /**
  * ProfileQRCodeModal - Ergonomic Bottom Sheet Version
  */
 export default function ProfileQRCodeModal({ isOpen, onClose, user, isDarkMode }) {
+  const { t, language } = useLanguage();
   const [copied, setCopied] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -18,7 +20,7 @@ export default function ProfileQRCodeModal({ isOpen, onClose, user, isDarkMode }
   const displayUrl = `stagelink.app/artist/${handleSlug}`;
 
   const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(profileUrl)}&color=0066FF&bgcolor=FFFFFF&margin=2`;
-  const ctaText = `🎵 Découvrez le profil d'artiste de ${user.name} sur StageLink !\n\n${profileUrl}`;
+  const ctaText = language === 'en' ? `🎵 Discover ${user.name}'s artist profile on StageLink!\n\n${profileUrl}` : `🎵 Découvrez le profil d'artiste de ${user.name} sur StageLink !\n\n${profileUrl}`;
 
   const handleCopyLink = () => {
     soundEngine.playPopSound();
@@ -67,13 +69,13 @@ export default function ProfileQRCodeModal({ isOpen, onClose, user, isDarkMode }
               display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
               boxShadow: '0 2px 8px rgba(239, 68, 68, 0.15)'
             }}
-            title="Fermer"
+            title={t('modal_close')}
           >
             <X size={20} color="#EF4444" />
           </button>
         </div>
 
-        <h3 style={{ fontSize: '1.15rem', fontWeight: 900, margin: '0 0 16px 0' }}>Votre Carte Contact QR</h3>
+        <h3 style={{ fontSize: '1.15rem', fontWeight: 900, margin: '0 0 16px 0' }}>{language === 'en' ? 'Your QR Contact Card' : 'Votre Carte Contact QR'}</h3>
 
         {/* QR Frame */}
         <div style={{ padding: '15px', background: '#FFF', borderRadius: '24px', border: '3px solid #0066FF', boxShadow: '0 10px 30px rgba(0, 102, 255, 0.15)', marginBottom: '20px' }}>
@@ -89,7 +91,7 @@ export default function ProfileQRCodeModal({ isOpen, onClose, user, isDarkMode }
             <Send size={20} /> <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>Telegram</span>
           </button>
           <button onClick={handleCopyLink} style={{ padding: '12px', borderRadius: '16px', background: '#0066FF', color: '#FFF', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-            {copied ? <Check size={20} /> : <Copy size={20} />} <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>{copied ? 'Copié' : 'Lien'}</span>
+            {copied ? <Check size={20} /> : <Copy size={20} />} <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>{copied ? (language === 'en' ? 'Copied' : 'Copié') : (language === 'en' ? 'Link' : 'Lien')}</span>
           </button>
         </div>
 
@@ -102,7 +104,7 @@ export default function ProfileQRCodeModal({ isOpen, onClose, user, isDarkMode }
             boxShadow: '0 8px 24px rgba(0, 102, 255, 0.35)'
           }}
         >
-          <Share2 size={20} style={{ marginRight: 8 }} /> Partager ma Carte Contact
+          <Share2 size={20} style={{ marginRight: 8 }} /> {language === 'en' ? 'Share my Contact Card' : 'Partager ma Carte Contact'}
         </button>
       </div>
     </div>

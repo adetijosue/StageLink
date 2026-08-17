@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import UserAvatar from '../common/UserAvatar';
 import { RotateCcw, VideoOff, ShieldCheck } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function VideoCallView({
   participant,
@@ -10,6 +11,7 @@ export default function VideoCallView({
   callDuration,
   onSwitchCamera
 }) {
+  const { t, language } = useLanguage();
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
 
@@ -89,16 +91,16 @@ export default function VideoCallView({
           <UserAvatar
             user={{
               avatar: participant?.avatar_url || participant?.avatar,
-              name: participant?.full_name || participant?.name || 'Artiste'
+              name: participant?.full_name || participant?.name || (language === 'en' ? 'Artist' : 'Artiste')
             }}
             size={110}
           />
           <div style={{ textAlign: 'center' }}>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
-              {participant?.full_name || participant?.name || 'Artiste StageLink'}
+              {participant?.full_name || participant?.name || (language === 'en' ? 'StageLink Artist' : 'Artiste StageLink')}
             </h3>
             <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: '4px 0 0 0', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
-              <VideoOff size={14} /> Caméra du correspondant désactivée
+              <VideoOff size={14} /> {language === 'en' ? "Participant's camera turned off" : 'Caméra du correspondant désactivée'}
             </p>
           </div>
         </div>
@@ -126,7 +128,7 @@ export default function VideoCallView({
           gap: '8px'
         }}>
           <span style={{ fontSize: '0.82rem', color: '#FFFFFF', fontWeight: 700 }}>
-            {participant?.full_name || participant?.name || 'Artiste'}
+            {participant?.full_name || participant?.name || (language === 'en' ? 'Artist' : 'Artiste')}
           </span>
           <span style={{ color: 'rgba(255,255,255,0.4)' }}>•</span>
           <span style={{ fontSize: '0.82rem', color: '#93C5FD', fontWeight: 600 }}>
@@ -145,7 +147,7 @@ export default function VideoCallView({
           gap: '6px'
         }}>
           <ShieldCheck size={14} color="#10B981" />
-          <span style={{ fontSize: '0.72rem', color: '#E2E8F0', fontWeight: 600 }}>HD Chiffré</span>
+          <span style={{ fontSize: '0.72rem', color: '#E2E8F0', fontWeight: 600 }}>{language === 'en' ? 'Encrypted HD' : 'HD Chiffré'}</span>
         </div>
       </div>
 
@@ -189,7 +191,7 @@ export default function VideoCallView({
               e.stopPropagation();
               onSwitchCamera();
             }}
-            title="Changer caméra"
+            title={language === 'en' ? 'Switch camera' : 'Changer caméra'}
             style={{
               position: 'absolute',
               bottom: '8px',

@@ -2,8 +2,11 @@ import React from 'react';
 import { Bell, Search } from 'lucide-react';
 import Logo from '../common/Logo';
 import { soundEngine } from '../../services/audioService';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function TopBar({ activeTab, onOpenNotifications, onOpenUserSearch, unreadNotificationsCount = 0, isDarkMode }) {
+  const { t } = useLanguage();
+
   const handleSearchClick = () => {
     soundEngine.playPopSound();
     if (onOpenUserSearch) onOpenUserSearch();
@@ -37,7 +40,7 @@ export default function TopBar({ activeTab, onOpenNotifications, onOpenUserSearc
         {/* Global User Search Button */}
         <button
           onClick={handleSearchClick}
-          title="Rechercher un membre ou artiste"
+          title={t('topbar_search_tooltip')}
           style={{
             background: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(248, 250, 252, 0.8)',
             border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid #E2E8F0',

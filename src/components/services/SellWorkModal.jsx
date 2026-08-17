@@ -2,10 +2,12 @@ import React, { useState, useRef } from 'react';
 import { X, DollarSign, FileAudio, Image, Music, UploadCloud, CheckCircle } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { compressImage } from '../../utils/imageCompressor';
 
 export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMode }) {
   const { currentUser } = useAuth();
+  const { t, language } = useLanguage();
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('150');
   const [category, setCategory] = useState('Beatmaking'); // 'Beatmaking' | 'Master' | 'SamplePack' | 'Mixage'
@@ -50,7 +52,7 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
       id: `work_${Date.now()}`,
       userId: currentUser?.id,
       title: title.trim(),
-      author: currentUser?.name || 'Artiste StageLink',
+      author: currentUser?.name || (language === 'en' ? 'StageLink Artist' : 'Artiste StageLink'),
       authorAvatar: currentUser?.avatar || '',
       price: `${price} €`,
       priceNum: parseFloat(price) || 0,
@@ -104,10 +106,10 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
         }}>
           <div>
             <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: isDarkMode ? '#FFFFFF' : '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Music size={20} color="#0066FF" /> Mettre en Vente une Œuvre
+              <Music size={20} color="#0066FF" /> {language === 'en' ? 'Sell a Work / Beat' : 'Mettre en Vente une Œuvre'}
             </h3>
             <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '2px 0 0 0' }}>
-              Publiez et vendez vos compositions, beats et masters
+              {language === 'en' ? 'Publish and sell your compositions, beats and masters' : 'Publiez et vendez vos compositions, beats et masters'}
             </p>
           </div>
 
@@ -141,14 +143,14 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
             {/* Title */}
             <div>
               <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '6px' }}>
-                Titre de l'Œuvre / Beat *
+                {language === 'en' ? 'Work / Beat Title *' : "Titre de l'Œuvre / Beat *"}
               </label>
               <input
                 type="text"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Afrobeat Summer Hit & Stems Master"
+                placeholder={language === 'en' ? 'Ex: Afrobeat Summer Hit & Stems Master' : 'Ex: Afrobeat Summer Hit & Stems Master'}
                 style={{
                   width: '100%',
                   padding: '10px 14px',
@@ -165,7 +167,7 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Catégorie
+                  {language === 'en' ? 'Category' : 'Catégorie'}
                 </label>
                 <select
                   value={category}
@@ -180,16 +182,16 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
                     fontSize: '0.82rem'
                   }}
                 >
-                  <option value="Beatmaking">Beatmaking / Prod</option>
-                  <option value="Master">Master Complet</option>
-                  <option value="SamplePack">Sample Pack & MIDI</option>
-                  <option value="Topline">Topline & Voix</option>
+                  <option value="Beatmaking">{language === 'en' ? 'Beatmaking / Production' : 'Beatmaking / Prod'}</option>
+                  <option value="Master">{language === 'en' ? 'Full Master' : 'Master Complet'}</option>
+                  <option value="SamplePack">{language === 'en' ? 'Sample Pack & MIDI' : 'Sample Pack & MIDI'}</option>
+                  <option value="Topline">{language === 'en' ? 'Topline & Vocals' : 'Topline & Voix'}</option>
                 </select>
               </div>
 
               <div>
                 <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Genre Musical
+                  {language === 'en' ? 'Music Genre' : 'Genre Musical'}
                 </label>
                 <select
                   value={genre}
@@ -211,7 +213,7 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
                   <option value="Rap / Hip-Hop">Rap / Hip-Hop</option>
                   <option value="Pop / Variété">Pop / Variété</option>
                   <option value="Zouk / Kompa">Zouk / Kompa</option>
-                  <option value="Cinematic">Cinématique / Synchro</option>
+                  <option value="Cinematic">{language === 'en' ? 'Cinematic / Sync' : 'Cinématique / Synchro'}</option>
                 </select>
               </div>
             </div>
@@ -220,7 +222,7 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div>
                 <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Prix (€)
+                  {language === 'en' ? 'Price (€)' : 'Prix (€)'}
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
@@ -246,7 +248,7 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
 
               <div>
                 <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Type de Licence
+                  {language === 'en' ? 'License Type' : 'Type de Licence'}
                 </label>
                 <select
                   value={licenseType}
@@ -261,10 +263,10 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
                     fontSize: '0.82rem'
                   }}
                 >
-                  <option value="Licence Exclusive + Stems">Exclusive + Stems (WAV)</option>
-                  <option value="Licence Commerciale MP3/WAV">Commerciale MP3 + WAV</option>
-                  <option value="Licence Non-Exclusive (MP3)">Non-Exclusive (MP3)</option>
-                  <option value="Synchro TV & Film">Synchro Média / Film</option>
+                  <option value="Licence Exclusive + Stems">{language === 'en' ? 'Exclusive + Stems (WAV)' : 'Exclusive + Stems (WAV)'}</option>
+                  <option value="Licence Commerciale MP3/WAV">{language === 'en' ? 'Commercial MP3 + WAV' : 'Commerciale MP3 + WAV'}</option>
+                  <option value="Licence Non-Exclusive (MP3)">{language === 'en' ? 'Non-Exclusive (MP3)' : 'Non-Exclusive (MP3)'}</option>
+                  <option value="Synchro TV & Film">{language === 'en' ? 'Media / Film Sync' : 'Synchro Média / Film'}</option>
                 </select>
               </div>
             </div>
@@ -272,13 +274,13 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
             {/* Description / Notes */}
             <div>
               <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Description & Détails de l'Œuvre
+                {language === 'en' ? 'Description & Details' : "Description & Détails de l'Œuvre"}
               </label>
               <textarea
                 rows={2}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Précisez le tempo (BPM), la tonalité, les instruments utilisés ou conditions..."
+                placeholder={language === 'en' ? 'Specify BPM, key, instruments used or conditions...' : 'Précisez le tempo (BPM), la tonalité, les instruments utilisés ou conditions...'}
                 style={{
                   width: '100%',
                   padding: '9px 12px',
@@ -295,7 +297,7 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
             {/* Image / Cover Upload */}
             <div>
               <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Pochette / Visuel de l'Œuvre
+                {language === 'en' ? 'Cover / Artwork' : "Pochette / Visuel de l'Œuvre"}
               </label>
               <input
                 type="file"
@@ -322,13 +324,13 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
                 {coverImage ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <img src={coverImage} alt="Cover" style={{ width: '44px', height: '44px', borderRadius: '10px', objectFit: 'cover' }} />
-                    <span style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 700 }}>Visuel sélectionné (Cliquer pour changer)</span>
+                    <span style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 700 }}>{language === 'en' ? 'Artwork selected (Click to change)' : 'Visuel sélectionné (Cliquer pour changer)'}</span>
                   </div>
                 ) : (
                   <>
                     <Image size={20} color="#0066FF" />
                     <span style={{ fontSize: '0.78rem', color: isDarkMode ? '#CBD5E1' : '#64748B' }}>
-                      Ajouter une pochette / photo
+                      {language === 'en' ? 'Add a cover / photo' : 'Ajouter une pochette / photo'}
                     </span>
                   </>
                 )}
@@ -338,7 +340,7 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
             {/* Audio File Upload */}
             <div>
               <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Fichier Audio (Extrait Démo MP3 / WAV)
+                {language === 'en' ? 'Audio File (Demo MP3 / WAV)' : 'Fichier Audio (Extrait Démo MP3 / WAV)'}
               </label>
               <input
                 type="file"
@@ -373,7 +375,7 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
                   <>
                     <UploadCloud size={20} color="#0066FF" />
                     <span style={{ fontSize: '0.78rem', color: isDarkMode ? '#CBD5E1' : '#64748B' }}>
-                      Importer un fichier audio démo
+                      {language === 'en' ? 'Upload a demo audio track' : 'Importer un fichier audio démo'}
                     </span>
                   </>
                 )}
@@ -398,7 +400,7 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
                 style={{ accentColor: '#0066FF', width: '16px', height: '16px', cursor: 'pointer' }}
               />
               <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0066FF' }}>
-                📢 Partager automatiquement dans le fil d'actualité (Feed)
+                {language === 'en' ? '📢 Automatically share in Feed' : '📢 Partager automatiquement dans le fil d\'actualité (Feed)'}
               </span>
             </label>
 
@@ -412,7 +414,7 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
                 style={{ marginTop: '2px', accentColor: '#0066FF' }}
               />
               <span style={{ fontSize: '0.72rem', color: isDarkMode ? '#94A3B8' : '#64748B', lineHeight: 1.35 }}>
-                Je certifie détenir 100% des droits sur cette composition et autorise sa mise à disposition sur StageLink.
+                {language === 'en' ? 'I certify that I own 100% of the rights to this composition and authorize its listing on StageLink.' : 'Je certifie détenir 100% des droits sur cette composition et autorise sa mise à disposition sur StageLink.'}
               </span>
             </label>
 
@@ -434,7 +436,7 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
                 marginTop: '4px'
               }}
             >
-              🚀 Publier mon Œuvre ({price} €)
+              {language === 'en' ? `🚀 Publish Work (${price} €)` : `🚀 Publier mon Œuvre (${price} €)`}
             </button>
           </form>
         </div>

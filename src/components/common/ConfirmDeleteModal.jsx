@@ -1,7 +1,9 @@
 import React from 'react';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function ConfirmDeleteModal({ isOpen, onClose, onConfirm, title, message, confirmText }) {
+  const { t, language } = useLanguage();
   if (!isOpen) return null;
 
   return (
@@ -35,7 +37,7 @@ export default function ConfirmDeleteModal({ isOpen, onClose, onConfirm, title, 
             color: '#EF4444', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}
-          title="Fermer"
+          title={t('modal_close')}
         >
           <X size={18} color="#EF4444" />
         </button>
@@ -55,11 +57,11 @@ export default function ConfirmDeleteModal({ isOpen, onClose, onConfirm, title, 
         </div>
 
         <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0F172A', marginBottom: '8px' }}>
-          {title || 'Confirmation de suppression'}
+          {title || (language === 'en' ? 'Confirm Deletion' : 'Confirmation de suppression')}
         </h3>
 
         <p style={{ fontSize: '0.88rem', color: '#64748B', lineHeight: 1.5, marginBottom: '24px' }}>
-          {message || 'Voulez-vous vraiment supprimer cet élément ? Cette action est définitive et irréversible.'}
+          {message || (language === 'en' ? 'Are you sure you want to delete this item? This action is permanent and cannot be undone.' : 'Voulez-vous vraiment supprimer cet élément ? Cette action est définitive et irréversible.')}
         </p>
 
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -77,7 +79,7 @@ export default function ConfirmDeleteModal({ isOpen, onClose, onConfirm, title, 
               cursor: 'pointer'
             }}
           >
-            Annuler
+            {t('btn_cancel')}
           </button>
 
           <button
@@ -102,7 +104,7 @@ export default function ConfirmDeleteModal({ isOpen, onClose, onConfirm, title, 
               boxShadow: '0 6px 18px rgba(239, 68, 68, 0.4)'
             }}
           >
-            <Trash2 size={16} /> {confirmText || 'Supprimer'}
+            <Trash2 size={16} /> {confirmText || (language === 'en' ? 'Delete' : 'Supprimer')}
           </button>
         </div>
       </div>

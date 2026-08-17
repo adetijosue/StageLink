@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import SellWorkModal from './SellWorkModal';
 import OfferServiceModal from './OfferServiceModal';
 import PublishCourseModal from './PublishCourseModal';
@@ -18,6 +19,7 @@ import EventTicketModal from './EventTicketModal';
 
 export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProfile, isDarkMode }) {
   const { currentUser } = useAuth();
+  const { t, language } = useLanguage();
 
   const [activeSubTab, setActiveSubTab] = useState('marketplace'); // 'marketplace' | 'services' | 'courses' | 'events'
   const [searchQuery, setSearchQuery] = useState('');
@@ -263,7 +265,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                 gap: '5px'
               }}
             >
-              <Award size={13} /> ESPACE SERVICES PRO
+              <Award size={13} /> {language === 'en' ? 'PRO SERVICES HUB' : 'ESPACE SERVICES PRO'}
             </span>
           </div>
 
@@ -286,10 +288,10 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
         </div>
 
         <h2 style={{ fontSize: '1.28rem', fontWeight: 900, margin: '0 0 6px 0', letterSpacing: '-0.4px', lineHeight: 1.25 }}>
-          Hub des Prestations, Ventes & Formations
+          {language === 'en' ? 'Hub of Services, Sales & Courses' : 'Hub des Prestations, Ventes & Formations'}
         </h2>
         <p style={{ fontSize: '0.8rem', color: '#CBD5E1', margin: '0 0 16px 0', lineHeight: 1.45 }}>
-          Mettez en vente vos œuvres, proposez vos prestations studio professionnelles, animez des masterclasses et développez votre activité musicale en direct.
+          {language === 'en' ? 'Sell your beats, offer professional studio services, host masterclasses and grow your music career live.' : 'Mettez en vente vos œuvres, proposez vos prestations studio professionnelles, animez des masterclasses et développez votre activité musicale en direct.'}
         </p>
 
         {/* Dynamic Activity Counters */}
@@ -306,7 +308,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
             <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#38BDF8', display: 'block' }}>
               {worksList.length}
             </span>
-            <span style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 }}>Œuvres & Beats</span>
+            <span style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 }}>{language === 'en' ? 'Works & Beats' : 'Œuvres & Beats'}</span>
           </div>
 
           <div 
@@ -321,7 +323,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
             <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#34D399', display: 'block' }}>
               {servicesList.length}
             </span>
-            <span style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 }}>Prestations Studio</span>
+            <span style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 }}>{language === 'en' ? 'Studio Services' : 'Prestations Studio'}</span>
           </div>
 
           <div 
@@ -336,7 +338,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
             <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#FBBF24', display: 'block' }}>
               {coursesList.length + eventsList.length}
             </span>
-            <span style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 }}>Formations & Lives</span>
+            <span style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 700 }}>{language === 'en' ? 'Courses & Lives' : 'Formations & Lives'}</span>
           </div>
         </div>
       </div>
@@ -356,10 +358,10 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
         }}
       >
         {[
-          { id: 'marketplace', label: "Œuvres", fullLabel: "Œuvres & Beats", icon: <ShoppingBag size={15} />, count: worksList.length },
-          { id: 'services', label: 'Prestations', fullLabel: "Prestations Studio", icon: <Sliders size={15} />, count: servicesList.length },
-          { id: 'courses', label: 'Formations', fullLabel: "Formations", icon: <GraduationCap size={15} />, count: coursesList.length },
-          { id: 'events', label: 'Événements', fullLabel: "Événements", icon: <Calendar size={15} />, count: eventsList.length }
+          { id: 'marketplace', label: language === 'en' ? 'Works' : "Œuvres", fullLabel: language === 'en' ? 'Works & Beats' : "Œuvres & Beats", icon: <ShoppingBag size={15} />, count: worksList.length },
+          { id: 'services', label: language === 'en' ? 'Services' : 'Prestations', fullLabel: language === 'en' ? 'Studio Services' : "Prestations Studio", icon: <Sliders size={15} />, count: servicesList.length },
+          { id: 'courses', label: language === 'en' ? 'Courses' : 'Formations', fullLabel: language === 'en' ? 'Courses' : "Formations", icon: <GraduationCap size={15} />, count: coursesList.length },
+          { id: 'events', label: language === 'en' ? 'Events' : 'Événements', fullLabel: language === 'en' ? 'Events' : "Événements", icon: <Calendar size={15} />, count: eventsList.length }
         ].map((tab) => {
           const isSel = activeSubTab === tab.id;
           return (
@@ -424,12 +426,12 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
             type="text"
             placeholder={
               activeSubTab === 'marketplace'
-                ? 'Rechercher un beat, un artiste, une prod...'
+                ? (language === 'en' ? 'Search beat, artist, prod...' : 'Rechercher un beat, un artiste, une prod...')
                 : activeSubTab === 'services'
-                ? 'Rechercher mixage, mastering, enregistrement...'
+                ? (language === 'en' ? 'Search mix, mastering, recording...' : 'Rechercher mixage, mastering, enregistrement...')
                 : activeSubTab === 'courses'
-                ? 'Rechercher une masterclass, un formateur...'
-                : 'Rechercher un live, concert, workshop...'
+                ? (language === 'en' ? 'Search masterclass, trainer...' : 'Rechercher une masterclass, un formateur...')
+                : (language === 'en' ? 'Search live, concert, workshop...' : 'Rechercher un live, concert, workshop...')
             }
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -554,7 +556,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
               boxShadow: '0 8px 22px rgba(0, 102, 255, 0.32)'
             }}
           >
-            <Plus size={19} /> Mettre en vente une Œuvre / Beat
+            <Plus size={19} /> {language === 'en' ? 'Sell a Work / Beat' : 'Mettre en vente une Œuvre / Beat'}
           </button>
 
           {/* Works List / Clean Empty State */}
@@ -587,10 +589,10 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                   <Music size={30} />
                 </div>
                 <h4 style={{ fontSize: '1rem', fontWeight: 900, margin: '0 0 6px 0', color: isDarkMode ? '#FFFFFF' : '#0F172A' }}>
-                  Aucune œuvre en vente pour le moment
+                  {language === 'en' ? 'No works for sale yet' : 'Aucune œuvre en vente pour le moment'}
                 </h4>
                 <p style={{ fontSize: '0.8rem', color: '#64748B', maxWidth: '340px', margin: '0 auto 16px auto', lineHeight: 1.5 }}>
-                  Soyez le premier à mettre en vente vos compositions, beats ou packs audio et faites-vous découvrir par toute la communauté d'artistes !
+                  {language === 'en' ? 'Be the first to list your compositions, beats or audio packs and get discovered by the artist community!' : 'Soyez le premier à mettre en vente vos compositions, beats ou packs audio et faites-vous découvrir par toute la communauté d\'artistes !'}
                 </p>
                 <button
                   onClick={() => setIsSellModalOpen(true)}
@@ -606,7 +608,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                     boxShadow: '0 4px 14px rgba(0,102,255,0.3)'
                   }}
                 >
-                  + Déposer ma première œuvre
+                  {language === 'en' ? '+ Post my first work' : '+ Déposer ma première œuvre'}
                 </button>
               </div>
             ) : (
@@ -648,7 +650,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                           cursor: 'pointer',
                           transition: 'background 0.2s ease'
                         }}
-                        title="Écouter la démo"
+                        title={language === 'en' ? 'Listen to demo' : 'Écouter la démo'}
                       >
                         {playingId === item.id ? (
                           <Pause size={24} fill="#FFF" />
@@ -675,7 +677,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                         </span>
                         {playingId === item.id && (
                           <span style={{ fontSize: '0.68rem', color: '#10B981', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <Volume2 size={12} /> Démo en cours
+                            <Volume2 size={12} /> {language === 'en' ? 'Demo playing' : 'Démo en cours'}
                           </span>
                         )}
                       </div>
@@ -749,7 +751,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                         gap: '5px'
                       }}
                     >
-                      <Share2 size={14} /> Partager dans le Feed
+                      <Share2 size={14} /> {language === 'en' ? 'Share to Feed' : 'Partager dans le Feed'}
                     </button>
 
                     <button
@@ -767,7 +769,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                         gap: '5px'
                       }}
                     >
-                      <MessageSquare size={14} /> Contacter l'artiste
+                      <MessageSquare size={14} /> {language === 'en' ? 'Contact the artist' : 'Contacter l\'artiste'}
                     </button>
                   </div>
                 </div>
@@ -805,7 +807,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
               boxShadow: '0 8px 22px rgba(16, 185, 129, 0.32)'
             }}
           >
-            <Plus size={19} /> Proposer une Prestation Studio
+            <Plus size={19} /> {language === 'en' ? 'Offer a Studio Service' : 'Proposer une Prestation Studio'}
           </button>
 
           {/* Services List / Clean Empty State */}
@@ -838,10 +840,10 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                   <Sliders size={30} />
                 </div>
                 <h4 style={{ fontSize: '1rem', fontWeight: 900, margin: '0 0 6px 0', color: isDarkMode ? '#FFFFFF' : '#0F172A' }}>
-                  Aucune prestation studio disponible
+                  {language === 'en' ? 'No studio services available' : 'Aucune prestation studio disponible'}
                 </h4>
                 <p style={{ fontSize: '0.8rem', color: '#64748B', maxWidth: '340px', margin: '0 auto 16px auto', lineHeight: 1.5 }}>
-                  Proposez vos compétences professionnelles en mixage, mastering, enregistrement ou direction artistique et recevez vos premières commandes !
+                  {language === 'en' ? 'Offer your professional skills in mixing, mastering, recording or artistic direction and get your first orders!' : 'Proposez vos compétences professionnelles en mixage, mastering, enregistrement ou direction artistique et recevez vos premières commandes !'}
                 </p>
                 <button
                   onClick={() => setIsOfferServiceModalOpen(true)}
@@ -857,7 +859,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                     boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)'
                   }}
                 >
-                  + Proposer mon premier service
+                  {language === 'en' ? '+ Offer my first service' : '+ Proposer mon premier service'}
                 </button>
               </div>
             ) : (
@@ -969,7 +971,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                           boxShadow: '0 4px 10px rgba(0, 102, 255, 0.25)'
                         }}
                       >
-                        Commander <ChevronRight size={14} />
+                        {language === 'en' ? 'Order' : 'Commander'} <ChevronRight size={14} />
                       </button>
                     </div>
                   </div>
@@ -1008,7 +1010,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
               boxShadow: '0 8px 22px rgba(0, 102, 255, 0.32)'
             }}
           >
-            <Plus size={19} /> Publier une Nouvelle Formation
+            <Plus size={19} /> {language === 'en' ? 'Publish a New Course' : 'Publier une Nouvelle Formation'}
           </button>
 
           {/* Courses List / Clean Empty State */}
@@ -1041,10 +1043,10 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                   <GraduationCap size={30} />
                 </div>
                 <h4 style={{ fontSize: '1rem', fontWeight: 900, margin: '0 0 6px 0', color: isDarkMode ? '#FFFFFF' : '#0F172A' }}>
-                  Aucune formation publiée actuellement
+                  {language === 'en' ? 'No courses published yet' : 'Aucune formation publiée actuellement'}
                 </h4>
                 <p style={{ fontSize: '0.8rem', color: '#64748B', maxWidth: '340px', margin: '0 auto 16px auto', lineHeight: 1.5 }}>
-                  Transmettez votre expertise musicale en créant une masterclass vidéo ou un atelier thématique pour les talents de la plateforme !
+                  {language === 'en' ? 'Share your musical expertise by creating a video masterclass or workshop for talents on the platform!' : 'Transmettez votre expertise musicale en créant une masterclass vidéo ou un atelier thématique pour les talents de la plateforme !'}
                 </p>
                 <button
                   onClick={() => setIsCourseModalOpen(true)}
@@ -1060,7 +1062,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                     boxShadow: '0 4px 14px rgba(0,102,255,0.3)'
                   }}
                 >
-                  + Créer ma première formation
+                  {language === 'en' ? '+ Create my first course' : '+ Créer ma première formation'}
                 </button>
               </div>
             ) : (
@@ -1144,7 +1146,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                         gap: '5px'
                       }}
                     >
-                      <Share2 size={14} /> Partager dans le Feed
+                      <Share2 size={14} /> {language === 'en' ? 'Share to Feed' : 'Partager dans le Feed'}
                     </button>
 
                     <button
@@ -1162,7 +1164,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                         cursor: 'pointer'
                       }}
                     >
-                      Voir le programme →
+                      {language === 'en' ? 'View syllabus →' : 'Voir le programme →'}
                     </button>
                   </div>
                 </div>
@@ -1200,7 +1202,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
               boxShadow: '0 8px 22px rgba(245, 158, 11, 0.32)'
             }}
           >
-            <Plus size={19} /> Organiser un Événement Pro / Live
+            <Plus size={19} /> {language === 'en' ? 'Host a Pro / Live Event' : 'Organiser un Événement Pro / Live'}
           </button>
 
           {/* Events List / Clean Empty State */}
@@ -1233,10 +1235,10 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                   <Calendar size={30} />
                 </div>
                 <h4 style={{ fontSize: '1rem', fontWeight: 900, margin: '0 0 6px 0', color: isDarkMode ? '#FFFFFF' : '#0F172A' }}>
-                  Aucun événement planifié
+                  {language === 'en' ? 'No scheduled events' : 'Aucun événement planifié'}
                 </h4>
                 <p style={{ fontSize: '0.8rem', color: '#64748B', maxWidth: '340px', margin: '0 auto 16px auto', lineHeight: 1.5 }}>
-                  Organisez une session d'écoute live, un showcase ou un atelier interactif pour rassembler les musiciens et le public !
+                  {language === 'en' ? 'Host a live listening session, showcase or interactive workshop to bring musicians and fans together!' : 'Organisez une session d\'écoute live, un showcase ou un atelier interactif pour rassembler les musiciens et le public !'}
                 </p>
                 <button
                   onClick={() => setIsEventModalOpen(true)}
@@ -1252,7 +1254,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                     boxShadow: '0 4px 14px rgba(245, 158, 11, 0.3)'
                   }}
                 >
-                  + Créer mon premier événement
+                  {language === 'en' ? '+ Create my first event' : '+ Créer mon premier événement'}
                 </button>
               </div>
             ) : (
@@ -1345,7 +1347,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                         gap: '5px'
                       }}
                     >
-                      <Share2 size={14} /> Partager dans le Feed
+                      <Share2 size={14} /> {language === 'en' ? 'Share to Feed' : 'Partager dans le Feed'}
                     </button>
 
                     <button
@@ -1363,7 +1365,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
                         cursor: 'pointer'
                       }}
                     >
-                      Réserver mon Billet →
+                      {language === 'en' ? 'Book my Ticket →' : 'Réserver mon Billet →'}
                     </button>
                   </div>
                 </div>
