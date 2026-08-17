@@ -1395,11 +1395,19 @@ function MainApp() {
           if (syncMessagesFallback) syncMessagesFallback();
         }
       };
+      const handleShowToast = (e) => {
+        if (e.detail) {
+          setToastNotification(e.detail);
+          setTimeout(() => setToastNotification(null), 4000);
+        }
+      };
+      window.addEventListener('show_toast', handleShowToast);
       window.addEventListener('visibilitychange', handleVisibilityChange);
       window.addEventListener('focus', handleVisibilityChange);
 
       return () => {
         clearInterval(pollInterval);
+        window.removeEventListener('show_toast', handleShowToast);
         window.removeEventListener('visibilitychange', handleVisibilityChange);
         window.removeEventListener('focus', handleVisibilityChange);
         if (profilesSub) supabase.removeChannel(profilesSub);

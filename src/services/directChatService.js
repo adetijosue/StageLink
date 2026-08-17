@@ -142,9 +142,13 @@ export const directChatService = {
       try {
         // Persist to Postgres database
         const { error } = await supabase.from('direct_messages').insert(newRecord);
-        if (error) console.warn('Direct message DB insert note:', error.message);
+        if (error) {
+           console.warn('Direct message DB insert error:', error.message);
+           throw error;
+        }
       } catch (err) {
         console.warn('Direct message sending error:', err);
+        throw err;
       }
     }
 

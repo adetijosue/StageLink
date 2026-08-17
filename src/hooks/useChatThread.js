@@ -173,19 +173,26 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     }
 
     // 3. Persist and Broadcast
-    const savedRecord = await directChatService.sendMessage({
-      conversationId,
-      senderId: currentUser.id,
-      content: text,
-      messageType: mediaType,
-      mediaUrl: finalMediaUrl,
-      metadata: optimisticMsg.metadata,
-      replyToId: optimisticMsg.reply_to_id,
-      isVanished: isVanishMode
-    });
+    try {
+      const savedRecord = await directChatService.sendMessage({
+        conversationId,
+        senderId: currentUser.id,
+        content: text,
+        messageType: mediaType,
+        mediaUrl: finalMediaUrl,
+        metadata: optimisticMsg.metadata,
+        replyToId: optimisticMsg.reply_to_id,
+        isVanished: isVanishMode
+      });
 
-    // Replace optimistic record with server record
-    setMessages((prev) => prev.map((m) => (m.id === tempId ? savedRecord : m)));
+      // Replace optimistic record with server record
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? savedRecord : m)));
+    } catch (err) {
+      console.error("Message could not be sent:", err);
+      // Remove the optimistic message on failure
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      window.dispatchEvent(new CustomEvent('show_toast', { detail: { title: 'Erreur', message: 'Impossible d\'envoyer le message.' } }));
+    }
   }, [conversationId, currentUser, isVanishMode, replyingTo, partner]);
 
   /**
