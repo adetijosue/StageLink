@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Play, Pause, Heart, Eye, EyeOff, Music, Reply, Check, CheckCheck } from 'lucide-react';
+import { Play, Pause, Heart, Eye, FileText, Download, Film, Music, Reply, File } from 'lucide-react';
 import { soundEngine } from '../../../services/audioService';
 
 export default function MessageBubble({
@@ -27,7 +27,7 @@ export default function MessageBubble({
     : `${isPreviousSameSender ? '6px' : '22px'} ${isPreviousSameSender ? '18px' : '22px'} 18px ${isNextSameSender ? '6px' : '22px'}`;
 
   // Double-tap to like handler
-  const handleDoubleTap = (e) => {
+  const handleDoubleTap = () => {
     const now = Date.now();
     if (now - lastTapRef.current < 300) {
       soundEngine.playPopSound();
@@ -59,7 +59,8 @@ export default function MessageBubble({
   };
 
   // Toggle Voice Note Audio
-  const togglePlayAudio = () => {
+  const togglePlayAudio = (e) => {
+    e?.stopPropagation();
     if (!message.media_url) return;
 
     if (isPlayingAudio) {
@@ -71,8 +72,9 @@ export default function MessageBubble({
         audioRef.current = audio;
         audio.playbackRate = playbackSpeed;
         audio.onended = () => setIsPlayingAudio(false);
+        audio.onerror = () => setIsPlayingAudio(false);
       }
-      audioRef.current.play();
+      audioRef.current.play().catch(() => setIsPlayingAudio(false));
       setIsPlayingAudio(true);
     }
   };
@@ -84,8 +86,33 @@ export default function MessageBubble({
     if (audioRef.current) audioRef.current.playbackRate = nextSpeed;
   };
 
+  const handleDownloadFile = (e, url, fileName) => {
+    e.stopPropagation();
+    if (!url) return;
+    try {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName || 'fichier';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      window.open(url, '_blank');
+    }
+  };
+
   const isViewOnce = message.metadata?.view_once;
   const isViewed = message.metadata?.is_viewed;
+
+  const fileName = message.metadata?.fileName || message.content || 'Document';
+  const fileExt = fileName.split('.').pop()?.toUpperCase() || 'DOC';
+  const fileSizeText = message.metadata?.fileSize
+    ? message.metadata.fileSize > 1048576
+      ? `${(message.metadata.fileSize / 1048576).toFixed(1)} MB`
+      : `${(message.metadata.fileSize / 1024).toFixed(0)} KB`
+    : 'Fichier joint';
 
   return (
     <div
@@ -142,7 +169,7 @@ export default function MessageBubble({
 
       {/* Main Message Bubble */}
       <div style={{
-        maxWidth: '78%',
+        maxWidth: '82%',
         background: isMine
           ? 'linear-gradient(135deg, #0066FF 0%, #0052CC 100%)'
           : 'var(--card-bg)',
@@ -209,7 +236,7 @@ export default function MessageBubble({
           </div>
         )}
 
-        {/* 2. Photo / Video Attachment */}
+        {/* 2. Photo Attachment */}
         {message.message_type === 'image' && (
           <div style={{ position: 'relative', borderRadius: '18px', overflow: 'hidden' }}>
             {isViewOnce ? (
@@ -231,20 +258,143 @@ export default function MessageBubble({
                 </span>
               </div>
             ) : (
-              <img
-                src={message.media_url}
-                alt="Photo"
-                onClick={() => onOpenMedia && onOpenMedia(message)}
-                style={{
-                  width: '100%',
-                  maxHeight: '280px',
-                  objectFit: 'cover',
-                  borderRadius: '16px',
-                  display: 'block',
-                  cursor: 'pointer'
-                }}
-              />
+              <div style={{ position: 'relative' }}>
+                <img
+                  src={message.media_url}
+                  alt="Photo"
+                  onClick={() => onOpenMedia && onOpenMedia(message)}
+                  style={{
+                    width: '100%',
+                    maxHeight: '280px',
+                    objectFit: 'cover',
+                    borderRadius: '16px',
+                    display: 'block',
+                    cursor: 'pointer'
+                  }}
+                />
+                <button
+                  onClick={(e) => handleDownloadFile(e, message.media_url, message.metadata?.fileName || 'photo.jpg')}
+                  title="Télécharger l'image"
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    background: 'rgba(0,0,0,0.6)',
+                    color: '#FFF',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    backdropFilter: 'blur(4px)'
+                  }}
+                >
+                  <Download size={15} />
+                </button>
+              </div>
             )}
+          </div>
+        )}
+
+        {/* 2.1 Video Attachment */}
+        {message.message_type === 'video' && (
+          <div style={{ position: 'relative', borderRadius: '18px', overflow: 'hidden', maxWidth: '100%' }}>
+            <video
+              src={message.media_url}
+              controls
+              playsInline
+              preload="metadata"
+              style={{
+                width: '100%',
+                maxHeight: '280px',
+                borderRadius: '16px',
+                display: 'block',
+                background: '#000000'
+              }}
+            />
+          </div>
+        )}
+
+        {/* 2.2 Document / File Attachment */}
+        {(message.message_type === 'file' || message.message_type === 'document') && (
+          <div
+            onClick={(e) => handleDownloadFile(e, message.media_url, fileName)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              padding: '10px 14px',
+              background: isMine ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.04)',
+              borderRadius: '14px',
+              cursor: 'pointer',
+              border: `1px solid ${isMine ? 'rgba(255,255,255,0.25)' : 'var(--border-light)'}`,
+              minWidth: '200px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+              <div
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  background: isMine ? '#FFFFFF' : '#0066FF',
+                  color: isMine ? '#0066FF' : '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '0.68rem',
+                  flexShrink: 0
+                }}
+              >
+                {fileExt.length <= 4 ? fileExt : <FileText size={18} />}
+              </div>
+
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <h5 style={{
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  margin: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  color: isMine ? '#FFFFFF' : 'var(--text-dark)'
+                }}>
+                  {fileName}
+                </h5>
+                <span style={{
+                  fontSize: '0.72rem',
+                  opacity: 0.85,
+                  color: isMine ? '#FFFFFF' : '#64748B'
+                }}>
+                  {fileSizeText} • Télécharger
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={(e) => handleDownloadFile(e, message.media_url, fileName)}
+              title="Télécharger le document"
+              style={{
+                background: isMine ? 'rgba(255,255,255,0.25)' : '#EFF6FF',
+                color: isMine ? '#FFFFFF' : '#0066FF',
+                border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                flexShrink: 0
+              }}
+            >
+              <Download size={16} />
+            </button>
           </div>
         )}
 
@@ -301,16 +451,37 @@ export default function MessageBubble({
             >
               {playbackSpeed}x
             </button>
+
+            {/* Audio Download */}
+            <button
+              onClick={(e) => handleDownloadFile(e, message.media_url, message.metadata?.fileName || 'vocal.mp3')}
+              title="Télécharger l'audio"
+              style={{
+                background: isMine ? 'rgba(255,255,255,0.2)' : '#F1F5F9',
+                color: isMine ? '#FFFFFF' : '#0066FF',
+                border: 'none',
+                borderRadius: '50%',
+                width: '28px',
+                height: '28px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <Download size={13} />
+            </button>
           </div>
         )}
 
         {/* 4. Text Content */}
-        {message.content && (
+        {message.content && message.message_type !== 'file' && message.message_type !== 'document' && (
           <p style={{
             margin: 0,
             fontSize: '0.9rem',
             lineHeight: 1.4,
-            wordBreak: 'break-word'
+            wordBreak: 'break-word',
+            marginTop: (message.message_type === 'image' || message.message_type === 'video') ? '6px' : 0
           }}>
             {message.content}
           </p>

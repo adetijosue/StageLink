@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Send, Image, Mic, MicOff, Eye, X, Trash2 } from 'lucide-react';
+import { Send, Image, Paperclip, Mic, Eye, X, Trash2, FileText, Film, Music } from 'lucide-react';
 import { useVoiceRecorder } from '../../../hooks/useVoiceRecorder';
 import { soundEngine } from '../../../services/audioService';
 
@@ -11,7 +11,10 @@ export default function InputBar({
 }) {
   const [inputText, setInputText] = useState('');
   const [isViewOnce, setIsViewOnce] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+
   const fileInputRef = useRef(null);
+  const docInputRef = useRef(null);
 
   const {
     isRecording,
@@ -44,7 +47,7 @@ export default function InputBar({
     }
   };
 
-  const handleFileSelect = (e) => {
+  const handlePhotoVideoSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -57,28 +60,42 @@ export default function InputBar({
       mediaType: isVideo ? 'video' : 'image',
       metadata: {
         fileName: file.name,
+        fileSize: file.size,
         view_once: isViewOnce
       }
     });
 
     e.target.value = '';
     setIsViewOnce(false);
+    setShowAttachMenu(false);
   };
 
-  const handleSendVoiceNote = () => {
-    if (!audioPreviewData) return;
+  const handleDocSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    soundEngine.playPopSound();
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    const isAudio = file.type.startsWith('audio/');
+
+    const determinedType = isVideo ? 'video' : isImage ? 'image' : isAudio ? 'audio' : 'file';
 
     onSendMessage({
-      mediaBlob: audioPreviewData.blob,
-      mediaType: 'audio',
+      mediaBlob: file,
+      mediaType: determinedType,
+      text: determinedType === 'file' ? file.name : '',
       metadata: {
-        duration: audioPreviewData.duration,
-        durationSeconds: audioPreviewData.durationSeconds,
-        waveform: audioPreviewData.waveform
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        view_once: isViewOnce
       }
     });
 
-    cancelRecording();
+    e.target.value = '';
+    setIsViewOnce(false);
+    setShowAttachMenu(false);
   };
 
   return (
@@ -88,8 +105,25 @@ export default function InputBar({
       borderTop: '1px solid var(--border-light)',
       display: 'flex',
       flexDirection: 'column',
-      gap: '8px'
+      gap: '8px',
+      position: 'relative'
     }}>
+      {/* Hidden File Inputs */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handlePhotoVideoSelect}
+        accept="image/*,video/*"
+        style={{ display: 'none' }}
+      />
+      <input
+        type="file"
+        ref={docInputRef}
+        onChange={handleDocSelect}
+        accept=".pdf,.doc,.docx,.txt,.zip,.rar,.mp3,.wav,.ogg,.flac,.aac,.m4a,.json,.rtf,.xls,.xlsx,.ppt,.pptx"
+        style={{ display: 'none' }}
+      />
+
       {/* Quoted Message Header Banner */}
       {replyingTo && (
         <div style={{
@@ -112,6 +146,109 @@ export default function InputBar({
             <X size={16} />
           </button>
         </div>
+      )}
+
+      {/* Pop-up Attachment Menu */}
+      {showAttachMenu && (
+        <>
+          <div
+            onClick={() => setShowAttachMenu(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 100 }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '100%',
+              left: '14px',
+              marginBottom: '10px',
+              background: 'var(--card-bg)',
+              borderRadius: '20px',
+              padding: '10px',
+              boxShadow: '0 12px 36px rgba(0,0,0,0.22)',
+              border: '1px solid var(--border-light)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              minWidth: '210px',
+              zIndex: 101,
+              animation: 'slideUpFade 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
+            <button
+              onClick={() => {
+                fileInputRef.current?.click();
+                setShowAttachMenu(false);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 14px',
+                borderRadius: '14px',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-dark)',
+                fontSize: '0.86rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                textAlign: 'left'
+              }}
+            >
+              <div
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '10px',
+                  background: '#EFF6FF',
+                  color: '#0066FF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <Image size={18} />
+              </div>
+              Photos & Vidéos
+            </button>
+
+            <button
+              onClick={() => {
+                docInputRef.current?.click();
+                setShowAttachMenu(false);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 14px',
+                borderRadius: '14px',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-dark)',
+                fontSize: '0.86rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                textAlign: 'left'
+              }}
+            >
+              <div
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '10px',
+                  background: '#FEF3C7',
+                  color: '#D97706',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <FileText size={18} />
+              </div>
+              Documents & Fichiers
+            </button>
+          </div>
+        </>
       )}
 
       {/* Voice Recording Active Bar */}
@@ -207,6 +344,46 @@ export default function InputBar({
       ) : (
         /* Regular Input Controls */
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Attachment Menu Trigger (Paperclip) */}
+          <button
+            onClick={() => setShowAttachMenu(!showAttachMenu)}
+            title="Joindre un fichier (Photo, Vidéo, Document)"
+            style={{
+              background: showAttachMenu ? 'rgba(0, 102, 255, 0.15)' : 'transparent',
+              color: showAttachMenu ? '#0066FF' : '#94A3B8',
+              border: 'none',
+              borderRadius: '50%',
+              width: '38px',
+              height: '38px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'background 0.2s ease'
+            }}
+          >
+            <Paperclip size={20} />
+          </button>
+
+          {/* Quick Photo Button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            title="Envoyer une Photo ou Vidéo"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#94A3B8',
+              cursor: 'pointer',
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <Image size={21} />
+          </button>
+
           {/* View Once Ephemeral Toggle */}
           <button
             onClick={() => setIsViewOnce(!isViewOnce)}
@@ -216,38 +393,15 @@ export default function InputBar({
               color: isViewOnce ? '#0066FF' : '#94A3B8',
               border: 'none',
               borderRadius: '50%',
-              width: '38px',
-              height: '38px',
+              width: '36px',
+              height: '36px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer'
             }}
           >
-            <Eye size={20} />
-          </button>
-
-          {/* Photo / Video Attachment Button */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileSelect}
-            accept="image/*,video/*"
-            style={{ display: 'none' }}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#94A3B8',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Image size={22} />
+            <Eye size={19} />
           </button>
 
           {/* Text Input */}
@@ -297,12 +451,14 @@ export default function InputBar({
                 border: 'none',
                 color: '#0066FF',
                 cursor: 'pointer',
+                width: '38px',
+                height: '38px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
               }}
             >
-              <Mic size={24} />
+              <Mic size={22} />
             </button>
           )}
         </div>

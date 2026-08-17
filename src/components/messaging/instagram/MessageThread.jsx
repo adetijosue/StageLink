@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Phone, Video } from 'lucide-react';
+import { ArrowLeft, Phone, Video, Flame, X, Download } from 'lucide-react';
 import UserAvatar from '../../common/UserAvatar';
 import MessageBubble from './MessageBubble';
 import InputBar from './InputBar';
@@ -20,6 +20,7 @@ export default function MessageThread({
   const [touchStartX, setTouchStartX] = useState(null);
   const [reactionOverlayData, setReactionOverlayData] = useState(null);
   const [partnerProfile, setPartnerProfile] = useState(partner || null);
+  const [previewMedia, setPreviewMedia] = useState(null);
 
   // Sync internal partner state if prop changes
   useEffect(() => {
@@ -294,7 +295,7 @@ export default function MessageThread({
           justifyContent: 'center',
           gap: '6px'
         }}>
-          <Sparkles size={14} color="#818CF8" /> Mode Éphémère activé — Les messages disparaîtront après lecture
+          <Flame size={14} color="#F43F5E" /> Mode Éphémère activé — Les messages disparaîtront après lecture
         </div>
       )}
 
@@ -327,6 +328,7 @@ export default function MessageThread({
               isNextSameSender={isNextSameSender}
               onReply={(m) => setReplyingTo(m)}
               onReact={(msgId, emoji) => toggleReaction(msgId, emoji)}
+              onOpenMedia={(m) => setPreviewMedia(m)}
               onOpenReactionOverlay={(m, pos) => setReactionOverlayData({ message: m, position: pos })}
             />
           );
@@ -346,7 +348,99 @@ export default function MessageThread({
         onClose={() => setReactionOverlayData(null)}
       />
 
-      {/* 5. Input Bar */}
+      {/* 5. Fullscreen Media Preview Modal */}
+      {previewMedia && (
+        <div
+          onClick={() => setPreviewMedia(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.92)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            backdropFilter: 'blur(8px)'
+          }}
+        >
+          <button
+            onClick={() => setPreviewMedia(null)}
+            style={{
+              position: 'absolute',
+              top: 'calc(16px + env(safe-area-inset-top, 16px))',
+              right: '16px',
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              color: '#FFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              zIndex: 10
+            }}
+          >
+            <X size={22} />
+          </button>
+
+          {previewMedia.message_type === 'video' ? (
+            <video
+              src={previewMedia.media_url}
+              controls
+              autoPlay
+              playsInline
+              style={{ maxWidth: '100%', maxHeight: '85vh', borderRadius: '16px' }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <img
+              src={previewMedia.media_url}
+              alt="Média"
+              style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain', borderRadius: '16px' }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
+
+          {previewMedia.media_url && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const link = document.createElement('a');
+                link.href = previewMedia.media_url;
+                link.download = previewMedia.metadata?.fileName || 'media';
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              style={{
+                position: 'absolute',
+                bottom: 'calc(24px + env(safe-area-inset-bottom, 24px))',
+                background: '#0066FF',
+                color: '#FFF',
+                border: 'none',
+                borderRadius: '30px',
+                padding: '12px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                boxShadow: '0 8px 24px rgba(0,102,255,0.4)',
+                zIndex: 10
+              }}
+            >
+              <Download size={18} /> Télécharger le média
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 6. Input Bar */}
       <InputBar
         replyingTo={replyingTo}
         onCancelReply={() => setReplyingTo(null)}

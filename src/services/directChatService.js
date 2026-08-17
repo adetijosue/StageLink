@@ -38,7 +38,7 @@ export const directChatService = {
   },
 
   /**
-   * Upload media (photo, video, audio note) to Supabase Storage 'chat-media'
+   * Upload media (photo, video, audio note, document) to Supabase Storage
    */
   async uploadMedia(fileOrBlob, fileName, mediaType = 'image') {
     if (!fileOrBlob) return null;
@@ -68,35 +68,38 @@ export const directChatService = {
         } catch (_) { }
       }
 
-      const fileExt = fileName ? fileName.split('.').pop() : (mediaType === 'audio' ? 'webm' : 'jpg');
-      const uniquePath = `${mediaType}s/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+      const fileExt = fileName && fileName.includes('.')
+        ? fileName.split('.').pop()
+        : (mediaType === 'audio' ? 'webm' : mediaType === 'video' ? 'mp4' : mediaType === 'file' ? 'pdf' : 'jpg');
 
-      let bucketName = 'chat_media';
-      let error = null;
+      const folder = mediaType === 'file' ? 'documents' : `${mediaType}s`;
+      const uniquePath = `${folder}/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
 
-      const tryUpload = async (bucket) => {
-        const { error: err } = await supabase.storage.from(bucket).upload(uniquePath, uploadPayload, {
-          contentType,
-          cacheControl: '3600',
-          upsert: true
-        });
-        return err;
-      };
+      const candidateBuckets = ['chat_media', 'chat-media', 'media', 'posts', 'public'];
+      let successfulBucket = null;
 
-      error = await tryUpload(bucketName);
-      if (error) {
-        bucketName = 'media';
-        error = await tryUpload(bucketName);
-        if (error) {
-          bucketName = 'public';
-          error = await tryUpload(bucketName);
+      for (const bucket of candidateBuckets) {
+        try {
+          const { error: err } = await supabase.storage.from(bucket).upload(uniquePath, uploadPayload, {
+            contentType,
+            cacheControl: '3600',
+            upsert: true
+          });
+          if (!err) {
+            successfulBucket = bucket;
+            break;
+          }
+        } catch (e) {
+          // try next bucket
         }
       }
 
-      if (error) throw error;
+      if (!successfulBucket) {
+        throw new Error('No storage bucket accessible');
+      }
 
       const { data: publicData } = supabase.storage
-        .from(bucketName)
+        .from(successfulBucket)
         .getPublicUrl(uniquePath);
 
       return publicData.publicUrl;
