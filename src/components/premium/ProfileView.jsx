@@ -14,6 +14,7 @@ import MusicalCVModal from '../profile/MusicalCVModal';
 import AvatarCropModal from '../profile/AvatarCropModal';
 import UserAvatar from '../common/UserAvatar';
 import { getBrandLogoSVG } from '../common/SocialBrandLogo';
+import { compressImage } from '../../utils/imageCompressor';
 
 export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMode, onSimulateIncomingCall }) {
   const { currentUser, logout, updateUserProfile } = useAuth();
@@ -70,19 +71,25 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
     setFormData({ ...formData, [listKey]: currentList });
   };
 
-  const handleFileAction = (e, type) => {
+  const handleFileAction = async (e, type) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (type === 'cover') {
-        updateUserProfile({ coverPhoto: reader.result });
-      } else {
+
+    if (type === 'cover') {
+      try {
+        const compressedDataUrl = await compressImage(file, 1920, 1080, 0.7);
+        updateUserProfile({ coverPhoto: compressedDataUrl });
+      } catch (err) {
+        console.error('Error compressing cover photo:', err);
+      }
+    } else {
+      const reader = new FileReader();
+      reader.onloadend = () => {
         setRawImageForCrop(reader.result);
         setActiveModal('crop');
-      }
-    };
-    reader.readAsDataURL(file);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const score = (() => {

@@ -253,7 +253,10 @@ export function AuthProvider({ children }) {
         if (sanitizedFields.gear !== undefined) payload.gear = sanitizedFields.gear;
 
         if (Object.keys(payload).length > 0) {
-          await supabase.from('profiles').update(payload).eq('id', currentUser.id);
+          const { error: updateErr } = await supabase.from('profiles').update(payload).eq('id', currentUser.id);
+          if (updateErr) {
+            console.error('Failed to save profile to Supabase (check RLS policies or payload size):', updateErr);
+          }
         }
       } catch (pe) {
         console.warn('Supabase profile sync note:', pe?.message || pe);
