@@ -112,8 +112,15 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     if (!conversationId || !isSupabaseConfigured()) return;
 
     const handleIncoming = (incomingMsg) => {
-      if (!incomingMsg || incomingMsg.conversation_id !== conversationId) return;
+      if (!incomingMsg) return;
       if (incomingMsg.sender_id === currentUser?.id) return;
+
+      const partnerId = partner?.id || partner?.userId || partner?.user_id;
+      const isForThisThread =
+        (incomingMsg.conversation_id && conversationId && String(incomingMsg.conversation_id) === String(conversationId)) ||
+        (partnerId && (String(incomingMsg.sender_id) === String(partnerId) || String(incomingMsg.recipient_id) === String(partnerId)));
+
+      if (!isForThisThread) return;
 
       setMessages((prev) => {
         if (prev.some((m) => m.id === incomingMsg.id)) return prev;
@@ -123,7 +130,7 @@ export function useChatThread({ conversationId, currentUser, partner }) {
       });
 
       soundEngine.playPopSound();
-      if (currentUser?.id) {
+      if (currentUser?.id && conversationId) {
         directChatService.markAsRead(conversationId, currentUser.id);
       }
     };
@@ -219,8 +226,11 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     return () => {
       window.removeEventListener('direct_message_received', handleWindowDm);
       if (channelRef.current) supabase.removeChannel(channelRef.current);
+      if (currentUser?.id && conversationId) {
+        directChatService.markAsRead(conversationId, currentUser.id);
+      }
     };
-  }, [conversationId, currentUser, persistMessagesCache]);
+  }, [conversationId, currentUser, partner, persistMessagesCache]);
 
   /**
    * Send Text / Media Message (Optimistic rendering)

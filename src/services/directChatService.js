@@ -337,6 +337,27 @@ export const directChatService = {
    * Mark conversation as read
    */
   async markAsRead(conversationId, currentUserId) {
+    if (!conversationId || !currentUserId) return;
+    
+    // 0. Update LocalStorage conversation cache immediately (0ms instant UI badge update)
+    try {
+      const cacheKey = `stagelink_cached_conversations_${currentUserId}`;
+      const cachedStr = localStorage.getItem(cacheKey);
+      if (cachedStr) {
+        const cached = JSON.parse(cachedStr);
+        const updated = cached.map(c => {
+          if (c.id === conversationId) {
+            return { ...c, unreadCount: 0, isUnread: false };
+          }
+          return c;
+        });
+        localStorage.setItem(cacheKey, JSON.stringify(updated));
+      }
+    } catch (_) {}
+
+    // Dispatch UI refresh event immediately
+    window.dispatchEvent(new Event('refresh_conversations'));
+
     if (!isSupabaseConfigured()) return;
     try {
       const now = new Date().toISOString();

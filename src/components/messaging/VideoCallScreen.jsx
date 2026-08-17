@@ -193,7 +193,7 @@ export default function VideoCallScreen({
 
   // WebRTC Setup & Supabase Signaling
   const setupWebRTC = async () => {
-    if (!chatId) return;
+    if (!chatId && !remoteUserId) return;
 
     const pc = new RTCPeerConnection(iceConfig);
     peerConnectionRef.current = pc;
@@ -229,7 +229,9 @@ export default function VideoCallScreen({
     };
 
     // Supabase Signaling Room
-    const roomName = `call_${[currentUser?.id, remoteUserId].sort().join('_')}`;
+    const effectiveRoomUserId = remoteUserId || (chatId ? chatId.replace('call_', '') : 'remote');
+    const effectiveMyUserId = currentUser?.id || 'local';
+    const roomName = `call_${[effectiveMyUserId, effectiveRoomUserId].sort().join('_')}`;
     const channel = supabase.channel(roomName);
     channelRef.current = channel;
 
@@ -246,15 +248,19 @@ export default function VideoCallScreen({
     });
 
     channel.on('broadcast', { event: 'call_rejected' }, () => {
+      soundEngine.stopRingtone();
       soundEngine.playCallEndedChime();
       cleanupCall();
       onCallEnded({ status: 'rejected', duration: 0, isAudioOnly: currentIsAudioOnly, isIncoming });
+      if (onClose) onClose();
     });
 
     channel.on('broadcast', { event: 'call_ended' }, () => {
+      soundEngine.stopRingtone();
       soundEngine.playCallEndedChime();
       cleanupCall();
       onCallEnded({ status: 'completed', duration: callDuration, isAudioOnly: currentIsAudioOnly, isIncoming });
+      if (onClose) onClose();
     });
 
     channel.on('broadcast', { event: 'offer' }, async (payload) => {

@@ -24,7 +24,7 @@ const SwipeMatching = React.lazy(() => import('./components/matching/SwipeMatchi
 const ChatList = React.lazy(() => import('./components/messaging/ChatList'));
 const ChatRoom = React.lazy(() => import('./components/messaging/ChatRoom'));
 import EphemeralModal from './components/messaging/EphemeralModal';
-const VideoCallScreen = React.lazy(() => import('./components/messaging/VideoCallScreen'));
+import VideoCallScreen from './components/messaging/VideoCallScreen';
 const NewChatModal = React.lazy(() => import('./components/messaging/NewChatModal'));
 const CallHistoryModal = React.lazy(() => import('./components/messaging/CallHistoryModal'));
 const ProServicesView = React.lazy(() => import('./components/services/ProServicesView'));
@@ -229,7 +229,17 @@ function MainApp() {
     }
     const scon = selectedConversationRef.current;
     if (scon) {
-      return scon.partner?.id || scon.participant?.id || scon.participantId || scon.partnerId || (scon.participants?.find(p => p.user_id !== currentUser?.id)?.user_id);
+      const partObj = scon.partner || scon.participant;
+      if (partObj?.id) return partObj.id;
+      if (partObj?.userId) return partObj.userId;
+      if (scon.partnerId) return scon.partnerId;
+      if (scon.participantId) return scon.participantId;
+      const otherPart = scon.participants?.find(p => p.user_id !== currentUser?.id);
+      if (otherPart?.user_id) return otherPart.user_id;
+      if (otherPart?.id) return otherPart.id;
+      if (typeof scon.id === 'string' && scon.id.startsWith('conv_')) {
+        return scon.id.replace('conv_', '');
+      }
     }
     return null;
   }, [currentUser?.id]);
@@ -268,8 +278,13 @@ function MainApp() {
     // 2. Check if user is currently looking at this conversation
     const activePartnerId = getActivePartnerId();
     const senderId = toastData.partnerId || toastData.actorId;
-    if (activePartnerId && senderId && activePartnerId === senderId) {
-      // User is in active discussion -> soft sound, no pop-up banner
+    const isMatchingPartner = activePartnerId && senderId && String(activePartnerId) === String(senderId);
+    const isMatchingConv = (toastData.conversationId || toastData.reference_id) && 
+      selectedConversationRef.current?.id && 
+      (String(selectedConversationRef.current.id) === String(toastData.conversationId || toastData.reference_id));
+
+    if (isMatchingPartner || isMatchingConv) {
+      // User is inside the active discussion -> soft sound, no pop-up banner
       soundEngine.playPopSound();
       return;
     }
@@ -287,6 +302,97 @@ function MainApp() {
     const bannerTitle = toastData.title || 'StageLink';
     sendNativeNotification('StageLink', `${bannerTitle} : ${bannerBody}`);
   }, [getActivePartnerId]);
+
+  const broadcastCallEnded = useCallback((targetPartnerId) => {
+    const pId = targetPartnerId || activeCallPartner?.id || incomingCallData?.callerId;
+    if (pId && currentUser?.id) {
+      try {
+        supabase.channel(`user:${pId}`).send({
+          type: 'broadcast',
+          event: 'call_ended',
+          payload: { callerId: currentUser.id, targetUserId: pId }
+        }).catch(() => {});
+      } catch (e) {}
+
+      try {
+        supabase.channel('realtime:calls').send({
+          type: 'broadcast',
+          event: 'call_ended',
+          payload: { callerId: currentUser.id, targetUserId: pId }
+        }).catch(() => {});
+      } catch (e) {}
+    }
+  }, [activeCallPartner, incomingCallData, currentUser?.id]);
+
+  const initiateOutgoingCall = useCallback(async (targetPartner, isAudioOnly) => {
+    const partnerId = targetPartner?.id || targetPartner?.userId;
+    if (!partnerId || !currentUser?.id) return;
+
+    const partnerName = targetPartner.full_name || targetPartner.name || targetPartner.username || 'Artiste';
+    const partnerAvatar = targetPartner.avatar_url || targetPartner.avatar || '';
+    const partnerRole = targetPartner.role || targetPartner.userRole || 'Artiste';
+
+    const normalizedPartner = {
+      ...targetPartner,
+      id: partnerId,
+      name: partnerName,
+      full_name: partnerName,
+      avatar: partnerAvatar,
+      avatar_url: partnerAvatar,
+      role: partnerRole,
+      userRole: partnerRole
+    };
+
+    setActiveCallPartner(normalizedPartner);
+    setIsAudioCallOnly(isAudioOnly);
+    setIsVideoCallActive(true);
+    setIncomingCallData(null);
+
+    const callPayload = {
+      callerId: currentUser.id,
+      callerName: currentUser.name || currentUser.full_name || 'Artiste',
+      callerAvatar: currentUser.avatar || currentUser.avatar_url || '',
+      callerRole: currentUser.role || 'Artiste',
+      type: isAudioOnly ? 'incoming_call_audio' : 'incoming_call_video',
+      isAudioOnly,
+      targetUserId: partnerId,
+      chatId: `call_${[currentUser.id, partnerId].sort().join('_')}`,
+      timestamp: Date.now()
+    };
+
+    // 1. FAST WEBSOCKET SIGNALING to Callee's personal channel
+    try {
+      supabase.channel(`user:${partnerId}`).send({
+        type: 'broadcast',
+        event: 'incoming_call',
+        payload: callPayload
+      }).catch(() => {});
+    } catch (e) {}
+
+    // 2. Global calls broadcast fallback
+    try {
+      supabase.channel('realtime:calls').send({
+        type: 'broadcast',
+        event: 'incoming_call',
+        payload: callPayload
+      }).catch(() => {});
+    } catch (e) {}
+
+    // 3. Fallback database notification
+    if (isSupabaseConfigured()) {
+      try {
+        const { data } = await supabase.from('notifications').insert({
+          user_id: partnerId,
+          actor_id: currentUser.id,
+          type: isAudioOnly ? 'incoming_call_audio' : 'incoming_call_video',
+          content: isAudioOnly ? 'Appel audio entrant' : 'Appel vidéo entrant'
+        }).select('id').single();
+        if (data) setActiveCallNotificationId(data.id);
+      } catch (e) {
+        console.warn('Call notification note:', e);
+      }
+    }
+  }, [currentUser]);
 
   const [stories, setStories] = useState([]);
   const [matches, setMatches] = useState([]);
@@ -1411,48 +1517,82 @@ function MainApp() {
           // ----------------------------------------------------
           const handleIncomingNotification = async (notif) => {
             if (!notif) return;
+            console.log('[DEBUG handleIncomingNotification received]', { notif, currentUserId: currentUser?.id });
             const targetUserId = notif.user_id || notif.userId;
-            if (targetUserId && targetUserId !== currentUser.id) return;
-            const actorId = notif.actor_id || notif.actorId || notif.sender_id;
-            if (actorId && actorId === currentUser.id) return;
+            if (targetUserId && currentUser?.id && targetUserId !== currentUser.id) {
+              console.log('[DEBUG targetUserId mismatch]', { targetUserId, currentUserId: currentUser.id });
+              return;
+            }
+            const actorId = notif.actor_id || notif.actorId || notif.sender_id || notif.callerId;
+            if (actorId && currentUser?.id && actorId === currentUser.id) {
+              console.log('[DEBUG actorId is currentUser]', { actorId, currentUserId: currentUser.id });
+              return;
+            }
 
-            // Handle incoming calls (Audio / Video)
-            if (notif.type === 'incoming_call_audio' || notif.type === 'incoming_call_video') {
-              const isAudioOnly = notif.type === 'incoming_call_audio';
-              const callerId = actorId;
-              try {
-                const { data: actor } = await supabase
+            // Handle incoming calls (Audio / Video) with 0ms instant response
+            if (notif.type === 'incoming_call_audio' || notif.type === 'incoming_call_video' || notif.event === 'incoming_call') {
+              const isAudioOnly = notif.type === 'incoming_call_audio' || notif.isAudioOnly === true;
+              const callerId = actorId || notif.callerId || notif.sender_id || notif.actor_id;
+              if (!callerId || callerId === currentUser.id) return;
+
+              const callerName = notif.callerName || notif.actor_name || notif.actorName || 'Artiste';
+              const callerAvatar = notif.callerAvatar || notif.actor_avatar || notif.actorAvatar || '';
+              const callerRole = notif.callerRole || notif.actor_role || notif.actorRole || 'Artiste';
+
+              const partnerInfo = {
+                id: callerId,
+                name: callerName,
+                full_name: callerName,
+                avatar: callerAvatar,
+                avatar_url: callerAvatar,
+                role: callerRole,
+                userRole: callerRole,
+                verified: false
+              };
+
+              setActiveCallPartner(partnerInfo);
+              setIncomingCallData({
+                callerName,
+                callerAvatar,
+                callerRole,
+                isAudioOnly,
+                notificationId: notif.id || null,
+                callerId
+              });
+              setIsAudioCallOnly(isAudioOnly);
+              setIsVideoCallActive(true);
+
+              // Asynchronously enrich with database profile in background if details are minimal
+              if (callerId && (!notif.callerName || !notif.callerAvatar)) {
+                supabase
                   .from('profiles')
                   .select('id, full_name, username, avatar_url, role, verified_badge')
                   .eq('id', callerId)
-                  .maybeSingle();
-                const callerName = actor?.full_name || actor?.username || 'Artiste';
-                const callerAvatar = actor?.avatar_url || '';
-                const callerRole = actor?.role || 'Artiste';
-
-                const partnerInfo = {
-                  id: callerId,
-                  name: callerName,
-                  full_name: callerName,
-                  avatar: callerAvatar,
-                  avatar_url: callerAvatar,
-                  role: callerRole,
-                  userRole: callerRole,
-                  verified: actor?.verified_badge === 'gold' || actor?.verified_badge === 'blue'
-                };
-
-                setActiveCallPartner(partnerInfo);
-                setIncomingCallData({
-                  callerName,
-                  callerAvatar,
-                  callerRole,
-                  isAudioOnly,
-                  notificationId: notif.id,
-                  callerId
-                });
-                setIsAudioCallOnly(isAudioOnly);
-                setIsVideoCallActive(true);
-              } catch (e) { console.error("Incoming call notification note:", e); }
+                  .maybeSingle()
+                  .then(({ data: actor }) => {
+                    if (actor) {
+                      const dbName = actor.full_name || actor.username || callerName;
+                      const dbAvatar = actor.avatar_url || callerAvatar;
+                      const dbRole = actor.role || callerRole;
+                      setActiveCallPartner({
+                        id: callerId,
+                        name: dbName,
+                        full_name: dbName,
+                        avatar: dbAvatar,
+                        avatar_url: dbAvatar,
+                        role: dbRole,
+                        userRole: dbRole,
+                        verified: actor.verified_badge === 'gold' || actor.verified_badge === 'blue'
+                      });
+                      setIncomingCallData(prev => prev ? ({
+                        ...prev,
+                        callerName: dbName,
+                        callerAvatar: dbAvatar,
+                        callerRole: dbRole
+                      }) : null);
+                    }
+                  }).catch(() => {});
+              }
               return;
             }
 
@@ -1757,6 +1897,25 @@ function MainApp() {
           // ----------------------------------------------------
           userPrivateSub = supabase
             .channel(`user:${currentUser.id}`)
+            .on('broadcast', { event: 'incoming_call' }, ({ payload }) => {
+              if (payload) {
+                handleIncomingNotification(payload);
+              }
+            })
+            .on('broadcast', { event: 'call_ended' }, () => {
+              setIsVideoCallActive(false);
+              setIncomingCallData(null);
+              setActiveCallPartner(null);
+              soundEngine.stopRingtone();
+              soundEngine.playCallEndedChime();
+            })
+            .on('broadcast', { event: 'call_rejected' }, () => {
+              setIsVideoCallActive(false);
+              setIncomingCallData(null);
+              setActiveCallPartner(null);
+              soundEngine.stopRingtone();
+              soundEngine.playCallEndedChime();
+            })
             .on('broadcast', { event: 'new_direct_message' }, async ({ payload }) => {
               const msg = payload?.message || payload;
               if (msg) handleIncomingDirectMessage(msg);
@@ -1778,6 +1937,25 @@ function MainApp() {
                     messages: (prev.messages || []).map(m => ({ ...m, isRead: true, status: 'read' }))
                   };
                 });
+              }
+            })
+            .subscribe();
+
+          // Dedicated Realtime Calls Channel (Multi-channel signaling redundancy)
+          const callsSub = supabase
+            .channel('realtime:calls')
+            .on('broadcast', { event: 'incoming_call' }, ({ payload }) => {
+              if (payload && (payload.targetUserId === currentUser.id || payload.user_id === currentUser.id)) {
+                handleIncomingNotification(payload);
+              }
+            })
+            .on('broadcast', { event: 'call_ended' }, ({ payload }) => {
+              if (payload && (payload.targetUserId === currentUser.id || payload.user_id === currentUser.id)) {
+                setIsVideoCallActive(false);
+                setIncomingCallData(null);
+                setActiveCallPartner(null);
+                soundEngine.stopRingtone();
+                soundEngine.playCallEndedChime();
               }
             })
             .subscribe();
@@ -1899,11 +2077,22 @@ function MainApp() {
       };
       const handleShowToast = (e) => {
         if (e.detail) {
-          showInAppToast(e.detail);
+          if (e.detail.type === 'incoming_call_audio' || e.detail.type === 'incoming_call_video' || e.detail.event === 'incoming_call') {
+            handleIncomingNotification(e.detail);
+          } else {
+            showInAppToast(e.detail);
+          }
+        }
+      };
+      const handleOpenDirectConversation = (e) => {
+        if (e.detail) {
+          window.history.pushState({ page: 'chat' }, '');
+          setSelectedConversation(e.detail);
         }
       };
       window.addEventListener('refresh_conversations', handleRefreshConversations);
       window.addEventListener('show_toast', handleShowToast);
+      window.addEventListener('open_direct_conversation', handleOpenDirectConversation);
       window.addEventListener('visibilitychange', handleVisibilityChange);
       window.addEventListener('focus', handleVisibilityChange);
 
@@ -1911,6 +2100,7 @@ function MainApp() {
         clearInterval(pollInterval);
         window.removeEventListener('refresh_conversations', handleRefreshConversations);
         window.removeEventListener('show_toast', handleShowToast);
+        window.removeEventListener('open_direct_conversation', handleOpenDirectConversation);
         window.removeEventListener('visibilitychange', handleVisibilityChange);
         window.removeEventListener('focus', handleVisibilityChange);
         if (profilesSub) supabase.removeChannel(profilesSub);
@@ -3341,39 +3531,11 @@ function MainApp() {
         <ChatRoom
           chat={selectedChat}
           onBack={handleBackFromChat}
-          onStartAudioCall={async () => {
-            setActiveCallPartner(selectedChat.participant);
-            setIsAudioCallOnly(true);
-            setIsVideoCallActive(true);
-            setIncomingCallData(null); // Ensure it's not an incoming call
-            if (isSupabaseConfigured() && currentUser?.id && selectedChat?.participant?.id) {
-              try {
-                const { data } = await supabase.from('notifications').insert({
-                  user_id: selectedChat.participant.id,
-                  actor_id: currentUser.id,
-                  type: 'incoming_call_audio',
-                  content: 'Appel audio entrant'
-                }).select('id').single();
-                if (data) setActiveCallNotificationId(data.id);
-              } catch (e) { console.error("Suppressed error:", e); }
-            }
+          onStartAudioCall={() => {
+            initiateOutgoingCall(selectedChat.participant, true);
           }}
-          onStartVideoCall={async () => {
-            setActiveCallPartner(selectedChat.participant);
-            setIsAudioCallOnly(false);
-            setIsVideoCallActive(true);
-            setIncomingCallData(null);
-            if (isSupabaseConfigured() && currentUser?.id && selectedChat?.participant?.id) {
-              try {
-                const { data } = await supabase.from('notifications').insert({
-                  user_id: selectedChat.participant.id,
-                  actor_id: currentUser.id,
-                  type: 'incoming_call_video',
-                  content: 'Appel vidéo entrant'
-                }).select('id').single();
-                if (data) setActiveCallNotificationId(data.id);
-              } catch (e) { console.error("Suppressed error:", e); }
-            }
+          onStartVideoCall={() => {
+            initiateOutgoingCall(selectedChat.participant, false);
           }}
           onOpenEphemeralModal={() => setIsEphemeralOpen(true)}
           onSendMessage={handleSendMessage}
@@ -3417,41 +3579,11 @@ function MainApp() {
                 setSelectedConversation(null);
                 setActiveTab('discussions');
             }}
-            onStartAudioCall={async () => {
-              const partnerObj = resolvedPartner || { id: partnerId, name: 'Artiste' };
-              setActiveCallPartner(partnerObj);
-              setIsAudioCallOnly(true);
-              setIsVideoCallActive(true);
-              setIncomingCallData(null);
-              if (isSupabaseConfigured() && currentUser?.id && partnerId) {
-                try {
-                  const { data } = await supabase.from('notifications').insert({
-                    user_id: partnerId,
-                    actor_id: currentUser.id,
-                    type: 'incoming_call_audio',
-                    content: 'Appel audio entrant'
-                  }).select('id').single();
-                  if (data) setActiveCallNotificationId(data.id);
-                } catch (e) { console.error("Suppressed error:", e); }
-              }
+            onStartAudioCall={() => {
+              initiateOutgoingCall(resolvedPartner || { id: partnerId, name: 'Artiste' }, true);
             }}
-            onStartVideoCall={async () => {
-              const partnerObj = resolvedPartner || { id: partnerId, name: 'Artiste' };
-              setActiveCallPartner(partnerObj);
-              setIsAudioCallOnly(false);
-              setIsVideoCallActive(true);
-              setIncomingCallData(null);
-              if (isSupabaseConfigured() && currentUser?.id && partnerId) {
-                try {
-                  const { data } = await supabase.from('notifications').insert({
-                    user_id: partnerId,
-                    actor_id: currentUser.id,
-                    type: 'incoming_call_video',
-                    content: 'Appel vidéo entrant'
-                  }).select('id').single();
-                  if (data) setActiveCallNotificationId(data.id);
-                } catch (e) { console.error("Suppressed error:", e); }
-              }
+            onStartVideoCall={() => {
+              initiateOutgoingCall(resolvedPartner || { id: partnerId, name: 'Artiste' }, false);
             }}
             onOpenProfile={handleOpenPublicProfile}
           />
@@ -3484,8 +3616,7 @@ function MainApp() {
         chats={chats}
         onStartCallWithUser={(userObj, audioOnly) => {
           handleStartChatWithUser(userObj);
-          setIsAudioCallOnly(audioOnly);
-          setIsVideoCallActive(true);
+          initiateOutgoingCall(userObj, audioOnly);
         }}
         isDarkMode={isDarkMode}
       />
@@ -3558,7 +3689,7 @@ function MainApp() {
         const partnerName = incomingCallData?.callerName || resolvedPartner?.full_name || resolvedPartner?.name || resolvedPartner?.username || 'Artiste';
         const partnerAvatar = incomingCallData?.callerAvatar || resolvedPartner?.avatar_url || resolvedPartner?.avatar || null;
         const partnerRole = incomingCallData?.callerRole || resolvedPartner?.role || resolvedPartner?.userRole || 'Artiste';
-        const effectiveChatId = incomingCallData ? `call_${incomingCallData.callerId}` : (selectedConversation?.id || selectedChat?.id || (partnerId ? `call_${partnerId}` : 'call_direct'));
+        const effectiveChatId = `call_${[currentUser?.id, partnerId].filter(Boolean).sort().join('_')}`;
 
         return (
           <VideoCallScreen
@@ -3569,6 +3700,7 @@ function MainApp() {
             onMaximize={() => setIsCallMinimized(false)}
             onClose={() => {
               setIsVideoCallActive(false);
+              broadcastCallEnded(partnerId);
               handleCallEnded({ status: 'ended', duration: 0, isAudioOnly: incomingCallData ? incomingCallData.isAudioOnly : isAudioCallOnly });
               setActiveCallPartner(null);
               setIncomingCallData(null);
@@ -3579,7 +3711,10 @@ function MainApp() {
             remoteUserId={partnerId}
             chatId={effectiveChatId}
             isAudioOnly={incomingCallData ? incomingCallData.isAudioOnly : isAudioCallOnly}
-            onCallEnded={handleCallEnded}
+            onCallEnded={(res) => {
+              broadcastCallEnded(partnerId);
+              handleCallEnded(res);
+            }}
           />
         );
       })()}
