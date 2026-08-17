@@ -42,7 +42,7 @@ const InboxView = React.memo(function InboxView({
     }}>
       {/* 1. Header Bar */}
       <div style={{
-        paddingTop: 'calc(14px + env(safe-area-inset-top, 14px))',
+        paddingTop: '12px',
         paddingBottom: '12px',
         paddingLeft: '16px',
         paddingRight: '16px',
@@ -52,7 +52,13 @@ const InboxView = React.memo(function InboxView({
         alignItems: 'center',
         justifyContent: 'space-between'
       }}>
-        <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-dark)', margin: 0 }}>
+        <h1 style={{
+          fontSize: '1.65rem',
+          fontWeight: 900,
+          letterSpacing: '-0.5px',
+          color: 'var(--text-dark)',
+          margin: 0
+        }}>
           Messages
         </h1>
 
