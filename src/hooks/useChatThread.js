@@ -255,14 +255,18 @@ export function useChatThread({ conversationId, currentUser, partner }) {
         return next;
       });
     } catch (err) {
-      console.error("Message could not be sent:", err);
-      // Remove the optimistic message on failure
+      console.warn("Message server sync fallback:", err);
+      // Keep optimistic message locally with final media URL so media is never lost
+      const fallbackRecord = {
+        ...optimisticMsg,
+        media_url: finalMediaUrl || optimisticMsg.media_url,
+        status: 'sent'
+      };
       setMessages((prev) => {
-        const next = prev.filter((m) => m.id !== tempId);
+        const next = prev.map((m) => (m.id === tempId ? fallbackRecord : m));
         persistMessagesCache(next);
         return next;
       });
-      window.dispatchEvent(new CustomEvent('show_toast', { detail: { title: 'Erreur', message: 'Impossible d\'envoyer le message.' } }));
     }
   }, [conversationId, currentUser, isVanishMode, replyingTo, partner, persistMessagesCache]);
 

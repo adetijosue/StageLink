@@ -67,14 +67,21 @@ export default function MessageBubble({
       if (audioRef.current) audioRef.current.pause();
       setIsPlayingAudio(false);
     } else {
-      if (!audioRef.current) {
+      if (!audioRef.current || audioRef.current.src !== message.media_url) {
+        if (audioRef.current) {
+          try { audioRef.current.pause(); } catch (_) {}
+        }
         const audio = new Audio(message.media_url);
         audioRef.current = audio;
         audio.playbackRate = playbackSpeed;
         audio.onended = () => setIsPlayingAudio(false);
         audio.onerror = () => setIsPlayingAudio(false);
       }
-      audioRef.current.play().catch(() => setIsPlayingAudio(false));
+      audioRef.current.playbackRate = playbackSpeed;
+      audioRef.current.play().catch((err) => {
+        console.warn("Audio play error:", err);
+        setIsPlayingAudio(false);
+      });
       setIsPlayingAudio(true);
     }
   };
@@ -434,6 +441,18 @@ export default function MessageBubble({
                 />
               ))}
             </div>
+
+            {/* Audio Duration */}
+            {message.metadata?.duration && (
+              <span style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                opacity: 0.9,
+                color: isMine ? '#FFFFFF' : '#64748B'
+              }}>
+                {message.metadata.duration}
+              </span>
+            )}
 
             {/* Speed Toggle Button */}
             <button

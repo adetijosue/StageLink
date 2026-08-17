@@ -42,30 +42,50 @@ export const directChatService = {
    */
   async uploadMedia(fileOrBlob, fileName, mediaType = 'image') {
     if (!fileOrBlob) return null;
-    if (typeof fileOrBlob === 'string') return fileOrBlob;
+    if (typeof fileOrBlob === 'string' && (fileOrBlob.startsWith('http://') || fileOrBlob.startsWith('https://') || fileOrBlob.startsWith('data:'))) {
+      return fileOrBlob;
+    }
 
-    if (!isSupabaseConfigured()) {
+    const toBase64 = (blob) => {
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(fileOrBlob);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
       });
+    };
+
+    if (!isSupabaseConfigured()) {
+      return toBase64(fileOrBlob);
     }
 
     try {
       let uploadPayload = fileOrBlob;
-      let contentType = fileOrBlob.type || 'application/octet-stream';
+      let contentType = fileOrBlob.type;
 
-      if (mediaType === 'image' && fileOrBlob.type?.startsWith('image/')) {
+      if (mediaType === 'image') {
+        contentType = contentType || 'image/jpeg';
         try {
           const compressed = await compressImage(fileOrBlob, 1280, 1280, 0.82);
-          // Convert Data URL to Blob for Supabase Storage
-          if (typeof compressed === 'string' && compressed.startsWith('data:')) {
-            const res = await fetch(compressed);
-            uploadPayload = await res.blob();
-            contentType = 'image/jpeg';
+          if (typeof compressed === 'string' && compressed.startsWith('data:image')) {
+            const arr = compressed.split(',');
+            const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+            const bstr = atob(arr[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) {
+              u8arr[n] = bstr.charCodeAt(n);
+            }
+            uploadPayload = new Blob([u8arr], { type: mime });
+            contentType = mime;
           }
         } catch (_) { }
+      } else if (mediaType === 'audio') {
+        contentType = contentType || (fileOrBlob.name?.endsWith('.mp3') ? 'audio/mpeg' : 'audio/webm');
+      } else if (mediaType === 'video') {
+        contentType = contentType || 'video/mp4';
+      } else {
+        contentType = contentType || 'application/octet-stream';
       }
 
       const fileExt = fileName && fileName.includes('.')
@@ -75,13 +95,13 @@ export const directChatService = {
       const folder = mediaType === 'file' ? 'documents' : `${mediaType}s`;
       const uniquePath = `${folder}/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
 
-      const candidateBuckets = ['chat_media', 'chat-media', 'media', 'posts', 'public'];
+      const candidateBuckets = ['chat_media', 'chat-media', 'stories', 'posts', 'media', 'avatars', 'public'];
       let successfulBucket = null;
 
       for (const bucket of candidateBuckets) {
         try {
           const { error: err } = await supabase.storage.from(bucket).upload(uniquePath, uploadPayload, {
-            contentType,
+            contentType: contentType || 'application/octet-stream',
             cacheControl: '3600',
             upsert: true
           });
@@ -102,15 +122,14 @@ export const directChatService = {
         .from(successfulBucket)
         .getPublicUrl(uniquePath);
 
-      return publicData.publicUrl;
+      if (publicData?.publicUrl) {
+        return publicData.publicUrl;
+      }
+      throw new Error('Could not get public URL');
     } catch (err) {
-      console.warn('Media upload to storage failed, falling back to base64:', err.message);
+      console.warn('Media upload to storage failed, falling back to base64 Data URL:', err.message || err);
       if (typeof fileOrBlob === 'string') return fileOrBlob;
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(fileOrBlob);
-      });
+      return toBase64(fileOrBlob);
     }
   },
 

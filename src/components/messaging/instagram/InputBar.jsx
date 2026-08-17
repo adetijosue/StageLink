@@ -1,5 +1,18 @@
 import React, { useState, useRef } from 'react';
-import { Send, Image, Paperclip, Mic, Eye, X, Trash2, FileText, Film, Music } from 'lucide-react';
+import { 
+  Send, 
+  Image, 
+  Paperclip, 
+  Mic, 
+  Eye, 
+  X, 
+  Trash2, 
+  FileText, 
+  Music, 
+  Play, 
+  Pause,
+  Film
+} from 'lucide-react';
 import { useVoiceRecorder } from '../../../hooks/useVoiceRecorder';
 import { soundEngine } from '../../../services/audioService';
 import { useLanguage } from '../../../context/LanguageContext';
@@ -15,16 +28,20 @@ export default function InputBar({
   const [isViewOnce, setIsViewOnce] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
 
-  const fileInputRef = useRef(null);
+  const photoVideoInputRef = useRef(null);
+  const audioInputRef = useRef(null);
   const docInputRef = useRef(null);
 
   const {
     isRecording,
     recordingTime,
     audioPreviewData,
+    isPlayingPreview,
+    waveformData,
     startRecording,
     stopRecording,
-    cancelRecording
+    cancelRecording,
+    togglePlayPreview
   } = useVoiceRecorder();
 
   const handleTextChange = (e) => {
@@ -49,12 +66,41 @@ export default function InputBar({
     }
   };
 
+  // Dispatch Voice Note
+  const handleSendVoiceNote = (customPreview) => {
+    const dataToSend = customPreview || audioPreviewData;
+    if (!dataToSend?.blob) return;
+
+    soundEngine.playPopSound();
+    onSendMessage({
+      mediaBlob: dataToSend.blob,
+      mediaType: 'audio',
+      metadata: {
+        fileName: `vocal_${Date.now()}.webm`,
+        duration: dataToSend.duration || '00:00',
+        durationSeconds: dataToSend.durationSeconds || 1,
+        waveform: dataToSend.waveform || [],
+        view_once: isViewOnce
+      }
+    });
+
+    cancelRecording();
+    setIsViewOnce(false);
+  };
+
+  // Direct Send while actively recording
+  const handleDirectSendRecording = () => {
+    stopRecording((preview) => {
+      handleSendVoiceNote(preview);
+    });
+  };
+
+  // Handle Photo & Video Selection
   const handlePhotoVideoSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     soundEngine.playPopSound();
-    const isImage = file.type.startsWith('image/');
     const isVideo = file.type.startsWith('video/');
 
     onSendMessage({
@@ -63,6 +109,7 @@ export default function InputBar({
       metadata: {
         fileName: file.name,
         fileSize: file.size,
+        fileType: file.type,
         view_once: isViewOnce
       }
     });
@@ -72,6 +119,31 @@ export default function InputBar({
     setShowAttachMenu(false);
   };
 
+  // Handle Audio & Music File Selection
+  const handleAudioFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    soundEngine.playPopSound();
+
+    onSendMessage({
+      mediaBlob: file,
+      mediaType: 'audio',
+      text: file.name,
+      metadata: {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type || 'audio/mpeg',
+        view_once: isViewOnce
+      }
+    });
+
+    e.target.value = '';
+    setIsViewOnce(false);
+    setShowAttachMenu(false);
+  };
+
+  // Handle Document & Project File Selection
   const handleDocSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -113,16 +185,23 @@ export default function InputBar({
       {/* Hidden File Inputs */}
       <input
         type="file"
-        ref={fileInputRef}
+        ref={photoVideoInputRef}
         onChange={handlePhotoVideoSelect}
         accept="image/*,video/*"
         style={{ display: 'none' }}
       />
       <input
         type="file"
+        ref={audioInputRef}
+        onChange={handleAudioFileSelect}
+        accept="audio/*,.mp3,.wav,.ogg,.flac,.aac,.m4a,.mid,.midi"
+        style={{ display: 'none' }}
+      />
+      <input
+        type="file"
         ref={docInputRef}
         onChange={handleDocSelect}
-        accept=".pdf,.doc,.docx,.txt,.zip,.rar,.mp3,.wav,.ogg,.flac,.aac,.m4a,.json,.rtf,.xls,.xlsx,.ppt,.pptx"
+        accept=".pdf,.doc,.docx,.txt,.zip,.rar,.json,.rtf,.xls,.xlsx,.ppt,.pptx"
         style={{ display: 'none' }}
       />
 
@@ -171,14 +250,14 @@ export default function InputBar({
               display: 'flex',
               flexDirection: 'column',
               gap: '6px',
-              minWidth: '210px',
+              minWidth: '220px',
               zIndex: 101,
               animation: 'slideUpFade 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
           >
             <button
               onClick={() => {
-                fileInputRef.current?.click();
+                photoVideoInputRef.current?.click();
                 setShowAttachMenu(false);
               }}
               style={{
@@ -211,6 +290,43 @@ export default function InputBar({
                 <Image size={18} />
               </div>
               {language === 'en' ? 'Photos & Videos' : 'Photos & Vidéos'}
+            </button>
+
+            <button
+              onClick={() => {
+                audioInputRef.current?.click();
+                setShowAttachMenu(false);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 14px',
+                borderRadius: '14px',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-dark)',
+                fontSize: '0.86rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                textAlign: 'left'
+              }}
+            >
+              <div
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '10px',
+                  background: '#F5F3FF',
+                  color: '#8B5CF6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <Music size={18} />
+              </div>
+              {language === 'en' ? 'Audio & Beats' : 'Audios & Beats'}
             </button>
 
             <button
@@ -260,7 +376,7 @@ export default function InputBar({
           alignItems: 'center',
           justifyContent: 'space-between',
           background: '#FEF2F2',
-          padding: '10px 16px',
+          padding: '8px 16px',
           borderRadius: '24px',
           border: '1px solid #FCA5A5'
         }}>
@@ -272,20 +388,38 @@ export default function InputBar({
               background: '#EF4444',
               animation: 'pulse 1s infinite'
             }} />
-            <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>
+            <span style={{ fontWeight: 800, fontSize: '0.88rem' }}>
               {Math.floor(recordingTime / 60).toString().padStart(2, '0')}:{(recordingTime % 60).toString().padStart(2, '0')}
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px' }}>
+          {/* Realtime Waveform Animation */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2px', height: '22px', flex: 1, margin: '0 16px', justifyContent: 'center' }}>
+            {(waveformData.length > 0 ? waveformData.slice(-20) : [20, 40, 60, 30, 80, 50, 70, 40, 60]).map((amp, idx) => (
+              <div
+                key={idx}
+                style={{
+                  width: '3px',
+                  height: `${Math.max(4, Math.min(22, amp * 0.22))}px`,
+                  background: '#EF4444',
+                  borderRadius: '2px',
+                  transition: 'height 0.05s ease'
+                }}
+              />
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
               onClick={cancelRecording}
-              style={{ background: 'transparent', border: 'none', color: '#64748B', cursor: 'pointer' }}
+              title={language === 'en' ? 'Discard recording' : 'Annuler'}
+              style={{ background: 'transparent', border: 'none', color: '#64748B', cursor: 'pointer', padding: '6px' }}
             >
               <Trash2 size={20} />
             </button>
             <button
-              onClick={stopRecording}
+              onClick={handleDirectSendRecording}
+              title={language === 'en' ? 'Send voice note' : 'Envoyer la note vocale'}
               style={{
                 background: '#0066FF',
                 color: '#FFF',
@@ -296,7 +430,8 @@ export default function InputBar({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                boxShadow: '0 4px 10px rgba(0, 102, 255, 0.3)'
               }}
             >
               <Send size={18} />
@@ -304,28 +439,50 @@ export default function InputBar({
           </div>
         </div>
       ) : audioPreviewData ? (
-        /* Voice Note Preview Ready to Send */
+        /* Voice Note Preview Ready to Send or Listen */
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           background: '#EFF6FF',
-          padding: '10px 16px',
+          padding: '8px 16px',
           borderRadius: '24px',
           border: '1px solid #BFDBFE'
         }}>
-          <span style={{ fontSize: '0.85rem', color: '#0066FF', fontWeight: 700 }}>
-            {language === 'en' ? '🎙️ Voice note' : '🎙️ Vocal'} ({audioPreviewData.duration})
-          </span>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              onClick={togglePlayPreview}
+              style={{
+                background: '#0066FF',
+                color: '#FFF',
+                border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              {isPlayingPreview ? <Pause size={16} /> : <Play size={16} style={{ marginLeft: '2px' }} />}
+            </button>
+            <span style={{ fontSize: '0.85rem', color: '#0066FF', fontWeight: 800 }}>
+              {language === 'en' ? '🎙️ Voice note' : '🎙️ Note vocale'} ({audioPreviewData.duration})
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
               onClick={cancelRecording}
-              style={{ background: 'transparent', border: 'none', color: '#64748B', cursor: 'pointer' }}
+              title={language === 'en' ? 'Discard' : 'Supprimer'}
+              style={{ background: 'transparent', border: 'none', color: '#64748B', cursor: 'pointer', padding: '6px' }}
             >
               <Trash2 size={18} />
             </button>
             <button
-              onClick={handleSendVoiceNote}
+              onClick={() => handleSendVoiceNote()}
+              title={language === 'en' ? 'Send' : 'Envoyer'}
               style={{
                 background: '#0066FF',
                 color: '#FFF',
@@ -336,7 +493,8 @@ export default function InputBar({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                boxShadow: '0 4px 10px rgba(0, 102, 255, 0.3)'
               }}
             >
               <Send size={18} />
@@ -349,7 +507,7 @@ export default function InputBar({
           {/* Attachment Menu Trigger (Paperclip) */}
           <button
             onClick={() => setShowAttachMenu(!showAttachMenu)}
-            title={language === 'en' ? 'Attach file (Photo, Video, Document)' : 'Joindre un fichier (Photo, Vidéo, Document)'}
+            title={language === 'en' ? 'Attach file (Photo, Video, Audio, Document)' : 'Joindre un fichier (Photo, Vidéo, Audio, Document)'}
             style={{
               background: showAttachMenu ? 'rgba(0, 102, 255, 0.15)' : 'transparent',
               color: showAttachMenu ? '#0066FF' : '#94A3B8',
@@ -367,9 +525,9 @@ export default function InputBar({
             <Paperclip size={20} />
           </button>
 
-          {/* Quick Photo Button */}
+          {/* Quick Photo / Video Button */}
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => photoVideoInputRef.current?.click()}
             title={language === 'en' ? 'Send a Photo or Video' : 'Envoyer une Photo ou Vidéo'}
             style={{
               background: 'transparent',
@@ -448,6 +606,7 @@ export default function InputBar({
           ) : (
             <button
               onClick={startRecording}
+              title={language === 'en' ? 'Hold or tap to record voice note' : 'Enregistrer une note vocale'}
               style={{
                 background: 'transparent',
                 border: 'none',

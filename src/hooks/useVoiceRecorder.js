@@ -1,6 +1,10 @@
 import { useState, useRef, useCallback } from 'react';
 import { soundEngine } from '../services/audioService';
 
+/**
+ * StageLink Universal Voice Note Recorder Hook
+ * High-performance audio capture with iOS/Android codec fallback & realtime waveform
+ */
 export function useVoiceRecorder() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -15,6 +19,7 @@ export function useVoiceRecorder() {
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const waveAnimRef = useRef(null);
+  const streamRef = useRef(null);
 
   /**
    * Start Voice Recording
@@ -29,6 +34,11 @@ export function useVoiceRecorder() {
     setRecordingTime(0);
 
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Votre navigateur ne supporte pas l\'enregistrement audio.');
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -36,16 +46,25 @@ export function useVoiceRecorder() {
           autoGainControl: true
         }
       });
+      streamRef.current = stream;
 
       audioChunksRef.current = [];
 
-      let options = {};
+      // Determine best supported MIME type
+      let mimeType = '';
       if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-        options = { mimeType: 'audio/webm;codecs=opus' };
+        mimeType = 'audio/webm;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+        mimeType = 'audio/webm';
       } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-        options = { mimeType: 'audio/mp4' };
+        mimeType = 'audio/mp4';
+      } else if (MediaRecorder.isTypeSupported('audio/aac')) {
+        mimeType = 'audio/aac';
+      } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+        mimeType = 'audio/ogg;codecs=opus';
       }
 
+      const options = mimeType ? { mimeType } : {};
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
 
@@ -58,25 +77,30 @@ export function useVoiceRecorder() {
       // Realtime Audio Waveform Analyser
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
-        const audioCtx = new AudioCtx();
-        audioContextRef.current = audioCtx;
-        const source = audioCtx.createMediaStreamSource(stream);
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 32;
-        source.connect(analyser);
-        analyserRef.current = analyser;
+        try {
+          const audioCtx = new AudioCtx();
+          audioContextRef.current = audioCtx;
+          const source = audioCtx.createMediaStreamSource(stream);
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 32;
+          source.connect(analyser);
+          analyserRef.current = analyser;
 
-        const updateWave = () => {
-          const buffer = new Uint8Array(analyser.frequencyBinCount);
-          analyser.getByteFrequencyData(buffer);
-          let sum = 0;
-          for (let i = 0; i < buffer.length; i++) sum += buffer[i];
-          const avg = Math.min(100, Math.round((sum / buffer.length / 255) * 100));
+          const updateWave = () => {
+            if (!analyserRef.current) return;
+            const buffer = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(buffer);
+            let sum = 0;
+            for (let i = 0; i < buffer.length; i++) sum += buffer[i];
+            const avg = Math.min(100, Math.round((sum / buffer.length / 255) * 100));
 
-          setWaveformData((prev) => [...prev.slice(-35), Math.max(8, avg)]);
+            setWaveformData((prev) => [...prev.slice(-35), Math.max(10, avg)]);
+            waveAnimRef.current = requestAnimationFrame(updateWave);
+          };
           waveAnimRef.current = requestAnimationFrame(updateWave);
-        };
-        waveAnimRef.current = requestAnimationFrame(updateWave);
+        } catch (e) {
+          console.warn('AudioContext visualization setup note:', e);
+        }
       }
 
       mediaRecorder.start(100);
@@ -87,14 +111,14 @@ export function useVoiceRecorder() {
       }, 1000);
     } catch (err) {
       console.warn('Microphone access error:', err);
-      alert('Impossible d\'accéder au microphone.');
+      alert('Impossible d\'accéder au microphone. Veuillez autoriser l\'accès dans les paramètres.');
     }
   }, []);
 
   /**
-   * Stop Recording and prepare Preview
+   * Stop Recording and prepare Preview or execute callback
    */
-  const stopRecording = useCallback(() => {
+  const stopRecording = useCallback((onComplete) => {
     soundEngine.playPopSound();
     if (navigator.vibrate) navigator.vibrate([20]);
 
@@ -112,18 +136,24 @@ export function useVoiceRecorder() {
         const mimeType = mediaRecorderRef.current.mimeType || 'audio/webm';
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
 
-        if (mediaRecorderRef.current.stream) {
-          mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
         }
 
         const audioUrl = URL.createObjectURL(audioBlob);
-        setAudioPreviewData({
+        const preview = {
           blob: audioBlob,
           url: audioUrl,
           duration: durationFormatted,
-          durationSeconds: recordingTime,
-          waveform: waveformData
-        });
+          durationSeconds: Math.max(1, recordingTime),
+          waveform: waveformData.length > 0 ? waveformData : [25, 50, 75, 40, 90, 60, 80, 45, 70, 55, 65, 30]
+        };
+
+        setAudioPreviewData(preview);
+
+        if (typeof onComplete === 'function') {
+          onComplete(preview);
+        }
       };
       mediaRecorderRef.current.stop();
     }
@@ -135,10 +165,10 @@ export function useVoiceRecorder() {
   const cancelRecording = useCallback(() => {
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     if (waveAnimRef.current) cancelAnimationFrame(waveAnimRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      if (mediaRecorderRef.current.stream) {
-        mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
-      }
       mediaRecorderRef.current.stop();
     }
     if (audioPreviewInstanceRef.current) {
@@ -147,6 +177,8 @@ export function useVoiceRecorder() {
     setIsRecording(false);
     setAudioPreviewData(null);
     setIsPlayingPreview(false);
+    setWaveformData([]);
+    setRecordingTime(0);
   }, []);
 
   /**
@@ -164,6 +196,7 @@ export function useVoiceRecorder() {
       const audio = new Audio(audioPreviewData.url);
       audioPreviewInstanceRef.current = audio;
       audio.onended = () => setIsPlayingPreview(false);
+      audio.onerror = () => setIsPlayingPreview(false);
       audio.play().catch(() => setIsPlayingPreview(false));
       setIsPlayingPreview(true);
     }
