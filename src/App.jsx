@@ -3790,7 +3790,7 @@ function MainApp() {
         notification={toastNotification}
         onOpen={(notif) => {
           if (!notif) return;
-          if (notif.type === 'message' || notif.partnerId || notif.actorId) {
+          if (notif.type === 'message' || notif.partnerId) {
             const partnerId = notif.partnerId || notif.actorId;
             if (partnerId) {
               handleStartChatWithUser({
