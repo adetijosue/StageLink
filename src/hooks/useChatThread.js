@@ -4,44 +4,89 @@ import { directChatService } from '../services/directChatService';
 import { soundEngine } from '../services/audioService';
 
 export function useChatThread({ conversationId, currentUser, partner }) {
-  const [messages, setMessages] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // 1. Instant Cache-First Initial State (0ms render)
+  const [messages, setMessages] = useState(() => {
+    if (!conversationId) return [];
+    try {
+      const cached = localStorage.getItem(`stagelink_cached_msgs_${conversationId}`);
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [isLoading, setIsLoading] = useState(() => {
+    if (!conversationId) return false;
+    try {
+      const cached = localStorage.getItem(`stagelink_cached_msgs_${conversationId}`);
+      return !cached || JSON.parse(cached).length === 0;
+    } catch (e) {
+      return true;
+    }
+  });
+
   const [isVanishMode, setIsVanishMode] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
   const [hasMore, setHasMore] = useState(true);
   const channelRef = useRef(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const persistMessagesCache = useCallback((msgs) => {
+    if (!conversationId || !Array.isArray(msgs)) return;
+    try {
+      localStorage.setItem(`stagelink_cached_msgs_${conversationId}`, JSON.stringify(msgs.slice(-50)));
+    } catch (e) {}
+  }, [conversationId]);
 
   /**
    * Load Initial Page of Messages
    */
-  const loadMessages = useCallback(async () => {
+  const loadMessages = useCallback(async (silent = false) => {
     if (!conversationId || !isSupabaseConfigured()) {
-      setIsLoading(false);
+      if (isMountedRef.current) setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
+    if (!silent && messages.length === 0) {
+      setIsLoading(true);
+    }
+
     try {
       // 1. Fetch conversation details (e.g. Vanish mode state)
-      const { data: conv } = await supabase
+      const convPromise = supabase
         .from('conversations')
         .select('vanish_mode_enabled')
         .eq('id', conversationId)
         .maybeSingle();
 
-      if (conv) setIsVanishMode(Boolean(conv.vanish_mode_enabled));
-
       // 2. Fetch last 50 messages
-      const { data: msgs, error } = await supabase
+      const msgsPromise = supabase
         .from('direct_messages')
         .select('*, reactions:message_reactions(*)')
         .eq('conversation_id', conversationId)
-        // LA LIGNE '.is('deleted_at', null)' DOIT ETRE SUPPRIMEE ICI
         .order('created_at', { ascending: false })
         .limit(50);
 
+      const [{ data: conv }, { data: msgs, error }] = await Promise.all([convPromise, msgsPromise]);
+
+      if (conv && isMountedRef.current) {
+        setIsVanishMode(Boolean(conv.vanish_mode_enabled));
+      }
+
       if (error) throw error;
-      setMessages((msgs || []).reverse());
+      
+      const orderedMsgs = (msgs || []).reverse();
+      if (isMountedRef.current) {
+        setMessages(orderedMsgs);
+        persistMessagesCache(orderedMsgs);
+      }
 
       // 3. Mark conversation as read
       if (currentUser?.id) {
@@ -50,12 +95,14 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     } catch (e) {
       console.warn('Load messages error:', e);
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [conversationId, currentUser]);
+  }, [conversationId, currentUser, messages.length, persistMessagesCache]);
 
   useEffect(() => {
-    loadMessages();
+    loadMessages(messages.length > 0);
   }, [loadMessages]);
 
   /**
@@ -73,7 +120,9 @@ export function useChatThread({ conversationId, currentUser, partner }) {
 
         setMessages((prev) => {
           if (prev.some((m) => m.id === msg.id)) return prev;
-          return [...prev, msg];
+          const next = [...prev, msg];
+          persistMessagesCache(next);
+          return next;
         });
 
         if (msg.sender_id !== currentUser?.id) {
@@ -84,8 +133,8 @@ export function useChatThread({ conversationId, currentUser, partner }) {
         }
       })
       .on('broadcast', { event: 'reaction_added' }, ({ payload }) => {
-        setMessages((prev) =>
-          prev.map((m) => {
+        setMessages((prev) => {
+          const next = prev.map((m) => {
             if (m.id === payload.messageId) {
               const reactions = m.reactions || [];
               if (!reactions.some((r) => r.user_id === payload.userId && r.emoji === payload.emoji)) {
@@ -93,12 +142,14 @@ export function useChatThread({ conversationId, currentUser, partner }) {
               }
             }
             return m;
-          })
-        );
+          });
+          persistMessagesCache(next);
+          return next;
+        });
       })
       .on('broadcast', { event: 'reaction_removed' }, ({ payload }) => {
-        setMessages((prev) =>
-          prev.map((m) => {
+        setMessages((prev) => {
+          const next = prev.map((m) => {
             if (m.id === payload.messageId) {
               const reactions = (m.reactions || []).filter(
                 (r) => !(r.user_id === payload.userId && r.emoji === payload.emoji)
@@ -106,14 +157,20 @@ export function useChatThread({ conversationId, currentUser, partner }) {
               return { ...m, reactions };
             }
             return m;
-          })
-        );
+          });
+          persistMessagesCache(next);
+          return next;
+        });
       })
       .on('broadcast', { event: 'vanish_mode_toggled' }, ({ payload }) => {
         setIsVanishMode(payload.enabled);
         if (!payload.enabled) {
           // Vanish mode turned off -> remove vanished messages from local view
-          setMessages((prev) => prev.filter((m) => !m.is_vanished));
+          setMessages((prev) => {
+            const next = prev.filter((m) => !m.is_vanished);
+            persistMessagesCache(next);
+            return next;
+          });
         }
       })
       .subscribe();
@@ -123,7 +180,7 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     return () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
-  }, [conversationId, currentUser]);
+  }, [conversationId, currentUser, persistMessagesCache]);
 
   /**
    * Send Text / Media Message (Optimistic rendering)
@@ -163,7 +220,11 @@ export function useChatThread({ conversationId, currentUser, partner }) {
       created_at: new Date().toISOString()
     };
 
-    setMessages((prev) => [...prev, optimisticMsg]);
+    setMessages((prev) => {
+      const next = [...prev, optimisticMsg];
+      persistMessagesCache(next);
+      return next;
+    });
     setReplyingTo(null);
 
     // 2. Background Upload if Blob provided
@@ -188,14 +249,22 @@ export function useChatThread({ conversationId, currentUser, partner }) {
       });
 
       // Replace optimistic record with server record
-      setMessages((prev) => prev.map((m) => (m.id === tempId ? savedRecord : m)));
+      setMessages((prev) => {
+        const next = prev.map((m) => (m.id === tempId ? savedRecord : m));
+        persistMessagesCache(next);
+        return next;
+      });
     } catch (err) {
       console.error("Message could not be sent:", err);
       // Remove the optimistic message on failure
-      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setMessages((prev) => {
+        const next = prev.filter((m) => m.id !== tempId);
+        persistMessagesCache(next);
+        return next;
+      });
       window.dispatchEvent(new CustomEvent('show_toast', { detail: { title: 'Erreur', message: 'Impossible d\'envoyer le message.' } }));
     }
-  }, [conversationId, currentUser, isVanishMode, replyingTo, partner]);
+  }, [conversationId, currentUser, isVanishMode, replyingTo, partner, persistMessagesCache]);
 
   /**
    * Toggle Emoji Reaction
@@ -205,8 +274,8 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     soundEngine.playPopSound();
 
     // Optimistic reaction update
-    setMessages((prev) =>
-      prev.map((m) => {
+    setMessages((prev) => {
+      const next = prev.map((m) => {
         if (m.id === messageId) {
           const reactions = m.reactions || [];
           const exists = reactions.some((r) => r.user_id === currentUser.id && r.emoji === emoji);
@@ -217,11 +286,13 @@ export function useChatThread({ conversationId, currentUser, partner }) {
           }
         }
         return m;
-      })
-    );
+      });
+      persistMessagesCache(next);
+      return next;
+    });
 
     await directChatService.toggleReaction(messageId, currentUser.id, emoji, conversationId);
-  }, [currentUser, conversationId]);
+  }, [currentUser, conversationId, persistMessagesCache]);
 
   /**
    * Toggle Vanish Mode
@@ -233,9 +304,13 @@ export function useChatThread({ conversationId, currentUser, partner }) {
 
     await directChatService.toggleVanishMode(conversationId, nextState);
     if (!nextState) {
-      setMessages((prev) => prev.filter((m) => !m.is_vanished));
+      setMessages((prev) => {
+        const next = prev.filter((m) => !m.is_vanished);
+        persistMessagesCache(next);
+        return next;
+      });
     }
-  }, [conversationId, isVanishMode]);
+  }, [conversationId, isVanishMode, persistMessagesCache]);
 
   return {
     messages,
@@ -246,6 +321,6 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     sendMessage,
     toggleReaction,
     toggleVanishMode,
-    refreshMessages: loadMessages
+    refreshMessages: () => loadMessages(false)
   };
 }

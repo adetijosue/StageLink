@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-const InboxView = React.lazy(() => import('./components/messaging/instagram/InboxView'));
-const MessageThread = React.lazy(() => import('./components/messaging/instagram/MessageThread'));
+import InboxView from './components/messaging/instagram/InboxView';
+import MessageThread from './components/messaging/instagram/MessageThread';
 import { directChatService } from './services/directChatService';
 
 import { Plus, Volume2, User } from 'lucide-react';

@@ -1,31 +1,70 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { directChatService } from '../services/directChatService';
 
 export function useConversationList(currentUser) {
-  const [conversations, setConversations] = useState([]);
-  const [directNotes, setDirectNotes] = useState([]);
+  // 1. Instant Cache-First Initialization (0ms latency)
+  const [conversations, setConversations] = useState(() => {
+    if (!currentUser?.id) return [];
+    try {
+      const cached = localStorage.getItem(`stagelink_cached_conversations_${currentUser.id}`);
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [directNotes, setDirectNotes] = useState(() => {
+    if (!currentUser?.id) return [];
+    try {
+      const cached = localStorage.getItem(`stagelink_cached_notes_${currentUser.id}`);
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'unread' | 'groups'
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  
+  const [isLoading, setIsLoading] = useState(() => {
+    if (!currentUser?.id) return false;
+    try {
+      const cached = localStorage.getItem(`stagelink_cached_conversations_${currentUser.id}`);
+      return !cached || JSON.parse(cached).length === 0;
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   /**
-   * Fetch Conversations & Direct Notes
+   * Fetch Conversations & Direct Notes with Background Revalidation (SWR)
    */
-  const loadInboxData = useCallback(async () => {
+  const loadInboxData = useCallback(async (silent = false) => {
     if (!currentUser?.id || !isSupabaseConfigured()) {
-      setIsLoading(false);
+      if (isMountedRef.current) setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
+    if (!silent && conversations.length === 0) {
+      setIsLoading(true);
+    }
+
     try {
       // 1. Fetch 24h Direct Notes
-      const notes = await directChatService.fetchActiveNotes();
-      setDirectNotes(notes);
+      const notesPromise = directChatService.fetchActiveNotes().catch(() => []);
 
       // 2. Fetch Conversations where current user is participant
-      const { data: participants, error: partErr } = await supabase
+      const convPromise = supabase
         .from('conversation_participants')
         .select(`
           conversation_id,
@@ -55,6 +94,15 @@ export function useConversationList(currentUser) {
         .eq('user_id', currentUser.id)
         .is('left_at', null)
         .limit(50);
+
+      const [notes, { data: participants, error: partErr }] = await Promise.all([notesPromise, convPromise]);
+
+      if (notes && isMountedRef.current) {
+        setDirectNotes(notes);
+        try {
+          localStorage.setItem(`stagelink_cached_notes_${currentUser.id}`, JSON.stringify(notes));
+        } catch (e) {}
+      }
 
       if (partErr) throw partErr;
 
@@ -119,18 +167,26 @@ export function useConversationList(currentUser) {
         };
       }).filter(Boolean);
 
-      setConversations(formatted);
+      if (isMountedRef.current) {
+        setConversations(formatted);
+        try {
+          localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(formatted));
+        } catch (e) {}
+      }
     } catch (e) {
       console.warn('Load inbox data note:', e);
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [currentUser?.id]);
+  }, [currentUser?.id, conversations.length]);
 
   useEffect(() => {
-    loadInboxData();
+    // Initial fetch (silent if we already have cached conversations for 0ms instant display)
+    loadInboxData(conversations.length > 0);
     
-    const handleRefresh = () => loadInboxData();
+    const handleRefresh = () => loadInboxData(true);
     window.addEventListener('refresh_conversations', handleRefresh);
 
     if (!isSupabaseConfigured() || !currentUser?.id) {
@@ -145,7 +201,7 @@ export function useConversationList(currentUser) {
         schema: 'public',
         table: 'direct_messages'
       }, () => {
-        loadInboxData();
+        loadInboxData(true);
       })
       .on('postgres_changes', {
         event: '*',
@@ -153,14 +209,14 @@ export function useConversationList(currentUser) {
         table: 'conversation_participants',
         filter: `user_id=eq.${currentUser.id}`
       }, () => {
-        loadInboxData();
+        loadInboxData(true);
       })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'direct_notes'
       }, () => {
-        loadInboxData();
+        loadInboxData(true);
       })
       .subscribe();
 
@@ -182,17 +238,23 @@ export function useConversationList(currentUser) {
       audioTrackArtist
     });
     if (note) {
-      setDirectNotes((prev) => [
-        {
-          ...note,
-          user: {
-            id: currentUser.id,
-            full_name: currentUser.name || currentUser.full_name,
-            avatar_url: currentUser.avatar || currentUser.avatar_url
-          }
-        },
-        ...prev.filter((n) => n.user_id !== currentUser.id)
-      ]);
+      setDirectNotes((prev) => {
+        const next = [
+          {
+            ...note,
+            user: {
+              id: currentUser.id,
+              full_name: currentUser.name || currentUser.full_name,
+              avatar_url: currentUser.avatar || currentUser.avatar_url
+            }
+          },
+          ...prev.filter((n) => n.user_id !== currentUser.id)
+        ];
+        try {
+          localStorage.setItem(`stagelink_cached_notes_${currentUser.id}`, JSON.stringify(next));
+        } catch (e) {}
+        return next;
+      });
     }
   }, [currentUser]);
 
@@ -215,6 +277,6 @@ export function useConversationList(currentUser) {
     setSearchQuery,
     isLoading,
     postNote,
-    refreshInbox: loadInboxData
+    refreshInbox: () => loadInboxData(false)
   };
 }
