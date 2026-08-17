@@ -1,6 +1,7 @@
 import React from 'react';
 import { Search, Plus, PhoneCall } from 'lucide-react';
 import UserAvatar from '../../common/UserAvatar';
+import MessageStatusTicks from '../MessageStatusTicks';
 
 import { useConversationList } from '../../../hooks/useConversationList';
 import { soundEngine } from '../../../services/audioService';
@@ -266,29 +267,39 @@ const InboxView = React.memo(function InboxView({
                   )}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
-                  <p style={{
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', gap: '8px' }}>
+                  <div style={{
                     fontSize: '0.8rem',
                     color: conv.unreadCount > 0 ? '#0066FF' : '#64748B',
                     fontWeight: conv.unreadCount > 0 ? 700 : 400,
                     margin: 0,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
                   }}>
                     {conv.lastMessage ? (
                       <>
                         {conv.lastMessage.sender_id === currentUser?.id && (
-                          <span style={{ color: '#94A3B8', fontWeight: 500 }}>{language === 'en' ? 'You: ' : 'Vous : '}</span>
+                          <MessageStatusTicks
+                            status={conv.lastMessage.status || (conv.lastMessage.read ? 'read' : 'sent')}
+                            isRead={conv.lastMessage.status === 'read' || conv.lastMessage.read === true}
+                            isRecipientOnline={partnerUser?.id ? onlineUserIds.includes(partnerUser.id) : false}
+                            size={13}
+                          />
                         )}
-                        {conv.lastMessage.message_type === 'audio'
-                          ? (language === 'en' ? '🎙️ Voice note' : '🎙️ Note vocale')
-                          : conv.lastMessage.message_type === 'image'
-                          ? (language === 'en' ? '📷 Photo' : '📷 Photo')
-                          : (conv.lastMessage.content || (language === 'en' ? 'Message' : 'Message'))}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {conv.lastMessage.message_type === 'audio'
+                            ? (language === 'en' ? '🎙️ Voice note' : '🎙️ Note vocale')
+                            : conv.lastMessage.message_type === 'image'
+                            ? (language === 'en' ? '📷 Photo' : '📷 Photo')
+                            : (conv.lastMessage.content || (language === 'en' ? 'Message' : 'Message'))}
+                        </span>
                       </>
                     ) : (language === 'en' ? 'New conversation' : 'Nouvelle discussion')}
-                  </p>
+                  </div>
 
                   {conv.unreadCount > 0 && (
                     <span style={{

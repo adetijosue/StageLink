@@ -35,6 +35,7 @@ const EventTicketModal = React.lazy(() => import('./components/services/EventTic
 const ProfileView = React.lazy(() => import('./components/premium/ProfileView'));
 const PaywallModal = React.lazy(() => import('./components/premium/PaywallModal'));
 import NotificationsDrawer from './components/notifications/NotificationsDrawer';
+import TopNotificationBanner from './components/notifications/TopNotificationBanner';
 import AppSplashScreen from './components/common/AppSplashScreen';
 import GlobalAudioPlayer from './components/audio/GlobalAudioPlayer';
 import PWAInstallPrompt from './components/common/PWAInstallPrompt';
@@ -214,6 +215,24 @@ function MainApp() {
     selectedChatRef.current = selectedChat;
   }, [selectedChat]);
 
+  const selectedConversationRef = useRef(selectedConversation);
+  useEffect(() => {
+    selectedConversationRef.current = selectedConversation;
+  }, [selectedConversation]);
+
+  // Active chat partner detector (works across both ChatRoom and MessageThread)
+  const getActivePartnerId = () => {
+    const sc = selectedChatRef.current;
+    if (sc) {
+      return sc.participant?.id || sc.participantId || (typeof sc.id === 'string' ? sc.id.replace('chat_', '') : null);
+    }
+    const scon = selectedConversationRef.current;
+    if (scon) {
+      return scon.partner?.id || scon.participant?.id || scon.participantId || scon.partnerId || (scon.participants?.find(p => p.user_id !== currentUser?.id)?.user_id);
+    }
+    return null;
+  };
+
   const [stories, setStories] = useState([]);
   const [matches, setMatches] = useState([]);
   const [chats, setChats] = useState([]);
@@ -236,13 +255,20 @@ function MainApp() {
     if (currentUser?.id) {
       nativeNotificationService.initRealtimeNotifications(currentUser, (row, { actorName, actorAvatar }) => {
         if (row.type === 'message') {
+          const activePartnerId = getActivePartnerId();
+          if (activePartnerId && activePartnerId === row.actor_id) {
+            // Already in active discussion with this user -> skip top toast
+            return;
+          }
           soundEngine.playMessageReceivedSound();
           setToastNotification({
+            type: 'message',
             title: actorName,
             message: row.content || 'Nouveau message reçu',
-            avatar: actorAvatar
+            avatar: actorAvatar,
+            actorId: row.actor_id,
+            partnerId: row.actor_id
           });
-          setTimeout(() => setToastNotification(null), 4500);
           window.dispatchEvent(new Event('refresh_conversations'));
         }
       });
@@ -1392,29 +1418,90 @@ function MainApp() {
 
                 let body = 'Vous avez une nouvelle notification';
                 try {
-                  const { data: actor } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', payload.new.actor_id).maybeSingle();
-                  const actorName = actor ? actor.full_name : 'Quelqu\'un';
+                  const { data: actor } = await supabase.from('profiles').select('id, full_name, username, avatar_url, role').eq('id', payload.new.actor_id).maybeSingle();
+                  const actorName = actor?.full_name || actor?.username || 'Quelqu\'un';
+                  const activePartnerId = getActivePartnerId();
+
                   if (payload.new.type === 'message') {
+                    if (activePartnerId && activePartnerId === payload.new.actor_id) {
+                      // Already in active discussion with sender -> skip top pop-up banner
+                      return;
+                    }
                     body = `${actorName} : ${payload.new.content || 'Nouveau message'}`;
                     soundEngine.playMessageReceivedSound();
                     setToastNotification({
+                      type: 'message',
                       title: actorName,
                       message: payload.new.content || 'Nouveau message reçu',
-                      avatar: actor?.avatar_url
+                      avatar: actor?.avatar_url,
+                      actorId: payload.new.actor_id,
+                      partnerId: payload.new.actor_id
                     });
-                    setTimeout(() => setToastNotification(null), 4500);
                     window.dispatchEvent(new Event('refresh_conversations'));
                     await updateUnreadDirectMessagesCount();
                   } else if (payload.new.type === 'like_post') {
                     body = `${actorName} a aimé votre publication.`;
+                    soundEngine.playPopSound();
+                    setToastNotification({
+                      type: 'like_post',
+                      title: actorName,
+                      message: 'a aimé votre publication',
+                      avatar: actor?.avatar_url,
+                      actorId: payload.new.actor_id,
+                      targetTab: 'feed'
+                    });
                   } else if (payload.new.type === 'comment_post') {
                     body = `${actorName} a commenté votre publication.`;
+                    soundEngine.playPopSound();
+                    setToastNotification({
+                      type: 'comment_post',
+                      title: actorName,
+                      message: payload.new.content || 'a commenté votre publication',
+                      avatar: actor?.avatar_url,
+                      actorId: payload.new.actor_id,
+                      targetTab: 'feed'
+                    });
                   } else if (payload.new.type === 'like_story') {
                     body = `${actorName} a aimé votre story.`;
+                    soundEngine.playPopSound();
+                    setToastNotification({
+                      type: 'like_story',
+                      title: actorName,
+                      message: 'a aimé votre story',
+                      avatar: actor?.avatar_url,
+                      actorId: payload.new.actor_id,
+                      targetTab: 'feed'
+                    });
                   } else if (payload.new.type === 'view_story') {
                     body = `${actorName} a vu votre story.`;
+                    setToastNotification({
+                      type: 'view_story',
+                      title: actorName,
+                      message: 'a vu votre story',
+                      avatar: actor?.avatar_url,
+                      actorId: payload.new.actor_id,
+                      targetTab: 'feed'
+                    });
+                  } else if (payload.new.type === 'match') {
+                    body = `${actorName} a matché avec vous !`;
+                    soundEngine.playPopSound();
+                    setToastNotification({
+                      type: 'match',
+                      title: actorName,
+                      message: 'a matché avec vous !',
+                      avatar: actor?.avatar_url,
+                      actorId: payload.new.actor_id,
+                      targetTab: 'match'
+                    });
                   } else {
                     body = `Nouvelle notification de ${actorName}.`;
+                    setToastNotification({
+                      type: payload.new.type || 'notification',
+                      title: actorName,
+                      message: payload.new.content || 'Nouvelle interaction sur votre profil',
+                      avatar: actor?.avatar_url,
+                      actorId: payload.new.actor_id
+                    });
                   }
                   
                   sendNativeNotification('StageLink', body);
@@ -1470,15 +1557,17 @@ function MainApp() {
               isRead: false
             };
 
-            const activeChat = selectedChatRef.current;
-            const isInCurrentChat = activeChat && (
-              activeChat.participant?.id === senderId || 
-              activeChat.id === `chat_${senderId}`
-            );
+            const activePartnerId = getActivePartnerId();
+            const isInCurrentChat = activePartnerId && (activePartnerId === senderId);
 
             if (isInCurrentChat) {
               try {
                 supabase.from('messages').update({ is_read: true }).eq('id', msgRecord.id);
+                supabase.channel('realtime:messages').send({
+                  type: 'broadcast',
+                  event: 'message_read',
+                  payload: { messageId: msgRecord.id, readerId: currentUser.id }
+                });
               } catch (e) {}
 
               soundEngine.playPopSound();
@@ -1539,11 +1628,13 @@ function MainApp() {
             } else {
               soundEngine.playMessageReceivedSound();
               setToastNotification({
+                type: 'message',
                 title: senderProfile?.full_name || 'Nouveau message',
                 message: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Message audio' : '📷 Média'),
-                avatar: senderProfile?.avatar_url
+                avatar: senderProfile?.avatar_url,
+                partnerId: senderId,
+                actorId: senderId
               });
-              setTimeout(() => setToastNotification(null), 4000);
 
               setChats(prevChats => {
                 const chatId = `chat_${senderId}`;
@@ -1617,7 +1708,17 @@ function MainApp() {
                 };
               });
             })
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, async () => {
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, async (payload) => {
+              if (payload.new) {
+                // Update local message status (e.g. read / delivered ticks)
+                setSelectedChat(prev => {
+                  if (!prev) return null;
+                  return {
+                    ...prev,
+                    messages: (prev.messages || []).map(m => m.id === payload.new.id ? { ...m, isRead: payload.new.is_read, status: payload.new.is_read ? 'read' : m.status } : m)
+                  };
+                });
+              }
               syncMessages();
             })
             .subscribe();
@@ -1629,19 +1730,28 @@ function MainApp() {
                 // Dispatch event to refresh InboxView & update badge
                 window.dispatchEvent(new Event('refresh_conversations'));
                 await updateUnreadDirectMessagesCount();
-                // Fetch sender name for toast
+
+                const activePartnerId = getActivePartnerId();
+                if (activePartnerId && activePartnerId === payload.new.sender_id) {
+                  // Already actively chatting with sender -> skip top pop-up banner
+                  return;
+                }
+
+                // Fetch sender name for banner
                 let senderName = 'Nouveau message';
                 try {
-                  const { data } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', payload.new.sender_id).maybeSingle();
+                  const { data } = await supabase.from('profiles').select('id, full_name, avatar_url').eq('id', payload.new.sender_id).maybeSingle();
                   if (data) {
-                    senderName = data.full_name;
+                    senderName = data.full_name || 'Artiste';
                     soundEngine.playMessageReceivedSound();
                     setToastNotification({
+                      type: 'message',
                       title: senderName,
                       message: payload.new.message_type === 'audio' ? '🎤 Message vocal' : (payload.new.message_type === 'image' ? '📷 Photo' : (payload.new.content || 'Nouveau message')),
-                      avatar: data.avatar_url
+                      avatar: data.avatar_url,
+                      partnerId: data.id,
+                      actorId: data.id
                     });
-                    setTimeout(() => setToastNotification(null), 4000);
                     sendNativeNotification('StageLink', `Nouveau message de ${senderName}`);
                   }
                 } catch(e) {}
@@ -3019,21 +3129,39 @@ function MainApp() {
         />
       )}
 
-      {/* Global Notification Toast */}
+      {/* Global Top Floating Notification & Push Banner */}
       {toastNotification && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-bounce-in max-w-sm w-11/12 bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl p-4 flex items-center gap-4 cursor-pointer" onClick={() => setToastNotification(null)}>
-          <div className="w-12 h-12 shrink-0">
-            {toastNotification.avatar ? (
-              <UserAvatar avatarUrl={toastNotification.avatar} size={48} border="2px solid #0066FF" />
-            ) : (
-              <UserAvatar size={48} border="2px solid #0066FF" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h4 className="text-white font-semibold text-sm truncate">{toastNotification.title}</h4>
-            <p className="text-gray-300 text-xs truncate mt-0.5">{toastNotification.message}</p>
-          </div>
-        </div>
+        <TopNotificationBanner
+          notification={toastNotification}
+          isDarkMode={isDarkMode}
+          onClose={() => setToastNotification(null)}
+          onOpen={(notif) => {
+            setToastNotification(null);
+            const targetId = notif.partnerId || notif.actorId || notif.senderId;
+            const targetUser = allUsers.find(u => u.id === targetId) || {
+              id: targetId,
+              name: notif.title || notif.actorName || 'Artiste',
+              full_name: notif.title || notif.actorName || 'Artiste',
+              avatar: notif.avatar || notif.actorAvatar || '',
+              avatar_url: notif.avatar || notif.actorAvatar || '',
+              role: 'Artiste'
+            };
+
+            if (notif.type === 'message' || notif.partnerId) {
+              handleStartChatWithUser(targetUser);
+            } else if (notif.type === 'like_post' || notif.type === 'comment_post') {
+              setActiveTab('feed');
+            } else if (notif.type === 'like_story' || notif.type === 'view_story') {
+              setActiveTab('feed');
+            } else if (notif.type === 'match') {
+              setActiveTab('match');
+            } else if (targetId) {
+              handleOpenPublicProfile(targetUser);
+            } else if (notif.targetTab) {
+              setActiveTab(notif.targetTab);
+            }
+          }}
+        />
       )}
 
       {/* Active Story Viewer Overlay */}

@@ -4,6 +4,8 @@ import { soundEngine } from '../../services/audioService';
 import TopBar from '../navigation/TopBar';
 import UserAvatar from '../common/UserAvatar';
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
+import MessageStatusTicks from './MessageStatusTicks';
+import { presenceService } from '../../services/presenceService';
 
 export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoCall, onOpenEphemeralModal, onSendMessage, onDeleteMessageForMe, onDeleteMessageForEveryone, onOpenPublicProfile, onOpenStory }) {
   const [inputText, setInputText] = useState('');
@@ -62,6 +64,18 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
   const [playingAudioMsgId, setPlayingAudioMsgId] = useState(null);
   const [isPartnerTyping, setIsPartnerTyping] = useState(false);
   const [typingStatusText, setTypingStatusText] = useState('En ligne');
+
+  const partnerId = chat?.participant?.id || (typeof chat?.id === 'string' ? chat.id.replace('chat_', '') : null);
+  const [isPartnerOnline, setIsPartnerOnline] = useState(() => presenceService.isUserOnline(partnerId));
+
+  useEffect(() => {
+    if (!partnerId) return;
+    setIsPartnerOnline(presenceService.isUserOnline(partnerId));
+    const unsubscribe = presenceService.subscribe(() => {
+      setIsPartnerOnline(presenceService.isUserOnline(partnerId));
+    });
+    return () => unsubscribe();
+  }, [partnerId]);
 
   // MediaRecorder & Audio Instances
   const mediaRecorderRef = useRef(null);
@@ -1072,12 +1086,20 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: isCurrent ? 'flex-end' : isMissedCall ? 'center' : 'flex-start',
-                gap: '4px',
+                gap: '5px',
                 marginTop: '4px',
                 fontSize: '0.7rem',
                 color: '#94A3B8'
               }}>
                 <span>{msg.timestamp}</span>
+                {isCurrent && (
+                  <MessageStatusTicks
+                    status={msg.status || (msg.isRead ? 'read' : 'sent')}
+                    isRead={msg.isRead === true || msg.status === 'read'}
+                    isRecipientOnline={isPartnerOnline}
+                    size={14}
+                  />
+                )}
               </div>
             </div>
           );

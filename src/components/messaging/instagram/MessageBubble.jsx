@@ -1,12 +1,14 @@
 import React, { useState, useRef } from 'react';
 import { Play, Pause, Heart, Eye, FileText, Download, Film, Music, Reply, File } from 'lucide-react';
 import { soundEngine } from '../../../services/audioService';
+import MessageStatusTicks from '../MessageStatusTicks';
 
 export default function MessageBubble({
   message,
   isMine,
   isPreviousSameSender,
   isNextSameSender,
+  isRecipientOnline = false,
   onReply,
   onReact,
   onOpenMedia,
@@ -544,6 +546,33 @@ export default function MessageBubble({
           ))}
         </div>
       )}
+
+      {/* Timestamp & WhatsApp-Style Status Ticks */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: isMine ? 'flex-end' : 'flex-start',
+        gap: '4px',
+        marginTop: '2px',
+        paddingLeft: isMine ? '0px' : '6px',
+        paddingRight: isMine ? '6px' : '0px',
+        fontSize: '0.68rem',
+        color: '#94A3B8'
+      }}>
+        <span>
+          {message.created_at
+            ? new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : ''}
+        </span>
+        {isMine && (
+          <MessageStatusTicks
+            status={message.status || (message.read ? 'read' : 'sent')}
+            isRead={message.status === 'read' || message.read === true}
+            isRecipientOnline={isRecipientOnline}
+            size={13}
+          />
+        )}
+      </div>
     </div>
   );
 }

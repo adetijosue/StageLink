@@ -132,6 +132,31 @@ export function useChatThread({ conversationId, currentUser, partner }) {
           }
         }
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'direct_messages', filter: `conversation_id=eq.${conversationId}` }, (payload) => {
+        const updatedMsg = payload.new;
+        if (!updatedMsg) return;
+
+        setMessages((prev) => {
+          const next = prev.map((m) => (m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
+          persistMessagesCache(next);
+          return next;
+        });
+      })
+      .on('broadcast', { event: 'messages_read' }, ({ payload }) => {
+        if (payload?.conversationId === conversationId && payload?.readerId !== currentUser?.id) {
+          // Recipient read our messages -> turn ticks to double blue instantly
+          setMessages((prev) => {
+            const next = prev.map((m) => {
+              if (m.sender_id === currentUser?.id) {
+                return { ...m, status: 'read', read: true, isRead: true };
+              }
+              return m;
+            });
+            persistMessagesCache(next);
+            return next;
+          });
+        }
+      })
       .on('broadcast', { event: 'reaction_added' }, ({ payload }) => {
         setMessages((prev) => {
           const next = prev.map((m) => {

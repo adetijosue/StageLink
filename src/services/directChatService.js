@@ -331,7 +331,16 @@ export const directChatService = {
           .eq('is_read', false);
       } catch (ne) {}
 
-      // 4. SOLUTION RADICALE : Déclenche instantanément la mise à jour de l'icône de notification dans l'Inbox !
+      // 4. Diffuse en temps réel aux participants que les messages ont été lus (double coche bleue instantanée)
+      try {
+        supabase.channel(`dm:${conversationId}`).send({
+          type: 'broadcast',
+          event: 'messages_read',
+          payload: { conversationId, readerId: currentUserId }
+        });
+      } catch (be) {}
+
+      // 5. SOLUTION RADICALE : Déclenche instantanément la mise à jour de l'icône de notification dans l'Inbox !
       window.dispatchEvent(new Event('refresh_conversations'));
     } catch (err) {
       console.error('Error marking as read:', err);

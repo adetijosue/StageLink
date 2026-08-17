@@ -331,6 +331,7 @@ export default function MessageThread({
               isMine={isMine}
               isPreviousSameSender={isPreviousSameSender}
               isNextSameSender={isNextSameSender}
+              isRecipientOnline={isOnline}
               onReply={(m) => setReplyingTo(m)}
               onReact={(msgId, emoji) => toggleReaction(msgId, emoji)}
               onOpenMedia={(m) => setPreviewMedia(m)}

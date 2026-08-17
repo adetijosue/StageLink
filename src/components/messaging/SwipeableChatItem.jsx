@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Trash2, Archive, MessageSquare, MessageCircle, Trash } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
+import MessageStatusTicks from './MessageStatusTicks';
 
 function SwipeableChatItem({ chat, onSelectChat, onArchive, onDelete, onToggleUnread, onOpenPublicProfile }) {
   const [startX, setStartX] = useState(0);
@@ -173,16 +174,29 @@ function SwipeableChatItem({ chat, onSelectChat, onArchive, onDelete, onToggleUn
               {chat.lastMessageTime || 'Récemment'}
             </span>
           </div>
-          <p style={{
+          <div style={{
             fontSize: '0.82rem',
             color: chat.unreadCount > 0 ? 'var(--text-dark)' : 'var(--text-muted)',
             fontWeight: chat.unreadCount > 0 ? 600 : 400,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
-            textOverflow: 'ellipsis'
+            textOverflow: 'ellipsis',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
           }}>
-            {lastMsgPreview}
-          </p>
+            {lastMsg && (lastMsg.sender === 'me' || lastMsg.isCurrent) && (
+              <MessageStatusTicks
+                status={lastMsg.status || (lastMsg.isRead ? 'read' : 'sent')}
+                isRead={lastMsg.isRead === true || lastMsg.status === 'read'}
+                isRecipientOnline={isOnline}
+                size={13}
+              />
+            )}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {lastMsgPreview}
+            </span>
+          </div>
         </div>
 
         {/* Unread Message Badge Counter */}
