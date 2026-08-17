@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Image, Send, Sparkles } from 'lucide-react';
+import { Image, Send } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 
 export default function CreatePostBar({ onClickOpenModal }) {
@@ -48,7 +48,6 @@ export default function CreatePostBar({ onClickOpenModal }) {
           border: '1px solid var(--border-light, #E2E8F0)',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
           fontWeight: 500,
           minWidth: 0
         }}
@@ -60,7 +59,6 @@ export default function CreatePostBar({ onClickOpenModal }) {
         }}>
           Quoi de neuf, {firstName} ?
         </span>
-        <Sparkles size={15} color="#0066FF" style={{ opacity: 0.85, flexShrink: 0, marginLeft: '6px' }} />
       </div>
 
       {/* 3. Quick Action Buttons */}
