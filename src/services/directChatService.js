@@ -117,6 +117,7 @@ export const directChatService = {
   async sendMessage({
     conversationId,
     senderId,
+    recipientId = null,
     content = '',
     messageType = 'text',
     mediaUrl = null,
@@ -149,6 +150,39 @@ export const directChatService = {
         if (error) {
           console.warn('Direct message DB insert error:', error.message);
           throw error;
+        }
+
+        // Resolve recipient ID if not explicitly provided
+        let targetRecipientId = recipientId;
+        if (!targetRecipientId) {
+          try {
+            const { data: parts } = await supabase
+              .from('conversation_participants')
+              .select('user_id')
+              .eq('conversation_id', conversationId)
+              .neq('user_id', senderId)
+              .limit(1);
+            if (parts && parts.length > 0) {
+              targetRecipientId = parts[0].user_id;
+            }
+          } catch (pe) {}
+        }
+
+        // Insert notification in notifications table for recipient (instant push & sync across devices)
+        if (targetRecipientId && targetRecipientId !== senderId) {
+          try {
+            const notifContent = content || (messageType === 'audio' ? '🎤 Note vocale' : (messageType === 'image' ? '📷 Photo' : 'Nouveau message'));
+            await supabase.from('notifications').insert({
+              user_id: targetRecipientId,
+              actor_id: senderId,
+              type: 'message',
+              reference_id: conversationId,
+              content: notifContent,
+              is_read: false
+            });
+          } catch (ne) {
+            console.warn('Direct message notification insert note:', ne.message);
+          }
         }
       } catch (err) {
         console.warn('Direct message sending error:', err);
@@ -265,7 +299,17 @@ export const directChatService = {
         .neq('sender_id', currentUserId)
         .eq('status', 'sent');
 
-      // 3. SOLUTION RADICALE : Déclenche instantanément la mise à jour de l'icône de notification dans l'Inbox !
+      // 3. Met à jour les notifications associées à cette conversation comme lues
+      try {
+        await supabase
+          .from('notifications')
+          .update({ is_read: true })
+          .eq('user_id', currentUserId)
+          .eq('reference_id', conversationId)
+          .eq('is_read', false);
+      } catch (ne) {}
+
+      // 4. SOLUTION RADICALE : Déclenche instantanément la mise à jour de l'icône de notification dans l'Inbox !
       window.dispatchEvent(new Event('refresh_conversations'));
     } catch (err) {
       console.error('Error marking as read:', err);

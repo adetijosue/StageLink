@@ -265,11 +265,18 @@ const InboxView = React.memo(function InboxView({
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap'
                   }}>
-                    {conv.lastMessage?.message_type === 'audio'
-                      ? '🎙️ Note vocale'
-                      : conv.lastMessage?.message_type === 'image'
-                      ? '📷 Photo'
-                      : (conv.lastMessage?.content || 'Nouvelle discussion')}
+                    {conv.lastMessage ? (
+                      <>
+                        {conv.lastMessage.sender_id === currentUser?.id && (
+                          <span style={{ color: '#94A3B8', fontWeight: 500 }}>Vous : </span>
+                        )}
+                        {conv.lastMessage.message_type === 'audio'
+                          ? '🎙️ Note vocale'
+                          : conv.lastMessage.message_type === 'image'
+                          ? '📷 Photo'
+                          : (conv.lastMessage.content || 'Message')}
+                      </>
+                    ) : 'Nouvelle discussion'}
                   </p>
 
                   {conv.unreadCount > 0 && (

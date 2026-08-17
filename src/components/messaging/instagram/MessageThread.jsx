@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Phone, Video, Sparkles } from 'lucide-react';
+import { ArrowLeft, Phone, Video } from 'lucide-react';
 import UserAvatar from '../../common/UserAvatar';
 import MessageBubble from './MessageBubble';
 import InputBar from './InputBar';
@@ -100,7 +100,6 @@ export default function MessageThread({
 
   const activePartner = partnerProfile || partner || {};
   const partnerName = activePartner.full_name || activePartner.name || activePartner.username || activePartner.userName || 'Artiste';
-  const partnerUsername = activePartner.username || '';
   const partnerAvatar = activePartner.avatar_url || activePartner.avatar || activePartner.userAvatar || '';
   const partnerRole = activePartner.role || activePartner.userRole || activePartner.metier || 'Artiste';
   const partnerId = activePartner.id || activePartner.userId;
@@ -138,25 +137,25 @@ export default function MessageThread({
         position: 'fixed',
         inset: 0,
         zIndex: 100,
-        // ... le reste de votre style ...
         background: isVanishMode ? '#0B0F19' : 'var(--bg-light)',
         display: 'flex',
         flexDirection: 'column',
-        color: isVanishMode ? '#FFFFFF' : 'var(--text-dark)'
+        color: isVanishMode ? '#FFFFFF' : 'var(--text-dark)',
+        height: '100%',
+        touchAction: 'pan-y'
       }}>
       {/* 1. Header Bar */}
       <div style={{
-        paddingTop: 'calc(12px + env(safe-area-inset-top, 12px))',
+        paddingTop: 'calc(14px + env(safe-area-inset-top, 14px))',
         paddingBottom: '12px',
         paddingLeft: '16px',
         paddingRight: '16px',
-        background: isVanishMode ? '#111827' : 'var(--card-bg)',
-        borderBottom: `1px solid ${isVanishMode ? '#1F2937' : 'var(--border-light)'}`,
+        background: isVanishMode ? 'rgba(15, 23, 42, 0.95)' : 'var(--card-bg)',
+        borderBottom: isVanishMode ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid var(--border-light)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        boxShadow: 'var(--shadow-sm)',
-        zIndex: 10
+        flexShrink: 0
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
           <button
@@ -202,29 +201,17 @@ export default function MessageThread({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-                <h3 style={{
-                  fontSize: '0.95rem',
-                  fontWeight: 700,
-                  color: isVanishMode ? '#FFFFFF' : '#0F172A',
-                  margin: 0,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}>
-                  {partnerName}
-                </h3>
-                {partnerUsername && (
-                  <span style={{
-                    fontSize: '0.75rem',
-                    fontWeight: 500,
-                    color: isVanishMode ? '#94A3B8' : '#64748B',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    @{partnerUsername.replace(/^@/, '')}
-                  </span>
-                )}
-              </div>
+              <h3 style={{
+                fontSize: '0.98rem',
+                fontWeight: 700,
+                color: isVanishMode ? '#FFFFFF' : '#0F172A',
+                margin: 0,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {partnerName}
+              </h3>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '1px' }}>
                 <span style={{
@@ -251,27 +238,8 @@ export default function MessageThread({
           </div>
         </div>
 
-        {/* Action Call Icons & Vanish Mode Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
-          <button
-            onClick={toggleVanishMode}
-            title="Activer / Désactiver le mode éphémère (Vanish Mode)"
-            style={{
-              background: isVanishMode ? 'rgba(0, 102, 255, 0.2)' : 'transparent',
-              color: isVanishMode ? '#60A5FA' : '#64748B',
-              border: 'none',
-              borderRadius: '50%',
-              width: '36px',
-              height: '36px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer'
-            }}
-          >
-            <Sparkles size={18} />
-          </button>
-
+        {/* Action Call Icons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
           <button
             onClick={onStartAudioCall}
             title="Appel Audio HD"

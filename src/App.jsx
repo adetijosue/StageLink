@@ -1195,13 +1195,29 @@ function MainApp() {
 
                 let body = 'Vous avez une nouvelle notification';
                 try {
-                  const { data: actor } = await supabase.from('profiles').select('full_name').eq('id', payload.new.actor_id).maybeSingle();
+                  const { data: actor } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', payload.new.actor_id).maybeSingle();
                   const actorName = actor ? actor.full_name : 'Quelqu\'un';
-                  if (payload.new.type === 'like_post') body = `${actorName} a aimé votre publication.`;
-                  else if (payload.new.type === 'comment_post') body = `${actorName} a commenté votre publication.`;
-                  else if (payload.new.type === 'like_story') body = `${actorName} a aimé votre story.`;
-                  else if (payload.new.type === 'view_story') body = `${actorName} a vu votre story.`;
-                  else body = `Nouvelle notification de ${actorName}.`;
+                  if (payload.new.type === 'message') {
+                    body = `${actorName} : ${payload.new.content || 'Nouveau message'}`;
+                    soundEngine.playMessageReceivedSound();
+                    setToastNotification({
+                      title: actorName,
+                      message: payload.new.content || 'Nouveau message reçu',
+                      avatar: actor?.avatar_url
+                    });
+                    setTimeout(() => setToastNotification(null), 4500);
+                    window.dispatchEvent(new Event('refresh_conversations'));
+                  } else if (payload.new.type === 'like_post') {
+                    body = `${actorName} a aimé votre publication.`;
+                  } else if (payload.new.type === 'comment_post') {
+                    body = `${actorName} a commenté votre publication.`;
+                  } else if (payload.new.type === 'like_story') {
+                    body = `${actorName} a aimé votre story.`;
+                  } else if (payload.new.type === 'view_story') {
+                    body = `${actorName} a vu votre story.`;
+                  } else {
+                    body = `Nouvelle notification de ${actorName}.`;
+                  }
                   
                   sendNativeNotification('StageLink', body);
                 } catch (e) { console.error("Suppressed error:", e); }

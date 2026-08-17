@@ -174,9 +174,11 @@ export function useChatThread({ conversationId, currentUser, partner }) {
 
     // 3. Persist and Broadcast
     try {
+      const recipientId = partner?.id || partner?.userId || partner?.user_id;
       const savedRecord = await directChatService.sendMessage({
         conversationId,
         senderId: currentUser.id,
+        recipientId,
         content: text,
         messageType: mediaType,
         mediaUrl: finalMediaUrl,

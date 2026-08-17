@@ -65,9 +65,11 @@ export function useConversationList(currentUser) {
         // Find partner profile for 1:1 direct chat
         const otherPartObj = conv.participants?.find((p) => p.user_id !== currentUser.id);
         const otherParticipant = Array.isArray(otherPartObj?.profile) ? otherPartObj.profile[0] : otherPartObj?.profile;
-        const lastMsg = conv.last_message && conv.last_message.length > 0
-          ? conv.last_message[conv.last_message.length - 1]
-          : null;
+        
+        const sortedMsgs = Array.isArray(conv.last_message)
+          ? [...conv.last_message].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+          : [];
+        const lastMsg = sortedMsgs[0] || null;
 
         const partnerName = otherParticipant?.full_name || otherParticipant?.username || otherParticipant?.name || 'Artiste';
         const partnerUsername = otherParticipant?.username || '';
@@ -95,6 +97,13 @@ export function useConversationList(currentUser) {
           userRole: 'Artiste'
         } : null);
 
+        const isLastMsgFromMe = Boolean(lastMsg && lastMsg.sender_id === currentUser.id);
+        const isUnread = Boolean(
+          lastMsg &&
+          !isLastMsgFromMe &&
+          (!item.last_read_at || new Date(lastMsg.created_at) > new Date(item.last_read_at))
+        );
+
         return {
           id: conv.id,
           type: conv.type,
@@ -106,7 +115,7 @@ export function useConversationList(currentUser) {
           vanishModeEnabled: conv.vanish_mode_enabled,
           lastMessage: lastMsg,
           updatedAt: conv.updated_at,
-          unreadCount: lastMsg && (!item.last_read_at || new Date(lastMsg.created_at) > new Date(item.last_read_at)) ? 1 : 0
+          unreadCount: isUnread ? 1 : 0
         };
       }).filter(Boolean);
 
@@ -123,8 +132,43 @@ export function useConversationList(currentUser) {
     
     const handleRefresh = () => loadInboxData();
     window.addEventListener('refresh_conversations', handleRefresh);
-    return () => window.removeEventListener('refresh_conversations', handleRefresh);
-  }, [loadInboxData]);
+
+    if (!isSupabaseConfigured() || !currentUser?.id) {
+      return () => window.removeEventListener('refresh_conversations', handleRefresh);
+    }
+
+    // Real-time synchronization across all devices and background tabs
+    const channel = supabase
+      .channel(`inbox_sync_${currentUser.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'direct_messages'
+      }, () => {
+        loadInboxData();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'conversation_participants',
+        filter: `user_id=eq.${currentUser.id}`
+      }, () => {
+        loadInboxData();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'direct_notes'
+      }, () => {
+        loadInboxData();
+      })
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('refresh_conversations', handleRefresh);
+      supabase.removeChannel(channel);
+    };
+  }, [loadInboxData, currentUser?.id]);
 
   /**
    * Post a new Direct Note
