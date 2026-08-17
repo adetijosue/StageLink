@@ -92,6 +92,17 @@ export const initializeStorage = () => {
     }
   });
 
+  try {
+    const rawMatches = localStorage.getItem(STORAGE_KEYS.MATCHES);
+    if (rawMatches) {
+      const parsed = JSON.parse(rawMatches);
+      if (Array.isArray(parsed)) {
+        const authenticMatches = parsed.filter(m => m && m.id && (String(m.id).startsWith('match_') || m.userId));
+        localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(authenticMatches));
+      }
+    }
+  } catch (e) {}
+
   if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
     setStoredItem(STORAGE_KEYS.USERS, INITIAL_USERS);
   }

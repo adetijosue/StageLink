@@ -514,27 +514,39 @@ function MainApp() {
               setStoredItem(STORAGE_KEYS.STORIES, loadedStories);
             }
 
-            // Fetch live matches or generate collaboration cards from real Supabase members
-            const { data: supaMatches } = await supabase.from('matches').select('*').limit(50);
-            if (supaMatches && supaMatches.length > 0) {
-              loadedMatches = supaMatches;
-            } else if (loadedUsers && loadedUsers.length > 0) {
-              const otherUsers = loadedUsers.filter(u => u.id !== currentUser?.id && u.email !== currentUser?.email);
-              loadedMatches = otherUsers.map(u => ({
+            // Generate real Match Pro cards strictly from real Supabase / database profiles
+            const otherUsers = (loadedUsers || []).filter(u => u.id !== currentUser?.id && u.email !== currentUser?.email);
+            loadedMatches = otherUsers.map(u => {
+              const combinedSkills = [
+                ...(Array.isArray(u.genres) ? u.genres : []),
+                ...(Array.isArray(u.instruments) ? u.instruments : []),
+                ...(Array.isArray(u.skills) ? u.skills : [])
+              ];
+
+              return {
                 id: `match_${u.id}`,
                 userId: u.id,
-                title: `Session Studio & Collaboration avec ${u.name}`,
+                title: u.name || u.full_name || u.username || 'Artiste',
+                name: u.name || u.full_name || u.username || 'Artiste',
+                role: u.role || 'Artiste',
                 category: u.role || 'Artiste',
                 location: u.location || 'Studio & En ligne',
-                matchPercentage: 95,
-                image: u.avatar || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80',
-                description: u.bio || `Artiste ${u.role} à la recherche de collaborations sur StageLink.`,
-                creator: u.name,
-                creatorAvatar: u.avatar,
-                verified: u.verified,
-                badgeType: u.badgeType
-              }));
-            }
+                matchPercentage: 94,
+                image: u.cover_url || u.avatar || u.avatar_url || '',
+                avatar: u.avatar || u.avatar_url || '',
+                cover_url: u.cover_url || '',
+                bio: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
+                description: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
+                skills: combinedSkills.length > 0 ? combinedSkills : [u.role || 'Artiste'],
+                company: u.company || '',
+                creator: u.name || u.full_name || 'Artiste',
+                creatorAvatar: u.avatar || '',
+                verified: u.verified || u.badgeType === 'gold' || u.badgeType === 'blue',
+                badgeType: u.badgeType || 'none',
+                rawUser: u
+              };
+            });
+            setStoredItem(STORAGE_KEYS.MATCHES, loadedMatches);
 
             // Fetch live messages for currentUser from Supabase
             try {
@@ -2537,17 +2549,26 @@ function MainApp() {
     if (!currentUser || !matchCard) return;
 
     const targetUserId = matchCard.userId || matchCard.id?.replace('match_', '');
-    const targetUserName = matchCard.creator || matchCard.title || 'Artiste StageLink';
-    const targetAvatar = matchCard.creatorAvatar || matchCard.image || '';
-    const targetRole = matchCard.category || 'Artiste';
+    const targetUserName = matchCard.name || matchCard.title || matchCard.creator || 'Artiste';
+    const targetAvatar = matchCard.avatar || matchCard.creatorAvatar || matchCard.image || '';
+    const targetRole = matchCard.role || matchCard.category || 'Artiste';
 
     // 1. Insert match record into Supabase matches table
-    if (isSupabaseConfigured() && targetUserId) {
+    if (isSupabaseConfigured() && targetUserId && currentUser?.id) {
       try {
         await supabase.from('matches').insert({
           candidate_id: currentUser.id,
           target_id: targetUserId,
-          status: 'pending'
+          status: 'matched'
+        });
+
+        // Insert instant notification for matched partner
+        await supabase.from('notifications').insert({
+          user_id: targetUserId,
+          actor_id: currentUser.id,
+          type: 'match',
+          content: `${currentUser.name || 'Un artiste'} a matché avec vous !`,
+          is_read: false
         });
       } catch (me) {
         console.warn('Supabase match insert note:', me?.message || me);
@@ -2558,20 +2579,87 @@ function MainApp() {
     handleStartChatWithUser({
       id: targetUserId,
       name: targetUserName,
+      full_name: targetUserName,
       avatar: targetAvatar,
-      role: targetRole
+      avatar_url: targetAvatar,
+      role: targetRole,
+      userRole: targetRole
     });
+  };
 
-    // 3. Send initial intro message in chat
-    const chatId = `chat_${targetUserId}`;
-    setTimeout(() => {
-      handleSendMessage(chatId, `Bonjour ${targetUserName} ! Je suis intéressé(e) par votre opportunité "${matchCard.title}" sur StageLink.`, {
-        id: targetUserId,
-        name: targetUserName,
-        avatar: targetAvatar,
-        role: targetRole
-      });
-    }, 100);
+  const handleRefreshMatches = async () => {
+    if (isSupabaseConfigured()) {
+      try {
+        const { data: supaProfiles, error } = await supabase
+          .from('profiles')
+          .select('id, full_name, username, avatar_url, cover_url, role, bio, location, company, verified_badge, genres, instruments, skills, gear')
+          .limit(100);
+
+        if (!error && supaProfiles) {
+          const mappedUsers = supaProfiles.map(p => ({
+            id: p.id,
+            name: p.full_name || p.username || 'Artiste',
+            userName: p.username || p.full_name || 'Artiste',
+            full_name: p.full_name || p.username || 'Artiste',
+            username: p.username || '',
+            role: p.role || 'Artiste',
+            userRole: p.role || 'Artiste',
+            company: p.company || '',
+            avatar: p.avatar_url || '',
+            avatar_url: p.avatar_url || '',
+            cover_url: p.cover_url || '',
+            verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+            badgeType: p.verified_badge || 'none',
+            bio: p.bio || '',
+            location: p.location || '',
+            instruments: p.instruments || [],
+            genres: p.genres || [],
+            skills: p.skills || [],
+            gear: p.gear || []
+          }));
+
+          setAllUsers(mappedUsers);
+          setStoredItem(STORAGE_KEYS.USERS, mappedUsers);
+
+          const otherUsers = mappedUsers.filter(u => u.id !== currentUser?.id && u.email !== currentUser?.email);
+          const realMatchCards = otherUsers.map(u => {
+            const combinedSkills = [
+              ...(Array.isArray(u.genres) ? u.genres : []),
+              ...(Array.isArray(u.instruments) ? u.instruments : []),
+              ...(Array.isArray(u.skills) ? u.skills : [])
+            ];
+
+            return {
+              id: `match_${u.id}`,
+              userId: u.id,
+              title: u.name || u.full_name || u.username || 'Artiste',
+              name: u.name || u.full_name || u.username || 'Artiste',
+              role: u.role || 'Artiste',
+              category: u.role || 'Artiste',
+              location: u.location || 'Studio & En ligne',
+              matchPercentage: 94,
+              image: u.cover_url || u.avatar || u.avatar_url || '',
+              avatar: u.avatar || u.avatar_url || '',
+              cover_url: u.cover_url || '',
+              bio: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
+              description: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
+              skills: combinedSkills.length > 0 ? combinedSkills : [u.role || 'Artiste'],
+              company: u.company || '',
+              creator: u.name || u.full_name || 'Artiste',
+              creatorAvatar: u.avatar || '',
+              verified: u.verified,
+              badgeType: u.badgeType,
+              rawUser: u
+            };
+          });
+
+          setMatches(realMatchCards);
+          setStoredItem(STORAGE_KEYS.MATCHES, realMatchCards);
+        }
+      } catch (err) {
+        console.warn('Error refreshing matches:', err);
+      }
+    }
   };
 
   const handleUpgradeSuccess = () => {
@@ -2664,6 +2752,9 @@ function MainApp() {
           <SwipeMatching
             matches={matches}
             onApplyMatch={handleApplyMatch}
+            onRefreshMatches={handleRefreshMatches}
+            onOpenProfile={handleOpenPublicProfile}
+            currentUser={currentUser}
           />
         )}
         {activeTab === 'discussions' && (
