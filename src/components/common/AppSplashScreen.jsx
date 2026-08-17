@@ -4,15 +4,15 @@ export default function AppSplashScreen({ onFinish }) {
   const [stage, setStage] = useState('active'); // active -> exiting
 
   useEffect(() => {
-    // Transition to main app at ~3.6s
+    // Ultra-Snappy transition to main app at ~1.2s
     const exitTimer = setTimeout(() => {
       setStage('exiting');
-    }, 3600);
+    }, 1200);
 
-    // Complete unmount callback at ~4.0s
+    // Complete unmount callback at ~1.5s
     const finishTimer = setTimeout(() => {
       if (onFinish) onFinish();
-    }, 4000);
+    }, 1500);
 
     return () => {
       clearTimeout(exitTimer);
@@ -35,17 +35,17 @@ export default function AppSplashScreen({ onFinish }) {
         alignItems: 'center',
         justifyContent: 'center',
         opacity: isExiting ? 0 : 1,
-        transform: isExiting ? 'scale(1.04)' : 'scale(1)',
-        transition: 'opacity 0.5s cubic-bezier(0.4, 0.0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1)',
+        transform: isExiting ? 'scale(1.03)' : 'scale(1)',
+        transition: 'opacity 0.35s cubic-bezier(0.4, 0.0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0.0, 0.2, 1)',
         pointerEvents: isExiting ? 'none' : 'auto',
         overflow: 'hidden',
         userSelect: 'none'
       }}
       onClick={() => {
-        // Quick skip on tap
+        // Quick instant skip on tap
         if (stage === 'active') {
           setStage('exiting');
-          setTimeout(() => { if (onFinish) onFinish(); }, 350);
+          setTimeout(() => { if (onFinish) onFinish(); }, 150);
         }
       }}
     >
@@ -53,7 +53,7 @@ export default function AppSplashScreen({ onFinish }) {
       <div className="splash-ambient-radial-1" />
       <div className="splash-ambient-radial-2" />
 
-      {/* 2. Concentric Ripple Rings (Stage 3: 1.8s - 2.8s) */}
+      {/* 2. Concentric Ripple Rings */}
       <div className="splash-ripple-ring ripple-1" />
       <div className="splash-ripple-ring ripple-2" />
 
@@ -63,7 +63,7 @@ export default function AppSplashScreen({ onFinish }) {
         {/* Official StageLink App Icon Card */}
         <div className="splash-official-icon-container">
           
-          {/* Base Official Logo Image with Perfect Elevation and Geometry */}
+          {/* Base Official Logo Image with Elevation and Geometry */}
           <div className="splash-official-logo-card">
             <img
               src="/stagelink-logo.png"
@@ -74,7 +74,7 @@ export default function AppSplashScreen({ onFinish }) {
             <div className="splash-shimmer-sweep" />
           </div>
 
-          {/* Dynamic Arrow Sparkle Star on Top-Right Arrow Tip (top: 31%, left: 73%) */}
+          {/* Dynamic Arrow Sparkle Star on Top-Right Arrow Tip */}
           <div className="splash-arrow-sparkle-anchor">
             <svg viewBox="0 0 40 40" className="splash-sparkle-svg">
               <path
@@ -93,55 +93,47 @@ export default function AppSplashScreen({ onFinish }) {
         </div>
       </div>
 
-      {/* --- 4. FOOTER BRANDING --- */}
+      {/* 4. Footer Branding */}
       <div className="splash-brand-footer">
         Powered by <strong>JABE PRODUCTION</strong>
       </div>
 
-      {/* --- CSS ANIMATION TIMELINE & KEYFRAMES --- */}
+      {/* CSS ANIMATION TIMELINE & KEYFRAMES (Snappy ~1.2s timing) */}
       <style>{`
-        /* ============================================================
-           GLOBAL SPLASH KEYFRAMES & EASING
-           Duration: 3.6s - 4.0s
-           Easing: cubic-bezier(0.4, 0.0, 0.2, 1)
-           ============================================================ */
-
         /* Ambient Glow Pulses */
         .splash-ambient-radial-1 {
           position: absolute;
-          width: 520px;
-          height: 520px;
+          width: 480px;
+          height: 480px;
           border-radius: 50%;
           background: radial-gradient(circle, rgba(56, 189, 248, 0.28) 0%, rgba(13, 114, 209, 0) 70%);
           top: 35%;
           left: 50%;
           transform: translate(-50%, -50%);
-          filter: blur(50px);
+          filter: blur(40px);
           pointer-events: none;
-          animation: ambientFloat 4s ease-in-out infinite alternate;
+          animation: ambientFloat 2.5s ease-in-out infinite alternate;
         }
 
         .splash-ambient-radial-2 {
           position: absolute;
-          width: 380px;
-          height: 380px;
+          width: 340px;
+          height: 340px;
           border-radius: 50%;
           background: radial-gradient(circle, rgba(255, 255, 255, 0.16) 0%, rgba(10, 60, 150, 0) 65%);
           top: 65%;
           left: 50%;
           transform: translate(-50%, -50%);
-          filter: blur(45px);
+          filter: blur(35px);
           pointer-events: none;
         }
 
         @keyframes ambientFloat {
-          0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.7; }
-          100% { transform: translate(-50%, -46%) scale(1.15); opacity: 1; }
+          0% { transform: translate(-50%, -50%) scale(0.95); opacity: 0.7; }
+          100% { transform: translate(-50%, -48%) scale(1.1); opacity: 1; }
         }
 
-        /* ------------------------------------------------------------
-           Concentric Ripple Rings (1.8s – 3.0s)
-           ------------------------------------------------------------ */
+        /* Ripple Rings */
         .splash-ripple-ring {
           position: absolute;
           top: 42%;
@@ -149,41 +141,39 @@ export default function AppSplashScreen({ onFinish }) {
           transform: translate(-50%, -50%);
           border-radius: 50%;
           border: 1.5px solid rgba(255, 255, 255, 0.75);
-          box-shadow: 0 0 24px rgba(56, 189, 248, 0.6);
+          box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
           pointer-events: none;
           opacity: 0;
         }
 
         .ripple-1 {
-          width: 175px;
-          height: 175px;
-          animation: rippleExpand 1.2s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
-          animation-delay: 1.8s;
+          width: 160px;
+          height: 160px;
+          animation: rippleExpand 0.8s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+          animation-delay: 0.6s;
         }
 
         .ripple-2 {
-          width: 175px;
-          height: 175px;
-          animation: rippleExpand 1.2s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
-          animation-delay: 2.1s;
+          width: 160px;
+          height: 160px;
+          animation: rippleExpand 0.8s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+          animation-delay: 0.75s;
         }
 
         @keyframes rippleExpand {
           0% {
-            transform: translate(-50%, -50%) scale(0.6);
+            transform: translate(-50%, -50%) scale(0.7);
             opacity: 0.7;
             border-width: 2px;
           }
           100% {
-            transform: translate(-50%, -50%) scale(2.6);
+            transform: translate(-50%, -50%) scale(2.3);
             opacity: 0;
             border-width: 0.5px;
           }
         }
 
-        /* ------------------------------------------------------------
-           LOGO STAGE & BREATHING PULSE
-           ------------------------------------------------------------ */
+        /* Logo Stage */
         .splash-brand-stage {
           display: flex;
           flex-direction: column;
@@ -191,23 +181,13 @@ export default function AppSplashScreen({ onFinish }) {
           justifyContent: center;
           position: relative;
           z-index: 10;
-          animation: logoPulse 1.4s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
-          animation-delay: 1.8s;
         }
 
-        @keyframes logoPulse {
-          0% { transform: scale(1); }
-          50% { transform: scale(1.04); }
-          100% { transform: scale(1); }
-        }
-
-        /* ------------------------------------------------------------
-           OFFICIAL LOGO SQUIRCLE CARD
-           ------------------------------------------------------------ */
+        /* Logo Card */
         .splash-official-icon-container {
           position: relative;
-          width: 175px;
-          height: 175px;
+          width: 160px;
+          height: 160px;
           display: flex;
           align-items: center;
           justifyContent: center;
@@ -216,14 +196,14 @@ export default function AppSplashScreen({ onFinish }) {
         .splash-official-logo-card {
           width: 100%;
           height: 100%;
-          border-radius: 40px;
+          border-radius: 36px;
           overflow: hidden;
           position: relative;
           box-shadow: 
-            0 24px 55px rgba(0, 15, 60, 0.5),
-            0 0 45px rgba(56, 189, 248, 0.35),
+            0 20px 45px rgba(0, 15, 60, 0.45),
+            0 0 35px rgba(56, 189, 248, 0.3),
             inset 0 1px 2px rgba(255, 255, 255, 0.4);
-          animation: cardEmerge 1.2s cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
+          animation: cardEmerge 0.55s cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
         }
 
         .splash-official-logo-img {
@@ -236,12 +216,8 @@ export default function AppSplashScreen({ onFinish }) {
         @keyframes cardEmerge {
           0% {
             opacity: 0;
-            transform: scale(0.8);
-            filter: brightness(1.3) blur(10px);
-          }
-          60% {
-            opacity: 0.95;
-            filter: brightness(1.1) blur(2px);
+            transform: scale(0.85);
+            filter: brightness(1.2) blur(6px);
           }
           100% {
             opacity: 1;
@@ -250,9 +226,7 @@ export default function AppSplashScreen({ onFinish }) {
           }
         }
 
-        /* ------------------------------------------------------------
-           SHIMMER GLINT SWEEP (1.1s – 2.3s)
-           ------------------------------------------------------------ */
+        /* Shimmer Sweep */
         .splash-shimmer-sweep {
           position: absolute;
           top: 0;
@@ -266,8 +240,8 @@ export default function AppSplashScreen({ onFinish }) {
             rgba(255, 255, 255, 0) 100%
           );
           transform: skewX(-25deg);
-          animation: shimmerSweepAnim 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-          animation-delay: 1.1s;
+          animation: shimmerSweepAnim 0.75s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+          animation-delay: 0.4s;
           pointer-events: none;
           z-index: 3;
         }
@@ -277,22 +251,19 @@ export default function AppSplashScreen({ onFinish }) {
           100% { left: 240%; }
         }
 
-        /* ------------------------------------------------------------
-           DYNAMIC ARROW SPARKLE (1.8s – 3.2s)
-           Positioned exactly on the arrow tip (top: 31%, left: 73%)
-           ------------------------------------------------------------ */
+        /* Sparkle Star */
         .splash-arrow-sparkle-anchor {
           position: absolute;
           top: 31%;
           left: 73%;
-          width: 42px;
-          height: 42px;
+          width: 38px;
+          height: 38px;
           z-index: 10;
           pointer-events: none;
           transform: translate(-50%, -50%);
           opacity: 0;
-          animation: sparkleBurstAnim 1.0s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
-          animation-delay: 1.8s;
+          animation: sparkleBurstAnim 0.65s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+          animation-delay: 0.55s;
         }
 
         .splash-sparkle-svg {
@@ -302,9 +273,7 @@ export default function AppSplashScreen({ onFinish }) {
         }
 
         .splash-sparkle-star {
-          filter: drop-shadow(0 0 10px rgba(255, 255, 255, 1)) drop-shadow(0 0 20px rgba(56, 189, 248, 0.95));
-          animation: idleShimmerAnim 2.0s ease-in-out infinite alternate;
-          animation-delay: 2.7s;
+          filter: drop-shadow(0 0 8px rgba(255, 255, 255, 1)) drop-shadow(0 0 16px rgba(56, 189, 248, 0.95));
         }
 
         @keyframes sparkleBurstAnim {
@@ -312,13 +281,9 @@ export default function AppSplashScreen({ onFinish }) {
             transform: translate(-50%, -50%) scale(0) rotate(0deg);
             opacity: 0;
           }
-          45% {
-            transform: translate(-50%, -50%) scale(1.45) rotate(45deg);
+          50% {
+            transform: translate(-50%, -50%) scale(1.35) rotate(45deg);
             opacity: 1;
-          }
-          80% {
-            transform: translate(-50%, -50%) scale(0.95) rotate(90deg);
-            opacity: 0.95;
           }
           100% {
             transform: translate(-50%, -50%) scale(1) rotate(90deg);
@@ -326,51 +291,42 @@ export default function AppSplashScreen({ onFinish }) {
           }
         }
 
-        @keyframes idleShimmerAnim {
-          0% { opacity: 0.55; transform: scale(0.85); }
-          100% { opacity: 1; transform: scale(1.25); filter: drop-shadow(0 0 16px rgba(255, 255, 255, 1)); }
-        }
-
-        /* ------------------------------------------------------------
-           SLOGAN & TAGLINE (1.5s – 2.4s)
-           ------------------------------------------------------------ */
+        /* Slogan */
         .splash-tagline-text {
-          margin-top: 24px;
+          margin-top: 20px;
           font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Outfit', 'Inter', sans-serif;
-          font-size: 1.02rem;
+          font-size: 0.98rem;
           font-weight: 500;
           color: rgba(255, 255, 255, 0.92);
           letter-spacing: 0.3px;
           text-shadow: 0 2px 10px rgba(0, 15, 60, 0.5);
           opacity: 0;
-          transform: translateY(16px);
-          animation: taglineSlideUp 0.8s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
-          animation-delay: 1.5s;
+          transform: translateY(12px);
+          animation: taglineSlideUp 0.5s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+          animation-delay: 0.45s;
           text-align: center;
           padding: 0 16px;
         }
 
         @keyframes taglineSlideUp {
-          0% { opacity: 0; transform: translateY(16px); }
+          0% { opacity: 0; transform: translateY(12px); }
           100% { opacity: 0.95; transform: translateY(0); }
         }
 
-        /* ------------------------------------------------------------
-           FOOTER BRANDING (2.0s – 2.8s)
-           ------------------------------------------------------------ */
+        /* Footer */
         .splash-brand-footer {
           position: absolute;
-          bottom: 34px;
+          bottom: 30px;
           left: 50%;
           transform: translateX(-50%);
           font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif;
-          font-size: 0.78rem;
+          font-size: 0.76rem;
           color: rgba(255, 255, 255, 0.6);
           letter-spacing: 0.8px;
           text-transform: uppercase;
           opacity: 0;
-          animation: footerFadeIn 0.8s ease forwards;
-          animation-delay: 2.0s;
+          animation: footerFadeIn 0.5s ease forwards;
+          animation-delay: 0.5s;
           white-space: nowrap;
           pointer-events: none;
         }
