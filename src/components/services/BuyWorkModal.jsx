@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, CheckCircle, Download, ShieldCheck, FileAudio, FileText, Sparkles } from 'lucide-react';
+import { X, CheckCircle, Download, ShieldCheck, FileAudio, FileText } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 
 export default function BuyWorkModal({ isOpen, onClose, work, onPurchaseComplete, isDarkMode }) {

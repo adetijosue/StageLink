@@ -27,7 +27,7 @@ import EphemeralModal from './components/messaging/EphemeralModal';
 const VideoCallScreen = React.lazy(() => import('./components/messaging/VideoCallScreen'));
 const NewChatModal = React.lazy(() => import('./components/messaging/NewChatModal'));
 const CallHistoryModal = React.lazy(() => import('./components/messaging/CallHistoryModal'));
-const AIMusicStudio = React.lazy(() => import('./components/music_studio/AIMusicStudio'));
+const ProServicesView = React.lazy(() => import('./components/services/ProServicesView'));
 const BuyWorkModal = React.lazy(() => import('./components/services/BuyWorkModal'));
 const OrderServiceModal = React.lazy(() => import('./components/services/OrderServiceModal'));
 const CourseDetailsModal = React.lazy(() => import('./components/services/CourseDetailsModal'));
@@ -2680,7 +2680,7 @@ function MainApp() {
         )}
 
         {activeTab === 'studio' && (
-          <AIMusicStudio
+          <ProServicesView
             onOpenPaywall={() => setIsPaywallOpen(true)}
             onShareToFeed={handleShareProServiceToFeed}
             onStartChat={handleStartChatWithUser}
