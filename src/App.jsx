@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import InboxView from './components/messaging/instagram/InboxView';
-import MessageThread from './components/messaging/instagram/MessageThread';
+const InboxView = React.lazy(() => import('./components/messaging/instagram/InboxView'));
+const MessageThread = React.lazy(() => import('./components/messaging/instagram/MessageThread'));
 import { directChatService } from './services/directChatService';
 
 import { Plus, Volume2, User } from 'lucide-react';
@@ -23,7 +23,7 @@ const PublicProfileModal = React.lazy(() => import('./components/profile/PublicP
 const SwipeMatching = React.lazy(() => import('./components/matching/SwipeMatching'));
 const ChatList = React.lazy(() => import('./components/messaging/ChatList'));
 const ChatRoom = React.lazy(() => import('./components/messaging/ChatRoom'));
-import EphemeralModal from './components/messaging/EphemeralModal';
+const EphemeralModal = React.lazy(() => import('./components/messaging/EphemeralModal'));
 const VideoCallScreen = React.lazy(() => import('./components/messaging/VideoCallScreen'));
 const NewChatModal = React.lazy(() => import('./components/messaging/NewChatModal'));
 const CallHistoryModal = React.lazy(() => import('./components/messaging/CallHistoryModal'));
@@ -34,7 +34,7 @@ const CourseDetailsModal = React.lazy(() => import('./components/services/Course
 const EventTicketModal = React.lazy(() => import('./components/services/EventTicketModal'));
 const ProfileView = React.lazy(() => import('./components/premium/ProfileView'));
 const PaywallModal = React.lazy(() => import('./components/premium/PaywallModal'));
-import NotificationsDrawer from './components/notifications/NotificationsDrawer';
+const NotificationsDrawer = React.lazy(() => import('./components/notifications/NotificationsDrawer'));
 import AppSplashScreen from './components/common/AppSplashScreen';
 import GlobalAudioPlayer from './components/audio/GlobalAudioPlayer';
 import PWAInstallPrompt from './components/common/PWAInstallPrompt';
@@ -791,15 +791,43 @@ function MainApp() {
           return mergedChats;
         });
 
-        // Open target profile if query params exist
+        // Open target profile if query params exist (e.g. from QR Code Scan)
         try {
           const params = new URLSearchParams(window.location.search);
           const targetProfileId = params.get('profile') || params.get('user');
-          if (targetProfileId && loadedUsers.length > 0) {
-            const target = loadedUsers.find(
+          if (targetProfileId) {
+            const target = (loadedUsers || []).find(
               (u) => u.id === targetProfileId || (u.name && u.name.toLowerCase().replace(/[^a-z0-9]/g, '-') === targetProfileId)
             );
-            if (target) setPublicProfileUser(target);
+            if (target) {
+              setPublicProfileUser(target);
+            } else if (isSupabaseConfigured()) {
+              // Direct Supabase lookup for external QR Code scan
+              supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', targetProfileId)
+                .maybeSingle()
+                .then(({ data: spProfile }) => {
+                  if (spProfile) {
+                    const mappedTarget = {
+                      id: spProfile.id,
+                      name: spProfile.full_name || 'Artiste StageLink',
+                      avatar: spProfile.avatar_url || '',
+                      role: spProfile.role || 'Artiste',
+                      location: spProfile.location || 'Studio & En ligne',
+                      bio: spProfile.bio || '',
+                      badgeType: spProfile.badge_type || null,
+                      verified: spProfile.verified || false,
+                      tracks: spProfile.tracks || [],
+                      socials: spProfile.socials || {},
+                      gear: spProfile.gear || []
+                    };
+                    setPublicProfileUser(mappedTarget);
+                  }
+                })
+                .catch((qrErr) => console.warn("Supabase QR profile fetch note:", qrErr?.message));
+            }
           }
         } catch (e) { console.error("Suppressed error:", e); }
 
