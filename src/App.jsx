@@ -2056,7 +2056,7 @@ function MainApp() {
         userAvatar: currentUser?.avatar || '',
         isVerified: currentUser?.verified || false,
         badgeType: currentUser?.badgeType || 'none',
-        hasUnread: false,
+        hasUnread: true,
         isTextStory: isText,
         mediaUrl: finalMediaUrl,
         storyMedia: isText ? null : finalMediaUrl,

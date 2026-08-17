@@ -29,6 +29,7 @@ export default function StoryBar({
   const myStories = (stories || []).filter(isCurrentUserStory);
   const otherStories = (stories || []).filter(s => !isCurrentUserStory(s));
   const myLatestStory = myStories.length > 0 ? myStories[0] : null;
+  const myHasUnread = myStories.some(s => s.hasUnread !== false);
 
   // 2. Strict Per-Creator Grouping for other users' stories (1 card per creator with all their stories grouped)
   const creatorGroupsMap = new Map();
@@ -216,8 +217,9 @@ export default function StoryBar({
             overflow: 'hidden',
             flexShrink: 0,
             cursor: 'pointer',
-            background: myLatestStory ? '#1E293B' : 'linear-gradient(145deg, #1E293B, #0F172A)',
-            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.12)',
+            background: myLatestStory ? '#1E293B' : 'linear-gradient(160deg, #F8FAFC 0%, #E2E8F0 100%)',
+            border: myLatestStory ? 'none' : '1px solid #CBD5E1',
+            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.08)',
             transition: 'transform 0.2s ease, box-shadow 0.2s ease',
             userSelect: 'none'
           }}
@@ -240,11 +242,11 @@ export default function StoryBar({
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              background: 'linear-gradient(135deg, #1E293B 0%, #0F172A 100%)'
+              background: 'linear-gradient(160deg, #F8FAFC 0%, #E2E8F0 100%)'
             }} />
           )}
 
-          {/* Top-Left Incrusted User Avatar with WhatsApp Green Ring & Black Plus Badge */}
+          {/* Top-Left Incrusted User Avatar with StageLink Blue / Cendre Ring & Plus Badge */}
           <div
             onClick={(e) => {
               if (myLatestStory) {
@@ -264,8 +266,10 @@ export default function StoryBar({
               <div style={{
                 padding: '2.5px',
                 borderRadius: '50%',
-                background: '#22C55E', // WhatsApp signature bright green ring
-                boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+                background: myLatestStory
+                  ? (myHasUnread ? 'linear-gradient(135deg, #0066FF, #0052CC)' : 'rgba(255, 255, 255, 0.45)')
+                  : 'transparent',
+                boxShadow: myLatestStory && myHasUnread ? '0 2px 10px rgba(0, 102, 255, 0.45)' : 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
@@ -273,11 +277,11 @@ export default function StoryBar({
                 <UserAvatar
                   user={currentUser}
                   size={42}
-                  border="2px solid #FFFFFF"
+                  border={myLatestStory ? '2px solid #FFFFFF' : '2px solid rgba(148, 163, 184, 0.4)'}
                 />
               </div>
 
-              {/* Black Circular Badge with White Plus (Exact match from screenshot) */}
+              {/* Blue Circular Badge with White Plus */}
               <div style={{
                 position: 'absolute',
                 bottom: '-2px',
@@ -285,13 +289,13 @@ export default function StoryBar({
                 width: '20px',
                 height: '20px',
                 borderRadius: '50%',
-                background: '#0F172A',
+                background: '#0066FF',
                 color: '#FFFFFF',
                 border: '2px solid #FFFFFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.4)'
+                boxShadow: '0 2px 6px rgba(0, 102, 255, 0.35)'
               }}>
                 <Plus size={12} strokeWidth={3.5} />
               </div>
@@ -313,19 +317,21 @@ export default function StoryBar({
               zIndex: 4,
               color: '#FFFFFF'
             }}>
-              <Loader2 size={24} className="animate-spin" style={{ color: '#22C55E' }} />
+              <Loader2 size={24} className="animate-spin" style={{ color: '#0066FF' }} />
               <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>Envoi...</span>
             </div>
           )}
 
-          {/* Dark Bottom Shadow Gradient with 'My status' Text */}
+          {/* Bottom Shadow Gradient with 'My status' Text */}
           <div style={{
             position: 'absolute',
             bottom: 0,
             left: 0,
             right: 0,
             padding: '28px 10px 10px 10px',
-            background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 65%, transparent 100%)',
+            background: myLatestStory
+              ? 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 65%, transparent 100%)'
+              : 'linear-gradient(to top, rgba(226, 232, 240, 0.95) 0%, rgba(241, 245, 249, 0.5) 65%, transparent 100%)',
             zIndex: 2,
             display: 'flex',
             flexDirection: 'column',
@@ -334,11 +340,11 @@ export default function StoryBar({
             <span style={{
               fontSize: '0.84rem',
               fontWeight: 800,
-              color: '#FFFFFF',
+              color: myLatestStory ? '#FFFFFF' : '#334155',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
-              textShadow: '0 1px 4px rgba(0,0,0,0.6)'
+              textShadow: myLatestStory ? '0 1px 4px rgba(0,0,0,0.6)' : 'none'
             }}>
               My status
             </span>
@@ -372,7 +378,7 @@ export default function StoryBar({
               {/* Background Story Thumbnail */}
               {renderCardMedia(story)}
 
-              {/* Top-Left Incrusted Author Avatar with WhatsApp Green Ring */}
+              {/* Top-Left Incrusted Author Avatar with StageLink Blue (if unread) or Cendre/Transparent (if read) */}
               <div style={{
                 position: 'absolute',
                 top: '10px',
@@ -382,8 +388,8 @@ export default function StoryBar({
                 <div style={{
                   padding: '2.5px',
                   borderRadius: '50%',
-                  background: isUnread ? '#22C55E' : 'rgba(255, 255, 255, 0.7)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+                  background: isUnread ? 'linear-gradient(135deg, #0066FF, #0052CC)' : 'rgba(255, 255, 255, 0.4)',
+                  boxShadow: isUnread ? '0 2px 10px rgba(0, 102, 255, 0.45)' : '0 1px 4px rgba(0,0,0,0.2)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center'
@@ -431,3 +437,4 @@ export default function StoryBar({
     </div>
   );
 }
+
