@@ -42,7 +42,6 @@ export const directChatService = {
    */
   async uploadMedia(fileOrBlob, fileName, mediaType = 'image') {
     if (!isSupabaseConfigured()) {
-      // Offline fallback: Return base64 URL
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result);
@@ -54,30 +53,47 @@ export const directChatService = {
       let uploadPayload = fileOrBlob;
       let contentType = fileOrBlob.type || 'application/octet-stream';
 
-      // Compress image client-side if image
       if (mediaType === 'image' && fileOrBlob.type?.startsWith('image/')) {
         try {
           const compressed = await compressImage(fileOrBlob, 1280, 1280, 0.82);
-          uploadPayload = compressed;
-          contentType = 'image/jpeg';
+          // Convert Data URL to Blob for Supabase Storage
+          if (typeof compressed === 'string' && compressed.startsWith('data:')) {
+            const res = await fetch(compressed);
+            uploadPayload = await res.blob();
+            contentType = 'image/jpeg';
+          }
         } catch (e) {}
       }
 
       const fileExt = fileName ? fileName.split('.').pop() : (mediaType === 'audio' ? 'webm' : 'jpg');
       const uniquePath = `${mediaType}s/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
 
-      const { data, error } = await supabase.storage
-        .from('chat-media')
-        .upload(uniquePath, uploadPayload, {
-          contentType,
-          cacheControl: '3600',
-          upsert: true
-        });
+      let bucketName = 'chat_media';
+      let error = null;
+
+      const tryUpload = async (bucket) => {
+         const { error: err } = await supabase.storage.from(bucket).upload(uniquePath, uploadPayload, {
+            contentType,
+            cacheControl: '3600',
+            upsert: true
+         });
+         return err;
+      };
+
+      error = await tryUpload(bucketName);
+      if (error) {
+         bucketName = 'media';
+         error = await tryUpload(bucketName);
+         if (error) {
+            bucketName = 'public';
+            error = await tryUpload(bucketName);
+         }
+      }
 
       if (error) throw error;
 
       const { data: publicData } = supabase.storage
-        .from('chat-media')
+        .from(bucketName)
         .getPublicUrl(uniquePath);
 
       return publicData.publicUrl;

@@ -1459,7 +1459,15 @@ function MainApp() {
        }
     }
     
-    // Fallback if not configured
+    // Fallback if not configured or RPC fails
+    setSelectedConversation({
+        id: `conv_${targetUser.id}`,
+        vanish_mode_enabled: false,
+        participants: [
+            { user_id: currentUser?.id || 'me' },
+            { user_id: targetUser.id, profile: targetUser }
+        ]
+    });
     setActiveTab('discussions');
   };
 
