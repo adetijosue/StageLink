@@ -181,13 +181,13 @@ function MainApp() {
   // Chat & Call States
   const [selectedChat, setSelectedChat] = useState(null);
   const [selectedConversation, setSelectedConversation] = useState(null);
+  const [activeCallPartner, setActiveCallPartner] = useState(null);
+  const [unreadDirectMessagesCount, setUnreadDirectMessagesCount] = useState(0);
   const [isEphemeralOpen, setIsEphemeralOpen] = useState(false);
   const [isVideoCallActive, setIsVideoCallActive] = useState(false);
   const [isIncomingCall, setIsIncomingCall] = useState(false); // New state for incoming call
   const [incomingCallData, setIncomingCallData] = useState(null);
   const incomingCallDataRef = useRef(null);
-
-
 
   useEffect(() => {
     incomingCallDataRef.current = incomingCallData;
@@ -1047,6 +1047,58 @@ function MainApp() {
         } catch (e) { console.error("Suppressed error:", e); }
       };
 
+      const updateUnreadDirectMessagesCount = async () => {
+        if (!isSupabaseConfigured() || !currentUser?.id) return;
+        try {
+          // 1. Fetch unread notifications of type message
+          const { count: msgNotifCount } = await supabase
+            .from('notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', currentUser.id)
+            .eq('type', 'message')
+            .eq('is_read', false);
+
+          // 2. Fetch unread messages from conversations where last_message is newer than last_read_at
+          const { data: parts } = await supabase
+            .from('conversation_participants')
+            .select(`
+              conversation_id,
+              last_read_at,
+              conversation:conversations(
+                last_message:direct_messages(
+                  id,
+                  sender_id,
+                  created_at
+                )
+              )
+            `)
+            .eq('user_id', currentUser.id)
+            .is('left_at', null)
+            .limit(50);
+
+          let convUnread = 0;
+          if (parts) {
+            parts.forEach((item) => {
+              const lastMsgs = Array.isArray(item.conversation?.last_message)
+                ? item.conversation.last_message
+                : (item.conversation?.last_message ? [item.conversation.last_message] : []);
+              const sorted = [...lastMsgs].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+              const lastMsg = sorted[0];
+              if (lastMsg && lastMsg.sender_id !== currentUser.id) {
+                if (!item.last_read_at || new Date(lastMsg.created_at) > new Date(item.last_read_at)) {
+                  convUnread += 1;
+                }
+              }
+            });
+          }
+
+          const totalUnread = Math.max(msgNotifCount || 0, convUnread);
+          setUnreadDirectMessagesCount(totalUnread);
+        } catch (e) {
+          console.warn('Update unread direct messages note:', e);
+        }
+      };
+
       const syncNotifications = async () => {
         if (!isSupabaseConfigured() || !currentUser?.id) return;
         try {
@@ -1079,6 +1131,7 @@ function MainApp() {
             setNotifications(mappedNotifs);
             setUnreadNotificationsCount(mappedNotifs.filter(n => !n.isRead).length);
           }
+          await updateUnreadDirectMessagesCount();
         } catch (e) {
           console.warn('Sync notifications note:', e);
         }
@@ -1312,18 +1365,38 @@ function MainApp() {
                   const isAudioOnly = payload.new.type === 'incoming_call_audio';
                   const callerId = payload.new.actor_id;
                   try {
-                    const { data: actor } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', callerId).maybeSingle();
-                    const callerName = actor ? actor.full_name : 'Utilisateur';
-                    const callerAvatar = actor ? actor.avatar_url : '';
+                    const { data: actor } = await supabase
+                      .from('profiles')
+                      .select('id, full_name, username, avatar_url, role, verified_badge')
+                      .eq('id', callerId)
+                      .maybeSingle();
+                    const callerName = actor?.full_name || actor?.username || 'Artiste';
+                    const callerAvatar = actor?.avatar_url || '';
+                    const callerRole = actor?.role || 'Artiste';
+
+                    const partnerInfo = {
+                      id: callerId,
+                      name: callerName,
+                      full_name: callerName,
+                      avatar: callerAvatar,
+                      avatar_url: callerAvatar,
+                      role: callerRole,
+                      userRole: callerRole,
+                      verified: actor?.verified_badge === 'gold' || actor?.verified_badge === 'blue'
+                    };
+
+                    setActiveCallPartner(partnerInfo);
                     setIncomingCallData({
                       callerName,
                       callerAvatar,
+                      callerRole,
                       isAudioOnly,
                       notificationId: payload.new.id,
                       callerId
                     });
+                    setIsAudioCallOnly(isAudioOnly);
                     setIsVideoCallActive(true);
-                  } catch (e) { console.error("Suppressed error:", e); }
+                  } catch (e) { console.error("Incoming call notification handler note:", e); }
                   return; // Do not push native notification or regular sync for calls
                 }
 
@@ -1341,6 +1414,7 @@ function MainApp() {
                     });
                     setTimeout(() => setToastNotification(null), 4500);
                     window.dispatchEvent(new Event('refresh_conversations'));
+                    await updateUnreadDirectMessagesCount();
                   } else if (payload.new.type === 'like_post') {
                     body = `${actorName} a aimé votre publication.`;
                   } else if (payload.new.type === 'comment_post') {
@@ -1562,8 +1636,9 @@ function MainApp() {
             .channel('realtime:direct_messages')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' }, async (payload) => {
               if (payload.new && payload.new.sender_id !== currentUser.id) {
-                // Dispatch event to refresh InboxView
+                // Dispatch event to refresh InboxView & update badge
                 window.dispatchEvent(new Event('refresh_conversations'));
+                await updateUnreadDirectMessagesCount();
                 // Fetch sender name for toast
                 let senderName = 'Nouveau message';
                 try {
@@ -1603,18 +1678,17 @@ function MainApp() {
           if (syncMessagesFallback) syncMessagesFallback();
         }
       };
-      const handleShowToast = (e) => {
-        if (e.detail) {
-          setToastNotification(e.detail);
-          setTimeout(() => setToastNotification(null), 4000);
-        }
+      const handleRefreshConversations = () => {
+        updateUnreadDirectMessagesCount();
       };
+      window.addEventListener('refresh_conversations', handleRefreshConversations);
       window.addEventListener('show_toast', handleShowToast);
       window.addEventListener('visibilitychange', handleVisibilityChange);
       window.addEventListener('focus', handleVisibilityChange);
 
       return () => {
         clearInterval(pollInterval);
+        window.removeEventListener('refresh_conversations', handleRefreshConversations);
         window.removeEventListener('show_toast', handleShowToast);
         window.removeEventListener('visibilitychange', handleVisibilityChange);
         window.removeEventListener('focus', handleVisibilityChange);
@@ -3029,6 +3103,7 @@ function MainApp() {
           chat={selectedChat}
           onBack={handleBackFromChat}
           onStartAudioCall={async () => {
+            setActiveCallPartner(selectedChat.participant);
             setIsAudioCallOnly(true);
             setIsVideoCallActive(true);
             setIncomingCallData(null); // Ensure it's not an incoming call
@@ -3037,13 +3112,15 @@ function MainApp() {
                 const { data } = await supabase.from('notifications').insert({
                   user_id: selectedChat.participant.id,
                   actor_id: currentUser.id,
-                  type: 'incoming_call_audio'
+                  type: 'incoming_call_audio',
+                  content: 'Appel audio entrant'
                 }).select('id').single();
                 if (data) setActiveCallNotificationId(data.id);
               } catch (e) { console.error("Suppressed error:", e); }
             }
           }}
           onStartVideoCall={async () => {
+            setActiveCallPartner(selectedChat.participant);
             setIsAudioCallOnly(false);
             setIsVideoCallActive(true);
             setIncomingCallData(null);
@@ -3052,7 +3129,8 @@ function MainApp() {
                 const { data } = await supabase.from('notifications').insert({
                   user_id: selectedChat.participant.id,
                   actor_id: currentUser.id,
-                  type: 'incoming_call_video'
+                  type: 'incoming_call_video',
+                  content: 'Appel vidéo entrant'
                 }).select('id').single();
                 if (data) setActiveCallNotificationId(data.id);
               } catch (e) { console.error("Suppressed error:", e); }
@@ -3101,6 +3179,8 @@ function MainApp() {
                 setActiveTab('discussions');
             }}
             onStartAudioCall={async () => {
+              const partnerObj = resolvedPartner || { id: partnerId, name: 'Artiste' };
+              setActiveCallPartner(partnerObj);
               setIsAudioCallOnly(true);
               setIsVideoCallActive(true);
               setIncomingCallData(null);
@@ -3109,13 +3189,16 @@ function MainApp() {
                   const { data } = await supabase.from('notifications').insert({
                     user_id: partnerId,
                     actor_id: currentUser.id,
-                    type: 'incoming_call_audio'
+                    type: 'incoming_call_audio',
+                    content: 'Appel audio entrant'
                   }).select('id').single();
                   if (data) setActiveCallNotificationId(data.id);
                 } catch (e) { console.error("Suppressed error:", e); }
               }
             }}
             onStartVideoCall={async () => {
+              const partnerObj = resolvedPartner || { id: partnerId, name: 'Artiste' };
+              setActiveCallPartner(partnerObj);
               setIsAudioCallOnly(false);
               setIsVideoCallActive(true);
               setIncomingCallData(null);
@@ -3124,7 +3207,8 @@ function MainApp() {
                   const { data } = await supabase.from('notifications').insert({
                     user_id: partnerId,
                     actor_id: currentUser.id,
-                    type: 'incoming_call_video'
+                    type: 'incoming_call_video',
+                    content: 'Appel vidéo entrant'
                   }).select('id').single();
                   if (data) setActiveCallNotificationId(data.id);
                 } catch (e) { console.error("Suppressed error:", e); }
@@ -3221,23 +3305,45 @@ function MainApp() {
       />
 
       {/* Live Video / Audio Call Screen */}
-      <VideoCallScreen
-        isOpen={isVideoCallActive}
-        isIncoming={!!incomingCallData}
-        isMinimized={isCallMinimized}
-        onMinimize={() => setIsCallMinimized(true)}
-        onMaximize={() => setIsCallMinimized(false)}
-        onClose={() => {
-          setIsVideoCallActive(false);
-          handleCallEnded({ status: 'ended', duration: 0, isAudioOnly: incomingCallData ? incomingCallData.isAudioOnly : isAudioCallOnly });
-        }}
-        callerName={incomingCallData ? incomingCallData.callerName : (selectedChat?.participant?.name || 'Artiste StageLink')}
-        callerAvatar={incomingCallData ? incomingCallData.callerAvatar : (selectedChat?.participant?.avatar || null)}
-        remoteUserId={incomingCallData ? incomingCallData.callerId : selectedChat?.participant?.id}
-        chatId={incomingCallData ? `chat_${incomingCallData.callerId}` : selectedChat?.id}
-        isAudioOnly={incomingCallData ? incomingCallData.isAudioOnly : isAudioCallOnly}
-        onCallEnded={handleCallEnded}
-      />
+      {(() => {
+        const resolvedPartner = incomingCallData ? {
+          id: incomingCallData.callerId,
+          name: incomingCallData.callerName,
+          full_name: incomingCallData.callerName,
+          avatar: incomingCallData.callerAvatar,
+          avatar_url: incomingCallData.callerAvatar,
+          role: incomingCallData.callerRole || 'Artiste'
+        } : (activeCallPartner || selectedConversation?.partner || selectedConversation?.participant || selectedChat?.participant || null);
+
+        const partnerId = incomingCallData?.callerId || resolvedPartner?.id || resolvedPartner?.userId;
+        const partnerName = incomingCallData?.callerName || resolvedPartner?.full_name || resolvedPartner?.name || resolvedPartner?.username || 'Artiste';
+        const partnerAvatar = incomingCallData?.callerAvatar || resolvedPartner?.avatar_url || resolvedPartner?.avatar || null;
+        const partnerRole = incomingCallData?.callerRole || resolvedPartner?.role || resolvedPartner?.userRole || 'Artiste';
+        const effectiveChatId = incomingCallData ? `call_${incomingCallData.callerId}` : (selectedConversation?.id || selectedChat?.id || (partnerId ? `call_${partnerId}` : 'call_direct'));
+
+        return (
+          <VideoCallScreen
+            isOpen={isVideoCallActive}
+            isIncoming={!!incomingCallData}
+            isMinimized={isCallMinimized}
+            onMinimize={() => setIsCallMinimized(true)}
+            onMaximize={() => setIsCallMinimized(false)}
+            onClose={() => {
+              setIsVideoCallActive(false);
+              handleCallEnded({ status: 'ended', duration: 0, isAudioOnly: incomingCallData ? incomingCallData.isAudioOnly : isAudioCallOnly });
+              setActiveCallPartner(null);
+              setIncomingCallData(null);
+            }}
+            callerName={partnerName}
+            callerAvatar={partnerAvatar}
+            callerRole={partnerRole}
+            remoteUserId={partnerId}
+            chatId={effectiveChatId}
+            isAudioOnly={incomingCallData ? incomingCallData.isAudioOnly : isAudioCallOnly}
+            onCallEnded={handleCallEnded}
+          />
+        );
+      })()}
 
       {/* RevenueCat Premium Paywall Modal */}
       <PaywallModal
@@ -3301,7 +3407,7 @@ function MainApp() {
           setActiveTab(tab);
           setSelectedChat(null);
         }}
-        unreadMessagesCount={chats.reduce((acc, c) => acc + (c.unreadCount || 0), 0)}
+        unreadMessagesCount={unreadDirectMessagesCount || chats.reduce((acc, c) => acc + (c.unreadCount || 0), 0)}
         isDarkMode={isDarkMode}
       />
     </div>

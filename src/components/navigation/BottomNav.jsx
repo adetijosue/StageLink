@@ -4,7 +4,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import UserAvatar from '../common/UserAvatar';
 
-export default function BottomNav({ activeTab, setActiveTab, unreadMessagesCount = 1, isDarkMode }) {
+export default function BottomNav({ activeTab, setActiveTab, unreadMessagesCount = 0, isDarkMode }) {
   const { t } = useLanguage();
   const { currentUser } = useAuth();
 

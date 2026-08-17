@@ -59,7 +59,9 @@ export default function VideoCallScreen({
 }) {
   const { currentUser } = useAuth();
 
-  // Call Controls State
+  // Call Controls & Acceptance State
+  const [hasAccepted, setHasAccepted] = useState(false);
+  const [resolvedPartnerProfile, setResolvedPartnerProfile] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [currentIsAudioOnly, setCurrentIsAudioOnly] = useState(isAudioOnly);
@@ -97,6 +99,23 @@ export default function VideoCallScreen({
   const pipVideoRef = useRef(null);
   const remoteVideoMainRef = useRef(null);
   const remoteVideoPipRef = useRef(null);
+
+  // Automatically fetch partner's profile if name is missing or generic
+  useEffect(() => {
+    if (remoteUserId && (!callerName || callerName === 'Artiste StageLink' || callerName === 'Utilisateur')) {
+      supabase.from('profiles').select('id, full_name, username, avatar_url, role, verified_badge').eq('id', remoteUserId).maybeSingle()
+        .then(({ data }) => {
+          if (data) setResolvedPartnerProfile(data);
+        }).catch(() => {});
+    }
+  }, [remoteUserId, callerName]);
+
+  // Safe Caller Info
+  const partnerName = (callerName && callerName !== 'Artiste StageLink' ? callerName : null) || resolvedPartnerProfile?.full_name || resolvedPartnerProfile?.username || 'Artiste';
+  const safeAvatar = callerAvatar || resolvedPartnerProfile?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300';
+  const displayRole = (callerRole && callerRole !== 'Artiste StageLink' ? callerRole : null) || resolvedPartnerProfile?.role || 'Artiste';
+  const myAvatar = currentUser?.avatar || currentUser?.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300';
+  const myName = currentUser?.name || currentUser?.full_name || 'Moi';
   
   const mediaStreamRef = useRef(null);
   const screenStreamRef = useRef(null);
@@ -119,12 +138,6 @@ export default function VideoCallScreen({
       { urls: 'stun:global.stun.twilio.com:3478' }
     ]
   };
-
-  // Safe Caller Info
-  const partnerName = callerName || 'Correspondant StageLink';
-  const safeAvatar = callerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300';
-  const myAvatar = currentUser?.avatar || currentUser?.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300';
-  const myName = currentUser?.name || currentUser?.full_name || 'Moi';
 
   // Setup Web Audio Analyser for Real-time Voice Waveform
   const setupAudioAnalyser = useCallback((stream) => {
@@ -226,6 +239,24 @@ export default function VideoCallScreen({
       }
     });
 
+    channel.on('broadcast', { event: 'call_accepted' }, async () => {
+      soundEngine.stopRingtone();
+      soundEngine.playCallConnectedChime();
+      setIsConnected(true);
+    });
+
+    channel.on('broadcast', { event: 'call_rejected' }, () => {
+      soundEngine.playCallEndedChime();
+      cleanupCall();
+      onCallEnded({ status: 'rejected', duration: 0, isAudioOnly: currentIsAudioOnly, isIncoming });
+    });
+
+    channel.on('broadcast', { event: 'call_ended' }, () => {
+      soundEngine.playCallEndedChime();
+      cleanupCall();
+      onCallEnded({ status: 'completed', duration: callDuration, isAudioOnly: currentIsAudioOnly, isIncoming });
+    });
+
     channel.on('broadcast', { event: 'offer' }, async (payload) => {
       if (!peerConnectionRef.current) return;
       try {
@@ -237,6 +268,8 @@ export default function VideoCallScreen({
           event: 'answer',
           payload: { sdp: peerConnectionRef.current.localDescription }
         });
+        setIsConnected(true);
+        soundEngine.stopRingtone();
       } catch (e) {
         console.error('Error handling offer:', e);
       }
@@ -246,12 +279,16 @@ export default function VideoCallScreen({
       if (!peerConnectionRef.current) return;
       try {
         await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(payload.payload.sdp));
+        setIsConnected(true);
+        soundEngine.stopRingtone();
       } catch (e) {
         console.error('Error handling answer:', e);
       }
     });
 
     channel.on('broadcast', { event: 'callee_ready' }, async () => {
+      soundEngine.stopRingtone();
+      setIsConnected(true);
       if (!isIncoming && peerConnectionRef.current) {
         try {
           const offer = await peerConnectionRef.current.createOffer();
@@ -283,14 +320,7 @@ export default function VideoCallScreen({
       setInCallMessages(prev => [...prev, payload.payload]);
     });
 
-    channel.subscribe(async (status) => {
-      if (status === 'SUBSCRIBED' && isIncoming) {
-        channel.send({
-          type: 'broadcast',
-          event: 'callee_ready'
-        });
-      }
-    });
+    channel.subscribe();
   };
 
   // Initialize Media Stream
@@ -538,17 +568,47 @@ export default function VideoCallScreen({
     }
   };
 
-  const handleAcceptCall = () => {
+  const handleAcceptCall = async () => {
+    setHasAccepted(true);
+    setIsConnected(true);
     soundEngine.stopRingtone();
-    initStream(facingMode, !currentIsAudioOnly);
+    soundEngine.playCallConnectedChime();
+    await initStream(facingMode, !currentIsAudioOnly);
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'call_accepted',
+        payload: { from: currentUser?.id }
+      });
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'callee_ready',
+        payload: { from: currentUser?.id }
+      });
+    }
   };
 
   const handleRejectCall = () => {
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'call_rejected',
+        payload: { from: currentUser?.id }
+      });
+    }
+    soundEngine.playCallEndedChime();
     cleanupCall();
-    onCallEnded({ status: 'rejected', duration: 0, isAudioOnly: currentIsAudioOnly, isIncoming: true });
+    onCallEnded({ status: 'rejected', duration: 0, isAudioOnly: currentIsAudioOnly, isIncoming });
   };
 
   const handleEndCall = () => {
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'call_ended',
+        payload: { from: currentUser?.id }
+      });
+    }
     soundEngine.playCallEndedChime();
     cleanupCall();
     onCallEnded({ status: 'completed', duration: callDuration, isAudioOnly: currentIsAudioOnly, isIncoming });
@@ -1030,8 +1090,9 @@ export default function VideoCallScreen({
         </div>
       )}
 
-      {/* 5. INCOMING CALL SCREEN WITH QUICK SMS MODAL */}
-      {isIncoming && !isConnected ? (
+      {/* 5. CALL CONTROLS HUD (3 SEPARATE MODES: INCOMING, OUTGOING RINGING, CONNECTED) */}
+      {isIncoming && !hasAccepted && !isConnected ? (
+        /* MODE A: INCOMING CALL SCREEN */
         <div style={{
           position: 'relative',
           zIndex: 20,
@@ -1153,8 +1214,98 @@ export default function VideoCallScreen({
             </>
           )}
         </div>
+      ) : !isConnected && !hasAccepted ? (
+        /* MODE B: OUTGOING CALLING / RINGING SCREEN (Clean, no premature emojis) */
+        <div style={{
+          position: 'relative',
+          zIndex: 20,
+          marginTop: 'auto',
+          padding: '24px 20px max(35px, env(safe-area-inset-bottom))',
+          background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 60%, transparent 100%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '24px'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: '#60A5FA',
+            fontSize: '0.9rem',
+            fontWeight: 700
+          }}>
+            <Radio size={16} className="animate-pulse" />
+            <span>Sonnerie en cours chez {partnerName}...</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '24px', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Mute Mic during ringing */}
+            <button
+              onClick={handleToggleMute}
+              title={isMuted ? 'Activer le micro' : 'Couper le micro'}
+              style={{
+                width: '54px',
+                height: '54px',
+                borderRadius: '50%',
+                background: isMuted ? '#EF4444' : 'rgba(255,255,255,0.18)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                color: '#FFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                backdropFilter: 'blur(10px)'
+              }}
+            >
+              {isMuted ? <MicOff size={22} /> : <Mic size={22} />}
+            </button>
+
+            {/* Cancel Call Button */}
+            <button
+              onClick={handleEndCall}
+              title="Annuler l'appel"
+              style={{
+                width: '68px',
+                height: '68px',
+                borderRadius: '50%',
+                background: '#EF4444',
+                border: 'none',
+                color: '#FFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 8px 25px rgba(239, 68, 68, 0.5)'
+              }}
+            >
+              <PhoneOff size={30} />
+            </button>
+
+            {/* Video Camera Toggle */}
+            <button
+              onClick={handleToggleVideo}
+              title={currentIsAudioOnly ? 'Activer la vidéo' : 'Désactiver la vidéo'}
+              style={{
+                width: '54px',
+                height: '54px',
+                borderRadius: '50%',
+                background: isVideoOff ? 'rgba(255,255,255,0.18)' : '#0066FF',
+                border: '1px solid rgba(255,255,255,0.3)',
+                color: '#FFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                backdropFilter: 'blur(10px)'
+              }}
+            >
+              {isVideoOff ? <VideoOff size={22} /> : <Video size={22} />}
+            </button>
+          </div>
+        </div>
       ) : (
-        /* 6. CONNECTED CALL CONTROL HUD */
+        /* MODE C: CONNECTED IN-CALL CONTROL HUD */
         <div style={{
           position: 'relative',
           zIndex: 20,
