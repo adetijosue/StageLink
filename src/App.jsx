@@ -329,6 +329,90 @@ function MainApp() {
     return () => window.removeEventListener('profileUpdated', handleProfileUpdated);
   }, []);
 
+  // Deep-Link & QR Code Scan Auto-Navigator (Directly opens Public Profile Modal & allows instant Follow)
+  useEffect(() => {
+    const resolveTargetProfileFromURL = async () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const hash = window.location.hash || '';
+        let targetId = params.get('profile') || params.get('user') || params.get('artist');
+        
+        if (!targetId && hash.startsWith('#profile-')) {
+          targetId = hash.replace('#profile-', '');
+        }
+
+        if (!targetId) return;
+
+        // 1. Try finding in loaded allUsers state
+        let target = (allUsers || []).find(
+          (u) => u.id === targetId || (u.name && u.name.toLowerCase().replace(/[^a-z0-9]/g, '-') === targetId)
+        );
+
+        // 2. Try finding in localStorage stagelink_users
+        if (!target) {
+          try {
+            const stored = JSON.parse(localStorage.getItem('stagelink_users') || '[]');
+            target = stored.find(
+              (u) => u.id === targetId || (u.name && u.name.toLowerCase().replace(/[^a-z0-9]/g, '-') === targetId)
+            );
+          } catch (e) {}
+        }
+
+        // 3. If still not found and Supabase is configured, fetch live profile
+        if (!target && isSupabaseConfigured()) {
+          try {
+            const { data, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .or(`id.eq.${targetId},username.eq.${targetId}`)
+              .maybeSingle();
+
+            if (data && !error) {
+              target = {
+                id: data.id,
+                name: data.full_name || data.username || 'Artiste StageLink',
+                full_name: data.full_name || data.username,
+                avatar: data.avatar_url,
+                avatar_url: data.avatar_url,
+                role: data.role || 'Artiste',
+                bio: data.bio || '',
+                location: data.location || '',
+                company: data.company || '',
+                instruments: data.instruments || [],
+                genres: data.genres || [],
+                gear: data.gear || [],
+                spotifyUrl: data.spotify_url,
+                instagramUrl: data.instagram_url,
+                tiktokUrl: data.tiktok_url,
+                youtubeUrl: data.youtube_url,
+                verified: data.verified_badge === 'gold' || data.verified_badge === 'blue',
+                badgeType: data.verified_badge
+              };
+            }
+          } catch (e) {
+            console.warn('QR scan profile fetch note:', e);
+          }
+        }
+
+        if (target) {
+          soundEngine.playPopSound();
+          setPublicProfileUser(target);
+        }
+      } catch (e) {
+        console.error('URL Profile Resolver Error:', e);
+      }
+    };
+
+    resolveTargetProfileFromURL();
+    window.addEventListener('popstate', resolveTargetProfileFromURL);
+    window.addEventListener('hashchange', resolveTargetProfileFromURL);
+
+    return () => {
+      window.removeEventListener('popstate', resolveTargetProfileFromURL);
+      window.removeEventListener('hashchange', resolveTargetProfileFromURL);
+    };
+  }, [allUsers]);
+
   const handleRefreshData = async () => {
     soundEngine.playPopSound();
     if (isSupabaseConfigured()) {

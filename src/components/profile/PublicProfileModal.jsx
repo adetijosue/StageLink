@@ -148,9 +148,24 @@ export default function PublicProfileModal({
   const isVip = profile.badgeType === 'gold' || profile.badgeType === 'blue' || profile.verified === true;
   const targetUserId = profile.id || profile.userId;
 
-  const isSelf = currentUser && (currentUser.id === targetUserId || currentUser.name === userName);
+  // Check if current user is already following this artist
+  useEffect(() => {
+    if (!currentUser?.id || !targetUserId) return;
+    if (isSupabaseConfigured()) {
+      supabase
+        .from('followers')
+        .select('id')
+        .eq('follower_id', currentUser.id)
+        .eq('following_id', targetUserId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setIsFollowing(true);
+        })
+        .catch(() => {});
+    }
+  }, [currentUser, targetUserId]);
 
-  const handleFollowClick = () => {
+  const handleFollowClick = async () => {
     soundEngine?.playPopSound?.();
     if (!isFollowing) {
       try {
@@ -158,8 +173,38 @@ export default function PublicProfileModal({
       } catch (e) {}
       setIsFollowing(true);
       if (onConnectUser && targetUserId) onConnectUser(targetUserId);
+
+      if (isSupabaseConfigured() && currentUser?.id && targetUserId) {
+        try {
+          await supabase.from('followers').insert({
+            follower_id: currentUser.id,
+            following_id: targetUserId
+          });
+
+          await supabase.from('notifications').insert({
+            user_id: targetUserId,
+            actor_id: currentUser.id,
+            type: 'follow',
+            content: `${currentUser.name || 'Un artiste'} s'est abonné à votre profil !`,
+            is_read: false
+          });
+        } catch (e) {
+          console.warn('Follow sync note:', e);
+        }
+      }
     } else {
       setIsFollowing(false);
+      if (isSupabaseConfigured() && currentUser?.id && targetUserId) {
+        try {
+          await supabase
+            .from('followers')
+            .delete()
+            .eq('follower_id', currentUser.id)
+            .eq('following_id', targetUserId);
+        } catch (e) {
+          console.warn('Unfollow sync note:', e);
+        }
+      }
     }
   };
 
