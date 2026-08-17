@@ -1,17 +1,30 @@
-import React, { useState } from 'react';
-import { X, GraduationCap, Clock, Award, BookOpen } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, GraduationCap, DollarSign, Clock, BookOpen, Image } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
+import { compressImage } from '../../utils/imageCompressor';
 
 export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, isDarkMode }) {
   const { currentUser } = useAuth();
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('49');
   const [duration, setDuration] = useState('4h 30min (12 Modules HD)');
+  const [description, setDescription] = useState('');
   const [level, setLevel] = useState('Tous niveaux');
-  const [coverUrl, setCoverUrl] = useState('https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=600&auto=format&fit=crop&q=80');
+  const [coverImage, setCoverImage] = useState(null);
+  const [shareToFeed, setShareToFeed] = useState(true);
+
+  const fileImageInputRef = useRef(null);
 
   if (!isOpen) return null;
+
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const compressed = await compressImage(file, 800, 800, 0.8);
+      setCoverImage(compressed);
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -19,79 +32,67 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
 
     soundEngine?.playPopSound?.();
 
-    onCourseCreated({
+    const newCourse = {
       id: `course_${Date.now()}`,
-      title,
-      instructor: currentUser?.name || 'Formateur Pro',
+      userId: currentUser?.id,
+      title: title.trim(),
+      instructor: currentUser?.name || 'Formateur Certifié',
+      instructorAvatar: currentUser?.avatar || '',
       price: `${price} €`,
+      priceNum: parseFloat(price) || 0,
       duration,
       level,
-      enrolled: '1 membre inscrit',
-      rating: '5.0 ⭐ (Nouveau)',
-      cover: coverUrl
-    });
+      description: description.trim(),
+      enrolled: '1er inscrit',
+      rating: '5.0 ⭐',
+      cover: coverImage || currentUser?.avatar || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=600&auto=format&fit=crop&q=80',
+      createdAt: new Date().toISOString()
+    };
+
+    onCourseCreated(newCourse, shareToFeed);
     onClose();
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 500,
-        background: 'rgba(15, 23, 42, 0.82)',
-        backdropFilter: 'blur(8px)',
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      zIndex: 500,
+      background: 'rgba(15, 23, 42, 0.82)',
+      backdropFilter: 'blur(8px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 'calc(14px + env(safe-area-inset-top, 14px)) 14px calc(20px + env(safe-area-inset-bottom, 20px)) 14px'
+    }} onClick={onClose}>
+      <div className="animate-scale-in" onClick={(e) => e.stopPropagation()} style={{
+        width: '100%',
+        maxWidth: '460px',
+        maxHeight: 'calc(100dvh - max(48px, env(safe-area-inset-top, 16px) + env(safe-area-inset-bottom, 20px)))',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 'calc(14px + env(safe-area-inset-top, 14px)) 14px calc(20px + env(safe-area-inset-bottom, 20px)) 14px'
-      }}
-      onClick={onClose}
-    >
-      <div
-        className="animate-scale-in"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%',
-          maxWidth: '440px',
-          maxHeight: 'calc(100dvh - max(48px, env(safe-area-inset-top, 16px) + env(safe-area-inset-bottom, 20px)))',
+        flexDirection: 'column',
+        background: isDarkMode ? '#0F172A' : '#FFFFFF',
+        color: isDarkMode ? '#FFFFFF' : '#0F172A',
+        borderRadius: '24px',
+        boxShadow: '0 25px 65px rgba(0,0,0,0.4)',
+        overflow: 'hidden'
+      }}>
+        {/* Header */}
+        <div style={{
+          flexShrink: 0,
+          padding: '14px 18px',
+          borderBottom: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #F1F5F9',
+          background: isDarkMode ? '#151D2A' : '#FFFFFF',
           display: 'flex',
-          flexDirection: 'column',
-          background: isDarkMode ? '#0F172A' : '#FFFFFF',
-          color: isDarkMode ? '#FFFFFF' : '#0F172A',
-          borderRadius: '24px',
-          boxShadow: '0 25px 65px rgba(0,0,0,0.4)',
-          overflow: 'hidden'
-        }}
-      >
-        {/* Sticky Header */}
-        <div
-          style={{
-            flexShrink: 0,
-            padding: '14px 18px',
-            borderBottom: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #F1F5F9',
-            background: isDarkMode ? '#151D2A' : '#FFFFFF',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}
-        >
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
           <div>
-            <h3
-              style={{
-                fontSize: '1.05rem',
-                fontWeight: 800,
-                color: isDarkMode ? '#FFFFFF' : '#0F172A',
-                margin: 0,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <GraduationCap size={20} color="#0066FF" /> Publier une Formation Pro
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: isDarkMode ? '#FFFFFF' : '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <GraduationCap size={20} color="#0066FF" /> Publier une Formation
             </h3>
             <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '2px 0 0 0' }}>
-              Partagez votre expertise et formez la communauté
+              Partagez votre savoir-faire et formez la communauté musicale
             </p>
           </div>
 
@@ -104,7 +105,6 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
               borderRadius: '50%',
               width: '38px',
               height: '38px',
-              minWidth: '38px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -115,64 +115,67 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
           </button>
         </div>
 
-        {/* Scrollable Body */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            WebkitOverflowScrolling: 'touch',
-            padding: '16px 18px 24px 18px'
-          }}
-        >
+        {/* Scrollable Form */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          padding: '16px 18px 24px 18px'
+        }}>
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {/* Title */}
             <div>
-              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '6px' }}>
                 Titre de la Formation / Masterclass *
               </label>
               <input
                 type="text"
                 required
-                placeholder="Ex: Masterclass : Mixing & Mastering Pro sur FL Studio"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                placeholder="Ex: Masterclass : Mixing & Mastering Pro sur FL Studio"
                 style={{
                   width: '100%',
                   padding: '10px 14px',
                   borderRadius: '14px',
-                  border: isDarkMode ? '1px solid rgba(255,255,255,0.15)' : '1px solid #CBD5E1',
-                  background: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  border: isDarkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid #CBD5E1',
+                  background: isDarkMode ? '#1E293B' : '#FFFFFF',
                   color: isDarkMode ? '#FFFFFF' : '#0F172A',
-                  fontSize: '0.86rem',
-                  outline: 'none'
+                  fontSize: '0.84rem'
                 }}
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            {/* Price & Level */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Prix d'accès (€) *
+                <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
+                  Prix d'Accès (€)
                 </label>
-                <input
-                  type="number"
-                  required
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '14px',
-                    border: isDarkMode ? '1px solid rgba(255,255,255,0.15)' : '1px solid #CBD5E1',
-                    background: isDarkMode ? '#1E293B' : '#F8FAFC',
-                    color: isDarkMode ? '#FFFFFF' : '#0F172A',
-                    fontSize: '0.86rem',
-                    outline: 'none'
-                  }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px 9px 30px',
+                      borderRadius: '12px',
+                      border: isDarkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid #CBD5E1',
+                      background: isDarkMode ? '#1E293B' : '#FFFFFF',
+                      color: isDarkMode ? '#FFFFFF' : '#0F172A',
+                      fontSize: '0.82rem',
+                      fontWeight: 700
+                    }}
+                  />
+                  <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#10B981', fontWeight: 800 }}>€</span>
+                </div>
               </div>
 
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
                   Niveau Requis
                 </label>
                 <select
@@ -180,10 +183,10 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
                   onChange={(e) => setLevel(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '10px',
-                    borderRadius: '14px',
-                    border: isDarkMode ? '1px solid rgba(255,255,255,0.15)' : '1px solid #CBD5E1',
-                    background: isDarkMode ? '#1E293B' : '#F8FAFC',
+                    padding: '9px 12px',
+                    borderRadius: '12px',
+                    border: isDarkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid #CBD5E1',
+                    background: isDarkMode ? '#1E293B' : '#FFFFFF',
                     color: isDarkMode ? '#FFFFFF' : '#0F172A',
                     fontSize: '0.82rem'
                   }}
@@ -196,45 +199,134 @@ export default function PublishCourseModal({ isOpen, onClose, onCourseCreated, i
               </div>
             </div>
 
+            {/* Duration */}
             <div>
-              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Durée & Nombre de Modules
+              <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
+                Format & Durée Totale
               </label>
               <input
                 type="text"
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
-                placeholder="Ex: 4h 30min (12 Modules HD)"
+                placeholder="Ex: 4h 30min (12 Modules Vidéo HD)"
                 style={{
                   width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '14px',
-                  border: isDarkMode ? '1px solid rgba(255,255,255,0.15)' : '1px solid #CBD5E1',
-                  background: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  padding: '9px 12px',
+                  borderRadius: '12px',
+                  border: isDarkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid #CBD5E1',
+                  background: isDarkMode ? '#1E293B' : '#FFFFFF',
                   color: isDarkMode ? '#FFFFFF' : '#0F172A',
-                  fontSize: '0.86rem',
-                  outline: 'none'
+                  fontSize: '0.82rem'
                 }}
               />
             </div>
 
+            {/* Description & Curriculum */}
+            <div>
+              <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
+                Programme & Objectifs Pédagogiques
+              </label>
+              <textarea
+                rows={3}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Décrivez les compétences acquises, les projets pratiques et ressources incluses..."
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  borderRadius: '12px',
+                  border: isDarkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid #CBD5E1',
+                  background: isDarkMode ? '#1E293B' : '#FFFFFF',
+                  color: isDarkMode ? '#FFFFFF' : '#0F172A',
+                  fontSize: '0.82rem',
+                  resize: 'none'
+                }}
+              />
+            </div>
+
+            {/* Cover Upload */}
+            <div>
+              <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
+                Vignette / Affiche de la Formation
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileImageInputRef}
+                onChange={handleImageChange}
+                style={{ display: 'none' }}
+              />
+              <div
+                onClick={() => fileImageInputRef.current?.click()}
+                style={{
+                  border: isDarkMode ? '2px dashed rgba(255,255,255,0.15)' : '2px dashed #CBD5E1',
+                  borderRadius: '14px',
+                  padding: '12px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  background: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px'
+                }}
+              >
+                {coverImage ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <img src={coverImage} alt="Course" style={{ width: '44px', height: '44px', borderRadius: '10px', objectFit: 'cover' }} />
+                    <span style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 700 }}>Vignette sélectionnée (Cliquer pour changer)</span>
+                  </div>
+                ) : (
+                  <>
+                    <Image size={20} color="#0066FF" />
+                    <span style={{ fontSize: '0.78rem', color: isDarkMode ? '#CBD5E1' : '#64748B' }}>
+                      Ajouter une affiche / vignette
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Feed Share Toggle */}
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              background: isDarkMode ? 'rgba(0,102,255,0.12)' : '#EFF6FF',
+              padding: '10px 12px',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              border: '1px solid rgba(0,102,255,0.2)'
+            }}>
+              <input
+                type="checkbox"
+                checked={shareToFeed}
+                onChange={(e) => setShareToFeed(e.target.checked)}
+                style={{ accentColor: '#0066FF', width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0066FF' }}>
+                📢 Partager automatiquement dans le fil d'actualité (Feed)
+              </span>
+            </label>
+
+            {/* Submit Button */}
             <button
               type="submit"
+              disabled={!title.trim()}
               style={{
-                width: '100%',
-                padding: '14px',
-                borderRadius: '16px',
-                border: 'none',
                 background: 'linear-gradient(135deg, #0066FF 0%, #0047FF 100%)',
                 color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '16px',
+                padding: '14px',
+                fontSize: '0.88rem',
                 fontWeight: 800,
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(0, 102, 255, 0.35)',
-                marginTop: '6px'
+                cursor: title.trim() ? 'pointer' : 'not-allowed',
+                boxShadow: '0 8px 20px rgba(0, 102, 255, 0.3)',
+                marginTop: '4px'
               }}
             >
-              🚀 Mettre en Ligne la Masterclass
+              🚀 Mettre en Vente la Formation ({price} €)
             </button>
           </form>
         </div>

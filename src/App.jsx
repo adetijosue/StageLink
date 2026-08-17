@@ -28,6 +28,10 @@ const VideoCallScreen = React.lazy(() => import('./components/messaging/VideoCal
 const NewChatModal = React.lazy(() => import('./components/messaging/NewChatModal'));
 const CallHistoryModal = React.lazy(() => import('./components/messaging/CallHistoryModal'));
 const AIMusicStudio = React.lazy(() => import('./components/music_studio/AIMusicStudio'));
+const BuyWorkModal = React.lazy(() => import('./components/services/BuyWorkModal'));
+const OrderServiceModal = React.lazy(() => import('./components/services/OrderServiceModal'));
+const CourseDetailsModal = React.lazy(() => import('./components/services/CourseDetailsModal'));
+const EventTicketModal = React.lazy(() => import('./components/services/EventTicketModal'));
 const ProfileView = React.lazy(() => import('./components/premium/ProfileView'));
 const PaywallModal = React.lazy(() => import('./components/premium/PaywallModal'));
 import NotificationsDrawer from './components/notifications/NotificationsDrawer';
@@ -194,9 +198,14 @@ function MainApp() {
   const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
 
   // Persistent Data States
-
   const [posts, setPosts] = useState([]);
   const [appDataError, setAppDataError] = useState(null);
+
+  // Feed Pro Services Action Modals
+  const [feedSelectedWork, setFeedSelectedWork] = useState(null);
+  const [feedSelectedService, setFeedSelectedService] = useState(null);
+  const [feedSelectedCourse, setFeedSelectedCourse] = useState(null);
+  const [feedSelectedEvent, setFeedSelectedEvent] = useState(null);
   
   // Prevent stale closures in real-time listeners
   const selectedChatRef = useRef(selectedChat);
@@ -409,6 +418,7 @@ function MainApp() {
                   badgeType: badgeType,
                   text: p.content || '',
                   image: p.media_url || null,
+                  proServiceData: p.metadata?.proServiceData || null,
                   hasAudio: Boolean(p.audio_url),
                   audioTitle: p.audio_title || 'Extrait Audio',
                   audioUrl: p.audio_url || null,
@@ -1972,6 +1982,7 @@ function MainApp() {
         text: newPostData.text || '',
         mediaList: newPostData.mediaList || [],
         image: finalMediaUrl,
+        proServiceData: newPostData.proServiceData || null,
         hasAudio: !!newPostData.hasAudio || !!finalAudioUrl,
         audioUrl: finalAudioUrl,
         audioTitle: newPostData.audioTitle || (newPostData.hasAudio ? 'Note Vocale' : null),
@@ -1995,7 +2006,8 @@ function MainApp() {
             content: newPostData.text || '',
             media_url: finalMediaUrl,
             audio_url: finalAudioUrl,
-            audio_title: newPostData.audioTitle || null
+            audio_title: newPostData.audioTitle || null,
+            metadata: newPostData.proServiceData ? { proServiceData: newPostData.proServiceData } : null
           });
         } catch (pe) {
           console.warn('Supabase post creation note:', pe?.message || pe);
@@ -2004,8 +2016,8 @@ function MainApp() {
 
       // Success Notification Toast
       setToastNotification({
-        title: 'Publication mise en ligne ! ✨',
-        message: 'Votre publication est maintenant visible par toute la communauté.',
+        title: newPostData.proServiceData ? 'Offre partagée dans le Feed ! 📢' : 'Publication mise en ligne ! ✨',
+        message: newPostData.proServiceData ? 'Votre offre est désormais visible par tous les artistes.' : 'Votre publication est maintenant visible par toute la communauté.',
         avatar: currentUser?.avatar
       });
       setTimeout(() => setToastNotification(null), 5000);
@@ -2020,6 +2032,24 @@ function MainApp() {
     } finally {
       setIsUploadingPost(false);
     }
+  };
+
+  const handleOpenProServiceFromFeed = (proItem) => {
+    if (!proItem) return;
+    if (proItem.proType === 'work') setFeedSelectedWork(proItem);
+    else if (proItem.proType === 'service') setFeedSelectedService(proItem);
+    else if (proItem.proType === 'course') setFeedSelectedCourse(proItem);
+    else if (proItem.proType === 'event') setFeedSelectedEvent(proItem);
+  };
+
+  const handleShareProServiceToFeed = async (proItem) => {
+    if (!proItem) return;
+    await handleCreatePost({
+      text: proItem.shareText || `Découvrez mon offre "${proItem.title}" (${proItem.price}) sur StageLink !`,
+      image: proItem.cover || null,
+      proServiceData: proItem
+    });
+    setActiveTab('feed');
   };
 
   const handleCreateStory = async (storyData) => {
@@ -2621,6 +2651,8 @@ function MainApp() {
                     onOpenShare={(p) => setSharePost(p)}
                     onOpenReport={(p) => setReportPost(p)}
                     onOpenPublicProfile={handleOpenPublicProfile}
+                    onOpenProServiceAction={handleOpenProServiceFromFeed}
+                    onStartChat={handleStartChatWithUser}
                   />
                 ))}
               </div>
@@ -2650,6 +2682,9 @@ function MainApp() {
         {activeTab === 'studio' && (
           <AIMusicStudio
             onOpenPaywall={() => setIsPaywallOpen(true)}
+            onShareToFeed={handleShareProServiceToFeed}
+            onStartChat={handleStartChatWithUser}
+            onOpenProfile={handleOpenPublicProfile}
             isDarkMode={isDarkMode}
           />
         )}
@@ -3002,6 +3037,35 @@ function MainApp() {
           setIsNotificationsOpen(false);
           setActiveTab(tab);
         }}
+      />
+
+      {/* Pro Services Action Modals triggered from Feed */}
+      <BuyWorkModal
+        isOpen={!!feedSelectedWork}
+        work={feedSelectedWork}
+        onClose={() => setFeedSelectedWork(null)}
+        isDarkMode={isDarkMode}
+      />
+
+      <OrderServiceModal
+        isOpen={!!feedSelectedService}
+        service={feedSelectedService}
+        onClose={() => setFeedSelectedService(null)}
+        isDarkMode={isDarkMode}
+      />
+
+      <CourseDetailsModal
+        isOpen={!!feedSelectedCourse}
+        course={feedSelectedCourse}
+        onClose={() => setFeedSelectedCourse(null)}
+        isDarkMode={isDarkMode}
+      />
+
+      <EventTicketModal
+        isOpen={!!feedSelectedEvent}
+        event={feedSelectedEvent}
+        onClose={() => setFeedSelectedEvent(null)}
+        isDarkMode={isDarkMode}
       />
 
       {/* Persistent Bottom Navigation Bar */}

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShoppingBag, GraduationCap, Calendar, Play, Pause, 
   DollarSign, Plus, TrendingUp, Sliders, Search, 
-  ShieldCheck, CheckCircle, Disc, Headphones, Sparkles, Filter, ChevronRight, Music
+  Share2, MessageSquare, ChevronRight, Music, Sparkles, User
 } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
@@ -15,169 +15,47 @@ import OrderServiceModal from '../services/OrderServiceModal';
 import CourseDetailsModal from '../services/CourseDetailsModal';
 import EventTicketModal from '../services/EventTicketModal';
 
-const INITIAL_WORKS = [
-  {
-    id: 'work_1',
-    title: 'Pack Beat Afrobeat & Stems Master',
-    author: 'David Producer',
-    price: '150 €',
-    genre: 'Afrobeat Pro',
-    category: 'Beatmaking',
-    type: 'Licence Exclusive + Stems',
-    cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80'
-  },
-  {
-    id: 'work_2',
-    title: 'Composition Piano & Vocal Soul (Prêt à synchroniser)',
-    author: 'Sarah Jenkins',
-    price: '280 €',
-    genre: 'RnB / Soul',
-    category: 'Master',
-    type: 'Synchro TV & Film',
-    cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80'
-  },
-  {
-    id: 'work_3',
-    title: 'Amapiano Groove Master Sample Pack + MIDI',
-    author: 'Marcus Vance',
-    price: '95 €',
-    genre: 'Amapiano',
-    category: 'SamplePack',
-    type: 'Sample Pack & Drum Kits',
-    cover: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=600&auto=format&fit=crop&q=80'
-  },
-  {
-    id: 'work_4',
-    title: 'Gospel Worship & Strings Live Arrangement',
-    author: 'Grace Harmony',
-    price: '190 €',
-    genre: 'Gospel',
-    category: 'Master',
-    type: 'Licence Complète WAV + MP3',
-    cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80'
-  }
-];
-
-const INITIAL_SERVICES = [
-  {
-    id: 'srv_1',
-    title: 'Mixage Stéréo & Spécialisation Dolby Atmos',
-    provider: 'Alex Rivera (Ingénieur Son Certifié)',
-    price: '250 € / titre',
-    delivery: 'Livraison 48h (3 Révisions incluses)',
-    rating: '5.0 ⭐ (38 avis)',
-    description: 'Mixage de haute précision avec calibration analogique et spatialisation Dolby Atmos pour plateformes Apple Music et Spotify.',
-    icon: '🎚️'
-  },
-  {
-    id: 'srv_2',
-    title: 'Enregistrement Voix, Edit & Tuning Vocal Melodyne',
-    provider: 'JABE PRODUCTION Studio',
-    price: '180 € / session',
-    delivery: 'Session Studio 4 heures',
-    rating: '4.9 ⭐ (24 avis)',
-    description: 'Enregistrement avec micros à lampes Neumann/Sony, correction de pitch chirurgicale et harmonisation vocale complète.',
-    icon: '🎙️'
-  },
-  {
-    id: 'srv_3',
-    title: 'Mastering Analogique Haute Définition (DDP + Streaming)',
-    provider: 'Mastering Lab Paris',
-    price: '120 € / titre',
-    delivery: 'Livraison 24h Express',
-    rating: '5.0 ⭐ (62 avis)',
-    description: 'Passage sur chaîne analogique Manley/SSL pour une présence, une clarté et un niveau sonore percutant aux normes commerciales.',
-    icon: '🎧'
-  }
-];
-
-const INITIAL_COURSES = [
-  {
-    id: 'course_1',
-    title: 'Masterclass : Mixing & Mastering Pro sur FL Studio & Logic',
-    instructor: 'Alex Rivera (Ingénieur Son Certifié)',
-    price: '49 €',
-    duration: '4h 30min (12 Modules HD)',
-    enrolled: '142 membres inscrits',
-    rating: '4.9 ⭐',
-    cover: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=600&auto=format&fit=crop&q=80'
-  },
-  {
-    id: 'course_2',
-    title: 'Business Musical : Droits d\'Auteur, Édition & Vente de Prods',
-    instructor: 'JABE PRODUCTION Academy',
-    price: '79 €',
-    duration: '6h (Certificat de fin d\'étude)',
-    enrolled: '280 membres inscrits',
-    rating: '5.0 ⭐',
-    cover: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=600&auto=format&fit=crop&q=80'
-  }
-];
-
-const INITIAL_EVENTS = [
-  {
-    id: 'event_1',
-    title: 'Session Live Listening & Pitch Pro prods devant Labels',
-    organizer: 'JABE PRODUCTION & StageLink',
-    date: 'Ce Vendredi à 20h00',
-    price: 'Gratuit',
-    type: 'Direct Stream HD',
-    attendees: '86 réservations',
-    cover: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80'
-  },
-  {
-    id: 'event_2',
-    title: 'Atelier Mixage Vocaux en Direct avec Questions & Réponses',
-    organizer: 'Studio MasterClass Live',
-    date: 'Dimanche à 18h00',
-    price: '15 €',
-    type: 'Webinar Interactif',
-    attendees: '45 réservations',
-    cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80'
-  }
-];
-
-export default function ProBusinessStudio({ onOpenPaywall, isDarkMode }) {
+export default function ProBusinessStudio({ onShareToFeed, onStartChat, onOpenProfile, isDarkMode }) {
   const { currentUser } = useAuth();
 
   const [activeSubTab, setActiveSubTab] = useState('marketplace'); // 'marketplace' | 'services' | 'courses' | 'events'
   const [searchQuery, setSearchQuery] = useState('');
   const [playingId, setPlayingId] = useState(null);
 
-  // Lists state with localStorage persistence
+  // Virgin initial state (no fake mock users or hardcoded fake services)
   const [worksList, setWorksList] = useState(() => {
     try {
       const saved = localStorage.getItem('stagelink_services_works');
-      return saved ? JSON.parse(saved) : INITIAL_WORKS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_WORKS;
+      return [];
     }
   });
 
   const [servicesList, setServicesList] = useState(() => {
     try {
       const saved = localStorage.getItem('stagelink_services_list');
-      return saved ? JSON.parse(saved) : INITIAL_SERVICES;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_SERVICES;
+      return [];
     }
   });
 
   const [coursesList, setCoursesList] = useState(() => {
     try {
       const saved = localStorage.getItem('stagelink_services_courses');
-      return saved ? JSON.parse(saved) : INITIAL_COURSES;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_COURSES;
+      return [];
     }
   });
 
   const [eventsList, setEventsList] = useState(() => {
     try {
       const saved = localStorage.getItem('stagelink_services_events');
-      return saved ? JSON.parse(saved) : INITIAL_EVENTS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_EVENTS;
+      return [];
     }
   });
 
@@ -218,31 +96,93 @@ export default function ProBusinessStudio({ onOpenPaywall, isDarkMode }) {
   const [selectedCourseForDetails, setSelectedCourseForDetails] = useState(null);
   const [selectedEventForTicket, setSelectedEventForTicket] = useState(null);
 
-  const toggleAudioPlay = (id) => {
-    if (playingId === id) {
+  const toggleAudioPlay = (item) => {
+    if (playingId === item.id) {
       soundEngine?.stop?.();
       setPlayingId(null);
     } else {
       soundEngine?.playPopSound?.();
-      soundEngine?.generateAndPlay?.(120, 'Afro-Gospel');
-      setPlayingId(id);
+      if (item.audioUrl) {
+        const audio = new Audio(item.audioUrl);
+        audio.play().catch(() => soundEngine?.generateAndPlay?.(120, 'Afro-Gospel'));
+        audio.onended = () => setPlayingId(null);
+      } else {
+        soundEngine?.generateAndPlay?.(120, 'Afro-Gospel');
+      }
+      setPlayingId(item.id);
     }
   };
 
-  const handleWorkCreated = (newWork) => {
-    setWorksList([newWork, ...worksList]);
+  const handleWorkCreated = (newWork, shareFeed) => {
+    const updated = [newWork, ...worksList];
+    setWorksList(updated);
+    if (shareFeed && onShareToFeed) {
+      onShareToFeed({
+        ...newWork,
+        proType: 'work',
+        shareText: `🎵 Nouvelle œuvre disponible : "${newWork.title}" (${newWork.genre}) à ${newWork.price}. Licence : ${newWork.type}`
+      });
+    }
   };
 
-  const handleServiceCreated = (newSrv) => {
-    setServicesList([newSrv, ...servicesList]);
+  const handleServiceCreated = (newSrv, shareFeed) => {
+    const updated = [newSrv, ...servicesList];
+    setServicesList(updated);
+    if (shareFeed && onShareToFeed) {
+      onShareToFeed({
+        ...newSrv,
+        proType: 'service',
+        shareText: `🎚️ Nouvelle prestation studio disponible : "${newSrv.title}" (${newSrv.price}). Délai : ${newSrv.delivery}`
+      });
+    }
   };
 
-  const handleCourseCreated = (newCourse) => {
-    setCoursesList([newCourse, ...coursesList]);
+  const handleCourseCreated = (newCourse, shareFeed) => {
+    const updated = [newCourse, ...coursesList];
+    setCoursesList(updated);
+    if (shareFeed && onShareToFeed) {
+      onShareToFeed({
+        ...newCourse,
+        proType: 'course',
+        shareText: `🎓 Nouvelle masterclass disponible : "${newCourse.title}" (${newCourse.duration}) à ${newCourse.price}.`
+      });
+    }
   };
 
-  const handleEventCreated = (newEvent) => {
-    setEventsList([newEvent, ...eventsList]);
+  const handleEventCreated = (newEvent, shareFeed) => {
+    const updated = [newEvent, ...eventsList];
+    setEventsList(updated);
+    if (shareFeed && onShareToFeed) {
+      onShareToFeed({
+        ...newEvent,
+        proType: 'event',
+        shareText: `🎟️ Nouvel événement musical : "${newEvent.title}" (${newEvent.date}) - Format : ${newEvent.type} (${newEvent.price}).`
+      });
+    }
+  };
+
+  const handleShareItemToFeed = (item, type) => {
+    soundEngine?.playPopSound?.();
+    if (onShareToFeed) {
+      let defaultText = '';
+      if (type === 'work') defaultText = `🎵 Découvrez mon œuvre "${item.title}" (${item.genre}) disponible à ${item.price} sur StageLink !`;
+      else if (type === 'service') defaultText = `🎚️ Prestation Studio disponible : "${item.title}" (${item.price}) par ${item.provider}.`;
+      else if (type === 'course') defaultText = `🎓 Masterclass disponible : "${item.title}" (${item.price}) dispensée par ${item.instructor}.`;
+      else if (type === 'event') defaultText = `🎟️ Rejoignez l'événement "${item.title}" le ${item.date} !`;
+
+      onShareToFeed({
+        ...item,
+        proType: type,
+        shareText: defaultText
+      });
+    }
+  };
+
+  const handleContactAuthor = (targetUser, subject) => {
+    soundEngine?.playPopSound?.();
+    if (onStartChat) {
+      onStartChat(targetUser, subject);
+    }
   };
 
   // Filtered lists based on search query
@@ -302,14 +242,14 @@ export default function ProBusinessStudio({ onOpenPaywall, isDarkMode }) {
           </span>
         </div>
 
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 900, margin: '0 0 6px 0', letterSpacing: '-0.3px' }}>
-          Espace Vente, Prestations & Masterclasses
+        <h2 style={{ fontSize: '1.22rem', fontWeight: 900, margin: '0 0 6px 0', letterSpacing: '-0.3px' }}>
+          Hub des Prestations, Ventes & Formations
         </h2>
         <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: '0 0 14px 0', lineHeight: 1.4 }}>
-          Accédez librement aux prestations des professionnels, achetez des œuvres avec licences certifiées ou proposez vos propres services.
+          Publiez librement vos services réels, vendez vos prods, ou commandez auprès des membres et partagez vos offres directement dans le feed.
         </p>
 
-        {/* Dashboard Quick Stats */}
+        {/* Real Dynamic Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center' }}>
           <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '14px', padding: '8px 4px', border: '1px solid rgba(255,255,255,0.06)' }}>
             <span style={{ fontSize: '1rem', fontWeight: 900, color: '#38BDF8', display: 'block' }}>{worksList.length}</span>
@@ -462,11 +402,54 @@ export default function ProBusinessStudio({ onOpenPaywall, isDarkMode }) {
             <Plus size={18} /> Vendre une Œuvre / Beat / Sample Pack
           </button>
 
-          {/* Works List */}
+          {/* Works List / Clean Empty State */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {filteredWorks.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94A3B8', fontSize: '0.86rem' }}>
-                Aucune œuvre trouvée pour cette recherche.
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '36px 20px',
+                  background: isDarkMode ? '#1E293B' : '#FFFFFF',
+                  borderRadius: '20px',
+                  border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0'
+                }}
+              >
+                <div
+                  style={{
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '50%',
+                    background: isDarkMode ? 'rgba(0,102,255,0.15)' : '#EFF6FF',
+                    color: '#0066FF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 12px auto'
+                  }}
+                >
+                  <Music size={26} />
+                </div>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, margin: '0 0 6px 0', color: isDarkMode ? '#FFFFFF' : '#0F172A' }}>
+                  Aucune œuvre en vente pour le moment
+                </h4>
+                <p style={{ fontSize: '0.78rem', color: '#64748B', maxWidth: '320px', margin: '0 auto 14px auto', lineHeight: 1.4 }}>
+                  Soyez le premier à mettre en vente vos beats, compositions ou sample packs et faites-vous découvrir par les artistes !
+                </p>
+                <button
+                  onClick={() => setIsSellModalOpen(true)}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #0066FF 0%, #0047FF 100%)',
+                    color: '#FFFFFF',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  + Déposer ma première œuvre
+                </button>
               </div>
             ) : (
               filteredWorks.map((item) => (
@@ -478,108 +461,157 @@ export default function ProBusinessStudio({ onOpenPaywall, isDarkMode }) {
                     padding: '12px',
                     border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
                     display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
+                    flexDirection: 'column',
+                    gap: '10px',
                     boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
                   }}
                 >
-                  {/* Cover & Audio Play Preview */}
-                  <div style={{ position: 'relative', width: '64px', height: '64px', flexShrink: 0 }}>
-                    <img
-                      src={item.cover}
-                      alt={item.title}
-                      style={{ width: '100%', height: '100%', borderRadius: '16px', objectFit: 'cover' }}
-                    />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* Cover & Audio Play Preview */}
+                    <div style={{ position: 'relative', width: '64px', height: '64px', flexShrink: 0 }}>
+                      <img
+                        src={item.cover}
+                        alt={item.title}
+                        style={{ width: '100%', height: '100%', borderRadius: '16px', objectFit: 'cover' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleAudioPlay(item)}
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          background: playingId === item.id ? 'rgba(0,102,255,0.7)' : 'rgba(0,0,0,0.42)',
+                          borderRadius: '16px',
+                          border: 'none',
+                          color: '#FFF',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s ease'
+                        }}
+                        title="Écouter la démo"
+                      >
+                        {playingId === item.id ? (
+                          <Pause size={22} fill="#FFF" />
+                        ) : (
+                          <Play size={20} fill="#FFF" style={{ marginLeft: '2px' }} />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            color: '#0066FF',
+                            background: isDarkMode ? 'rgba(0,102,255,0.2)' : '#EFF6FF',
+                            padding: '2px 8px',
+                            borderRadius: '8px'
+                          }}
+                        >
+                          {item.genre}
+                        </span>
+                        {playingId === item.id && (
+                          <span style={{ fontSize: '0.68rem', color: '#10B981', fontWeight: 800 }}>
+                            ● Lecture démo
+                          </span>
+                        )}
+                      </div>
+
+                      <h4
+                        style={{
+                          fontSize: '0.88rem',
+                          fontWeight: 800,
+                          color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                          margin: '0 0 2px 0',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}
+                      >
+                        {item.title}
+                      </h4>
+
+                      <p style={{ fontSize: '0.74rem', color: isDarkMode ? '#94A3B8' : '#64748B', margin: 0 }}>
+                        {item.type} • {item.author}
+                      </p>
+                    </div>
+
+                    {/* Buy Button */}
                     <button
                       type="button"
-                      onClick={() => toggleAudioPlay(item.id)}
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: playingId === item.id ? 'rgba(0,102,255,0.7)' : 'rgba(0,0,0,0.42)',
-                        borderRadius: '16px',
-                        border: 'none',
-                        color: '#FFF',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        transition: 'background 0.2s ease'
+                      onClick={() => {
+                        soundEngine?.playPopSound?.();
+                        setSelectedWorkForBuy(item);
                       }}
-                      title="Écouter la démo"
+                      style={{
+                        background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        borderRadius: '14px',
+                        padding: '8px 12px',
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                        boxShadow: '0 4px 10px rgba(16, 185, 129, 0.25)'
+                      }}
                     >
-                      {playingId === item.id ? (
-                        <Pause size={22} fill="#FFF" />
-                      ) : (
-                        <Play size={20} fill="#FFF" style={{ marginLeft: '2px' }} />
-                      )}
+                      {item.price}
                     </button>
                   </div>
 
-                  {/* Info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                      <span
-                        style={{
-                          fontSize: '0.68rem',
-                          fontWeight: 800,
-                          color: '#0066FF',
-                          background: isDarkMode ? 'rgba(0,102,255,0.2)' : '#EFF6FF',
-                          padding: '2px 8px',
-                          borderRadius: '8px'
-                        }}
-                      >
-                        {item.genre}
-                      </span>
-                      {playingId === item.id && (
-                        <span style={{ fontSize: '0.68rem', color: '#10B981', fontWeight: 800, animation: 'pulse 1.5s infinite' }}>
-                          ● Lecture démo
-                        </span>
-                      )}
-                    </div>
-
-                    <h4
-                      style={{
-                        fontSize: '0.88rem',
-                        fontWeight: 800,
-                        color: isDarkMode ? '#F8FAFC' : '#0F172A',
-                        margin: '0 0 2px 0',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}
-                    >
-                      {item.title}
-                    </h4>
-
-                    <p style={{ fontSize: '0.74rem', color: isDarkMode ? '#94A3B8' : '#64748B', margin: 0 }}>
-                      {item.type} • {item.author}
-                    </p>
-                  </div>
-
-                  {/* Buy Button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEngine?.playPopSound?.();
-                      setSelectedWorkForBuy(item);
-                    }}
+                  {/* Actions bar: Share to Feed & Contact Author */}
+                  <div
                     style={{
-                      background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      borderRadius: '14px',
-                      padding: '8px 12px',
-                      fontSize: '0.82rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                      flexShrink: 0,
-                      boxShadow: '0 4px 10px rgba(16, 185, 129, 0.25)'
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingTop: '6px',
+                      borderTop: isDarkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid #F1F5F9'
                     }}
                   >
-                    {item.price}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => handleShareItemToFeed(item, 'work')}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#0066FF',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Share2 size={13} /> Partager dans le Feed
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleContactAuthor({ id: item.userId, name: item.author, avatar: item.authorAvatar }, `Œuvre : ${item.title}`)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: isDarkMode ? '#94A3B8' : '#64748B',
+                        fontSize: '0.74rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <MessageSquare size={13} /> Contacter l'artiste
+                    </button>
+                  </div>
                 </div>
               ))
             )}
@@ -618,11 +650,54 @@ export default function ProBusinessStudio({ onOpenPaywall, isDarkMode }) {
             <Plus size={18} /> Proposer un Service Studio / Prestation
           </button>
 
-          {/* Services List */}
+          {/* Services List / Clean Empty State */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {filteredServices.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94A3B8', fontSize: '0.86rem' }}>
-                Aucune prestation trouvée pour cette recherche.
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '36px 20px',
+                  background: isDarkMode ? '#1E293B' : '#FFFFFF',
+                  borderRadius: '20px',
+                  border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0'
+                }}
+              >
+                <div
+                  style={{
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '50%',
+                    background: isDarkMode ? 'rgba(16,185,129,0.15)' : '#ECFDF5',
+                    color: '#10B981',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 12px auto'
+                  }}
+                >
+                  <Sliders size={26} />
+                </div>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, margin: '0 0 6px 0', color: isDarkMode ? '#FFFFFF' : '#0F172A' }}>
+                  Aucune prestation studio disponible
+                </h4>
+                <p style={{ fontSize: '0.78rem', color: '#64748B', maxWidth: '320px', margin: '0 auto 14px auto', lineHeight: 1.4 }}>
+                  Proposez vos compétences en mixage, mastering, enregistrement ou direction artistique et recevez des commandes !
+                </p>
+                <button
+                  onClick={() => setIsOfferServiceModalOpen(true)}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                    color: '#FFFFFF',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  + Proposer mon premier service
+                </button>
               </div>
             ) : (
               filteredServices.map((srv) => (
@@ -641,7 +716,7 @@ export default function ProBusinessStudio({ onOpenPaywall, isDarkMode }) {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '1.3rem' }}>{srv.icon}</span>
+                      <span style={{ fontSize: '1.3rem' }}>{srv.icon || '🎚️'}</span>
                       <div>
                         <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: isDarkMode ? '#F8FAFC' : '#0F172A', margin: 0 }}>
                           {srv.title}
@@ -678,28 +753,50 @@ export default function ProBusinessStudio({ onOpenPaywall, isDarkMode }) {
                       ⏱️ {srv.delivery}
                     </span>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        soundEngine?.playPopSound?.();
-                        setSelectedServiceForOrder(srv);
-                      }}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: '12px',
-                        border: 'none',
-                        background: 'linear-gradient(135deg, #0066FF 0%, #0047FF 100%)',
-                        color: '#FFFFFF',
-                        fontWeight: 800,
-                        fontSize: '0.78rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      Commander <ChevronRight size={14} />
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleShareItemToFeed(srv, 'service')}
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: '10px',
+                          border: isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E2E8F0',
+                          background: 'transparent',
+                          color: '#0066FF',
+                          fontWeight: 700,
+                          fontSize: '0.74rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px'
+                        }}
+                      >
+                        <Share2 size={12} /> Feed
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundEngine?.playPopSound?.();
+                          setSelectedServiceForOrder(srv);
+                        }}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '12px',
+                          border: 'none',
+                          background: 'linear-gradient(135deg, #0066FF 0%, #0047FF 100%)',
+                          color: '#FFFFFF',
+                          fontWeight: 800,
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        Commander <ChevronRight size={14} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
@@ -739,62 +836,156 @@ export default function ProBusinessStudio({ onOpenPaywall, isDarkMode }) {
             <Plus size={18} /> Publier une Nouvelle Formation
           </button>
 
-          {/* Courses List */}
+          {/* Courses List / Clean Empty State */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {filteredCourses.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94A3B8', fontSize: '0.86rem' }}>
-                Aucune formation trouvée pour cette recherche.
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '36px 20px',
+                  background: isDarkMode ? '#1E293B' : '#FFFFFF',
+                  borderRadius: '20px',
+                  border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0'
+                }}
+              >
+                <div
+                  style={{
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '50%',
+                    background: isDarkMode ? 'rgba(0,102,255,0.15)' : '#EFF6FF',
+                    color: '#0066FF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 12px auto'
+                  }}
+                >
+                  <GraduationCap size={26} />
+                </div>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, margin: '0 0 6px 0', color: isDarkMode ? '#FFFFFF' : '#0F172A' }}>
+                  Aucune formation publiée actuellement
+                </h4>
+                <p style={{ fontSize: '0.78rem', color: '#64748B', maxWidth: '320px', margin: '0 auto 14px auto', lineHeight: 1.4 }}>
+                  Transmettez votre expérience musicale en créant une masterclass vidéo ou un atelier pour la communauté !
+                </p>
+                <button
+                  onClick={() => setIsCourseModalOpen(true)}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #0066FF 0%, #0047FF 100%)',
+                    color: '#FFFFFF',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  + Créer ma première formation
+                </button>
               </div>
             ) : (
               filteredCourses.map((course) => (
                 <div
                   key={course.id}
-                  onClick={() => {
-                    soundEngine?.playPopSound?.();
-                    setSelectedCourseForDetails(course);
-                  }}
                   style={{
                     background: isDarkMode ? '#1E293B' : '#FFFFFF',
                     borderRadius: '20px',
                     padding: '12px',
                     border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
                     display: 'flex',
-                    gap: '12px',
-                    cursor: 'pointer',
+                    flexDirection: 'column',
+                    gap: '8px',
                     boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
                   }}
                 >
-                  <img
-                    src={course.cover}
-                    alt={course.title}
-                    style={{ width: '80px', height: '80px', borderRadius: '16px', objectFit: 'cover', flexShrink: 0 }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <div>
-                      <h4
-                        style={{
-                          fontSize: '0.88rem',
-                          fontWeight: 800,
-                          color: isDarkMode ? '#F8FAFC' : '#0F172A',
-                          margin: '0 0 2px 0',
-                          lineHeight: 1.3
-                        }}
-                      >
-                        {course.title}
-                      </h4>
-                      <span style={{ fontSize: '0.74rem', color: '#0066FF', fontWeight: 700 }}>
-                        {course.instructor}
-                      </span>
-                    </div>
+                  <div
+                    onClick={() => {
+                      soundEngine?.playPopSound?.();
+                      setSelectedCourseForDetails(course);
+                    }}
+                    style={{ display: 'flex', gap: '12px', cursor: 'pointer' }}
+                  >
+                    <img
+                      src={course.cover}
+                      alt={course.title}
+                      style={{ width: '80px', height: '80px', borderRadius: '16px', objectFit: 'cover', flexShrink: 0 }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <div>
+                        <h4
+                          style={{
+                            fontSize: '0.88rem',
+                            fontWeight: 800,
+                            color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                            margin: '0 0 2px 0',
+                            lineHeight: 1.3
+                          }}
+                        >
+                          {course.title}
+                        </h4>
+                        <span style={{ fontSize: '0.74rem', color: '#0066FF', fontWeight: 700 }}>
+                          {course.instructor}
+                        </span>
+                      </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
-                        {course.duration}
-                      </span>
-                      <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#10B981' }}>
-                        {course.price}
-                      </span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                          {course.duration}
+                        </span>
+                        <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#10B981' }}>
+                          {course.price}
+                        </span>
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingTop: '6px',
+                      borderTop: isDarkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid #F1F5F9'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleShareItemToFeed(course, 'course')}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#0066FF',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Share2 size={13} /> Partager dans le Feed
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEngine?.playPopSound?.();
+                        setSelectedCourseForDetails(course);
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#10B981',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Voir le programme →
+                    </button>
                   </div>
                 </div>
               ))
@@ -819,7 +1010,7 @@ export default function ProBusinessStudio({ onOpenPaywall, isDarkMode }) {
               padding: '13px 16px',
               borderRadius: '18px',
               border: 'none',
-              background: 'linear-gradient(135deg, #0066FF 0%, #0047FF 100%)',
+              background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
               color: '#FFFFFF',
               fontWeight: 800,
               fontSize: '0.86rem',
@@ -828,77 +1019,171 @@ export default function ProBusinessStudio({ onOpenPaywall, isDarkMode }) {
               justifyContent: 'center',
               gap: '8px',
               cursor: 'pointer',
-              boxShadow: '0 6px 18px rgba(0, 102, 255, 0.28)'
+              boxShadow: '0 6px 18px rgba(245, 158, 11, 0.28)'
             }}
           >
             <Plus size={18} /> Organiser un Événement Pro / Live
           </button>
 
-          {/* Events List */}
+          {/* Events List / Clean Empty State */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {filteredEvents.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94A3B8', fontSize: '0.86rem' }}>
-                Aucun événement trouvé pour cette recherche.
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '36px 20px',
+                  background: isDarkMode ? '#1E293B' : '#FFFFFF',
+                  borderRadius: '20px',
+                  border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0'
+                }}
+              >
+                <div
+                  style={{
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '50%',
+                    background: isDarkMode ? 'rgba(245,158,11,0.15)' : '#FEF3C7',
+                    color: '#D97706',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 12px auto'
+                  }}
+                >
+                  <Calendar size={26} />
+                </div>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 800, margin: '0 0 6px 0', color: isDarkMode ? '#FFFFFF' : '#0F172A' }}>
+                  Aucun événement planifié
+                </h4>
+                <p style={{ fontSize: '0.78rem', color: '#64748B', maxWidth: '320px', margin: '0 auto 14px auto', lineHeight: 1.4 }}>
+                  Planifiez une session d'écoute live, un showcase ou un webinaire interactif pour rassembler les musiciens !
+                </p>
+                <button
+                  onClick={() => setIsEventModalOpen(true)}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                    color: '#FFFFFF',
+                    fontSize: '0.8rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                >
+                  + Créer mon premier événement
+                </button>
               </div>
             ) : (
               filteredEvents.map((ev) => (
                 <div
                   key={ev.id}
-                  onClick={() => {
-                    soundEngine?.playPopSound?.();
-                    setSelectedEventForTicket(ev);
-                  }}
                   style={{
                     background: isDarkMode ? '#1E293B' : '#FFFFFF',
                     borderRadius: '20px',
                     padding: '12px',
                     border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
                     display: 'flex',
-                    gap: '12px',
-                    cursor: 'pointer',
+                    flexDirection: 'column',
+                    gap: '8px',
                     boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
                   }}
                 >
-                  <img
-                    src={ev.cover}
-                    alt={ev.title}
-                    style={{ width: '80px', height: '80px', borderRadius: '16px', objectFit: 'cover', flexShrink: 0 }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <div>
-                      <span
-                        style={{
-                          fontSize: '0.68rem',
-                          fontWeight: 800,
-                          color: '#D97706',
-                          background: isDarkMode ? 'rgba(217,119,6,0.18)' : '#FEF3C7',
-                          padding: '2px 8px',
-                          borderRadius: '8px'
-                        }}
-                      >
-                        {ev.date}
-                      </span>
-                      <h4
-                        style={{
-                          fontSize: '0.88rem',
-                          fontWeight: 800,
-                          color: isDarkMode ? '#F8FAFC' : '#0F172A',
-                          margin: '3px 0 0 0',
-                          lineHeight: 1.3
-                        }}
-                      >
-                        {ev.title}
-                      </h4>
-                    </div>
+                  <div
+                    onClick={() => {
+                      soundEngine?.playPopSound?.();
+                      setSelectedEventForTicket(ev);
+                    }}
+                    style={{ display: 'flex', gap: '12px', cursor: 'pointer' }}
+                  >
+                    <img
+                      src={ev.cover}
+                      alt={ev.title}
+                      style={{ width: '80px', height: '80px', borderRadius: '16px', objectFit: 'cover', flexShrink: 0 }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <div>
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 800,
+                            color: '#D97706',
+                            background: isDarkMode ? 'rgba(217,119,6,0.18)' : '#FEF3C7',
+                            padding: '2px 8px',
+                            borderRadius: '8px'
+                          }}
+                        >
+                          {ev.date}
+                        </span>
+                        <h4
+                          style={{
+                            fontSize: '0.88rem',
+                            fontWeight: 800,
+                            color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                            margin: '3px 0 0 0',
+                            lineHeight: 1.3
+                          }}
+                        >
+                          {ev.title}
+                        </h4>
+                      </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
-                        {ev.attendees}
-                      </span>
-                      <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0066FF' }}>
-                        {ev.price}
-                      </span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                          {ev.attendees}
+                        </span>
+                        <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0066FF' }}>
+                          {ev.price}
+                        </span>
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingTop: '6px',
+                      borderTop: isDarkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid #F1F5F9'
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleShareItemToFeed(ev, 'event')}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#D97706',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Share2 size={13} /> Partager dans le Feed
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEngine?.playPopSound?.();
+                        setSelectedEventForTicket(ev);
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#0066FF',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Réserver mon Billet →
+                    </button>
                   </div>
                 </div>
               ))

@@ -1,12 +1,27 @@
 import React, { useState, useRef } from 'react';
-import { Crown, Heart, MessageSquare, Share2, UserPlus, UserCheck, Play, Pause, MoreHorizontal, Send, Trash2, AlertTriangle } from 'lucide-react';
+import { 
+  Crown, Heart, MessageSquare, Share2, UserPlus, UserCheck, 
+  Play, Pause, MoreHorizontal, Send, Trash2, AlertTriangle,
+  ShoppingBag, Sliders, GraduationCap, Calendar, ChevronRight, ExternalLink
+} from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
 import confetti from 'canvas-confetti';
 import UserAvatar from '../common/UserAvatar';
 
-function FeedCard({ post, onLike, onFollowUser, onAddComment, onDeletePost, onOpenShare, onOpenReport, onOpenPublicProfile }) {
+function FeedCard({ 
+  post, 
+  onLike, 
+  onFollowUser, 
+  onAddComment, 
+  onDeletePost, 
+  onOpenShare, 
+  onOpenReport, 
+  onOpenPublicProfile,
+  onOpenProServiceAction,
+  onStartChat
+}) {
   const { currentUser } = useAuth();
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [showComments, setShowComments] = useState(false);
@@ -107,6 +122,8 @@ function FeedCard({ post, onLike, onFollowUser, onAddComment, onDeletePost, onOp
     onAddComment(post.id, commentText);
     setCommentText('');
   };
+
+  const pro = post.proServiceData;
 
   return (
     <div
@@ -318,8 +335,171 @@ function FeedCard({ post, onLike, onFollowUser, onAddComment, onDeletePost, onOp
         {post.text}
       </p>
 
+      {/* ------------------------------------------------------------------ */}
+      {/* RICH PRO SERVICE EMBEDDED CARD (BEAT, SERVICE, COURSE, EVENT)      */}
+      {/* ------------------------------------------------------------------ */}
+      {pro && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            marginBottom: '14px',
+            borderRadius: '18px',
+            overflow: 'hidden',
+            border: '1.5px solid rgba(0, 102, 255, 0.25)',
+            background: 'linear-gradient(135deg, rgba(0, 102, 255, 0.04) 0%, rgba(16, 185, 129, 0.04) 100%)',
+            boxShadow: '0 4px 16px rgba(0, 102, 255, 0.08)'
+          }}
+        >
+          {/* Card Category Header Banner */}
+          <div
+            style={{
+              padding: '6px 12px',
+              background: pro.proType === 'work' ? 'linear-gradient(90deg, #0066FF, #0047FF)' :
+                          pro.proType === 'service' ? 'linear-gradient(90deg, #10B981, #059669)' :
+                          pro.proType === 'course' ? 'linear-gradient(90deg, #0066FF, #0284C7)' :
+                          'linear-gradient(90deg, #F59E0B, #D97706)',
+              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '0.74rem',
+              fontWeight: 800
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {pro.proType === 'work' ? <ShoppingBag size={14} /> :
+               pro.proType === 'service' ? <Sliders size={14} /> :
+               pro.proType === 'course' ? <GraduationCap size={14} /> :
+               <Calendar size={14} />}
+              {pro.proType === 'work' ? 'ŒUVRE & BEAT EN VENTE' :
+               pro.proType === 'service' ? 'PRESTATION STUDIO & MIX' :
+               pro.proType === 'course' ? 'FORMATION & MASTERCLASS' :
+               'ÉVÉNEMENT LIVE PRO'}
+            </span>
+            <span style={{ background: 'rgba(255,255,255,0.22)', padding: '2px 8px', borderRadius: '10px', fontSize: '0.7rem' }}>
+              Offre Officielle StageLink
+            </span>
+          </div>
+
+          {/* Card Content Details */}
+          <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              {pro.cover ? (
+                <img
+                  src={pro.cover}
+                  alt={pro.title}
+                  style={{ width: '70px', height: '70px', borderRadius: '14px', objectFit: 'cover', flexShrink: 0 }}
+                />
+              ) : (
+                <div style={{
+                  width: '70px',
+                  height: '70px',
+                  borderRadius: '14px',
+                  background: 'rgba(0,102,255,0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.8rem',
+                  flexShrink: 0
+                }}>
+                  {pro.icon || '🎵'}
+                </div>
+              )}
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h4 style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-dark)', margin: '0 0 3px 0' }}>
+                  {pro.title}
+                </h4>
+                <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '0 0 4px 0' }}>
+                  {pro.author || pro.provider || pro.instructor || pro.organizer}
+                  {pro.genre ? ` • ${pro.genre}` : ''}
+                  {pro.delivery ? ` • ${pro.delivery}` : ''}
+                  {pro.duration ? ` • ${pro.duration}` : ''}
+                  {pro.date ? ` • ${pro.date}` : ''}
+                </p>
+                <span style={{ fontSize: '0.92rem', fontWeight: 900, color: '#10B981' }}>
+                  {pro.price}
+                </span>
+              </div>
+            </div>
+
+            {pro.description && (
+              <p style={{ fontSize: '0.78rem', color: '#64748B', lineHeight: 1.4, margin: 0 }}>
+                {pro.description}
+              </p>
+            )}
+
+            {/* Action Buttons Row */}
+            <div style={{ display: 'flex', gap: '8px', paddingTop: '4px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine?.playPopSound?.();
+                  if (onOpenProServiceAction) {
+                    onOpenProServiceAction(pro);
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: pro.proType === 'work' ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)' :
+                              pro.proType === 'service' ? 'linear-gradient(135deg, #0066FF 0%, #0047FF 100%)' :
+                              pro.proType === 'course' ? 'linear-gradient(135deg, #0066FF 0%, #0284C7 100%)' :
+                              'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                  color: '#FFFFFF',
+                  fontWeight: 800,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.12)'
+                }}
+              >
+                {pro.proType === 'work' ? `Acheter l'Œuvre (${pro.price})` :
+                 pro.proType === 'service' ? `Commander (${pro.price})` :
+                 pro.proType === 'course' ? `S'inscrire (${pro.price})` :
+                 `Réserver Billet (${pro.price})`}
+                <ChevronRight size={15} />
+              </button>
+
+              {!isAuthor && onStartChat && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEngine?.playPopSound?.();
+                    onStartChat(
+                      { id: pro.userId, name: pro.author || pro.provider || pro.instructor || pro.organizer, avatar: pro.authorAvatar || pro.providerAvatar || pro.cover },
+                      `À propos de votre offre : ${pro.title}`
+                    );
+                  }}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    border: '1px solid #BFDBFE',
+                    background: '#EFF6FF',
+                    color: '#0066FF',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <MessageSquare size={14} /> Contacter
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Multi-Media List (Carousel-like vertical list) */}
-      {post.mediaList && post.mediaList.length > 0 ? (
+      {!pro && post.mediaList && post.mediaList.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
           {post.mediaList.map((m, i) => (
             <div key={i} style={{ borderRadius: '14px', overflow: 'hidden', background: '#000', border: '1px solid #E2E8F0' }}>
@@ -331,7 +511,7 @@ function FeedCard({ post, onLike, onFollowUser, onAddComment, onDeletePost, onOp
             </div>
           ))}
         </div>
-      ) : (
+      ) : !pro && (
         <>
           {/* Legacy single media support */}
           {post.video && (
@@ -458,10 +638,9 @@ function FeedCard({ post, onLike, onFollowUser, onAddComment, onDeletePost, onOp
           }}
         >
           <MessageSquare size={18} />
-          <span>{post.commentsCount || (post.comments ? post.comments.length : 0)} Commentaires</span>
+          <span>{post.commentsCount} Commentaires</span>
         </button>
 
-        {/* Social Share Trigger */}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -484,24 +663,25 @@ function FeedCard({ post, onLike, onFollowUser, onAddComment, onDeletePost, onOp
         </button>
       </div>
 
-      {/* Comments Drawer */}
+      {/* Comments Section */}
       {showComments && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-light)' }}
-        >
-          {post.comments && post.comments.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
+        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #F1F5F9' }}>
+          {post.comments && post.comments.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
               {post.comments.map((c) => (
-                <div key={c.id} style={{ background: 'var(--bg-light)', padding: '8px 12px', borderRadius: '10px', fontSize: '0.82rem', border: '1px solid var(--border-light)' }}>
+                <div key={c.id} style={{ fontSize: '0.8rem', background: '#F8FAFC', padding: '8px 12px', borderRadius: '10px' }}>
                   <span style={{ fontWeight: 700, color: 'var(--text-dark)', marginRight: '6px' }}>{c.userName}:</span>
-                  <span style={{ color: 'var(--text-dark)' }}>{c.text}</span>
+                  <span style={{ color: '#475569' }}>{c.text}</span>
                 </div>
               ))}
             </div>
+          ) : (
+            <p style={{ fontSize: '0.78rem', color: '#94A3B8', textAlign: 'center', margin: '8px 0 12px' }}>
+              Aucun commentaire. Soyez le premier à commenter !
+            </p>
           )}
 
-          <form onSubmit={handleCommentSubmit} style={{ display: 'flex', gap: '6px' }}>
+          <form onSubmit={handleCommentSubmit} style={{ display: 'flex', gap: '8px' }}>
             <input
               type="text"
               placeholder="Écrire un commentaire..."
@@ -510,7 +690,7 @@ function FeedCard({ post, onLike, onFollowUser, onAddComment, onDeletePost, onOp
               style={{
                 flex: 1,
                 padding: '8px 12px',
-                borderRadius: '18px',
+                borderRadius: '20px',
                 border: '1px solid #CBD5E1',
                 fontSize: '0.82rem',
                 outline: 'none'
@@ -520,32 +700,36 @@ function FeedCard({ post, onLike, onFollowUser, onAddComment, onDeletePost, onOp
               type="submit"
               style={{
                 background: '#0066FF',
-                color: '#FFFFFF',
+                color: '#FFF',
                 border: 'none',
                 borderRadius: '50%',
-                width: '32px',
-                height: '32px',
+                width: '34px',
+                height: '34px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer'
               }}
             >
-              <Send size={14} />
+              <Send size={15} />
             </button>
           </form>
         </div>
       )}
 
-      {/* Confirm Post Deletion Modal */}
-      <ConfirmDeleteModal
-        isOpen={showConfirmDelete}
-        onClose={() => setShowConfirmDelete(false)}
-        onConfirm={() => onDeletePost(post.id)}
-        title="Supprimer cette publication ?"
-        message="Êtes-vous sûr de vouloir supprimer cette publication de votre fil d'actualité ?"
-        confirmText="Supprimer le post"
-      />
+      {/* Confirm Delete Post Modal */}
+      {showConfirmDelete && (
+        <ConfirmDeleteModal
+          isOpen={showConfirmDelete}
+          title="Supprimer la publication"
+          message="Êtes-vous sûr de vouloir supprimer cette publication ? Cette action est irréversible."
+          onConfirm={() => {
+            setShowConfirmDelete(false);
+            onDeletePost(post.id);
+          }}
+          onCancel={() => setShowConfirmDelete(false)}
+        />
+      )}
     </div>
   );
 }

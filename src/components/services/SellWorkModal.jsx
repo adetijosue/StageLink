@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { X, DollarSign, FileAudio } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, DollarSign, FileAudio, Image, Music, UploadCloud, CheckCircle } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
+import { compressImage } from '../../utils/imageCompressor';
 
 export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMode }) {
   const { currentUser } = useAuth();
@@ -10,15 +11,32 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
   const [category, setCategory] = useState('Beatmaking'); // 'Beatmaking' | 'Master' | 'SamplePack' | 'Mixage'
   const [genre, setGenre] = useState('Afrobeat');
   const [licenseType, setLicenseType] = useState('Licence Exclusive + Stems');
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [description, setDescription] = useState('');
+  const [selectedAudioFile, setSelectedAudioFile] = useState(null);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState(null);
+  const [coverImage, setCoverImage] = useState(null);
   const [agreeRights, setAgreeRights] = useState(true);
+  const [shareToFeed, setShareToFeed] = useState(true);
+
+  const fileAudioInputRef = useRef(null);
+  const fileImageInputRef = useRef(null);
 
   if (!isOpen) return null;
 
-  const handleFileChange = (e) => {
+  const handleAudioChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setSelectedFile(file);
+      setSelectedAudioFile(file);
+      const url = URL.createObjectURL(file);
+      setAudioPreviewUrl(url);
+    }
+  };
+
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const compressed = await compressImage(file, 800, 800, 0.8);
+      setCoverImage(compressed);
     }
   };
 
@@ -26,19 +44,27 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
     e.preventDefault();
     if (!title.trim()) return;
 
-    soundEngine.playPopSound();
+    soundEngine?.playPopSound?.();
 
-    onWorkCreated({
+    const newWork = {
       id: `work_${Date.now()}`,
-      title,
-      author: currentUser?.name || 'Vous',
+      userId: currentUser?.id,
+      title: title.trim(),
+      author: currentUser?.name || 'Artiste StageLink',
+      authorAvatar: currentUser?.avatar || '',
       price: `${price} €`,
+      priceNum: parseFloat(price) || 0,
       genre,
       category,
       type: licenseType,
-      fileName: selectedFile ? selectedFile.name : 'Maquette_Master_Preview.mp3',
-      cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80'
-    });
+      description: description.trim(),
+      audioUrl: audioPreviewUrl || null,
+      fileName: selectedAudioFile ? selectedAudioFile.name : null,
+      cover: coverImage || currentUser?.avatar || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80',
+      createdAt: new Date().toISOString()
+    };
+
+    onWorkCreated(newWork, shareToFeed);
     onClose();
   };
 
@@ -56,7 +82,7 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
     }} onClick={onClose}>
       <div className="animate-scale-in" onClick={(e) => e.stopPropagation()} style={{
         width: '100%',
-        maxWidth: '440px',
+        maxWidth: '460px',
         maxHeight: 'calc(100dvh - max(48px, env(safe-area-inset-top, 16px) + env(safe-area-inset-bottom, 20px)))',
         display: 'flex',
         flexDirection: 'column',
@@ -66,7 +92,7 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
         boxShadow: '0 25px 65px rgba(0,0,0,0.4)',
         overflow: 'hidden'
       }}>
-        {/* Sticky Non-collapsible Top Header */}
+        {/* Header */}
         <div style={{
           flexShrink: 0,
           padding: '14px 18px',
@@ -77,11 +103,11 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
           justifyContent: 'space-between'
         }}>
           <div>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: isDarkMode ? '#FFFFFF' : '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <DollarSign size={20} color="#0066FF" /> Mettre à disposition une Œuvre
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: isDarkMode ? '#FFFFFF' : '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Music size={20} color="#0066FF" /> Mettre en Vente une Œuvre
             </h3>
-            <p style={{ fontSize: '0.76rem', color: '#64748B', margin: '2px 0 0 0' }}>
-              Publiez et monétisez vos prods & masters sur StageLink
+            <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '2px 0 0 0' }}>
+              Publiez et vendez vos compositions, beats et masters
             </p>
           </div>
 
@@ -92,22 +118,19 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
               background: isDarkMode ? '#1E293B' : '#F1F5F9',
               border: isDarkMode ? '1px solid rgba(255,255,255,0.15)' : '1px solid #CBD5E1',
               borderRadius: '50%',
-              width: '42px',
-              height: '42px',
-              minWidth: '42px',
-              minHeight: '42px',
+              width: '38px',
+              height: '38px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              justifyContent: 'center'
             }}
           >
-            <X size={20} color={isDarkMode ? '#F8FAFC' : '#0F172A'} />
+            <X size={18} color={isDarkMode ? '#F8FAFC' : '#0F172A'} />
           </button>
         </div>
 
-        {/* Scrollable Form Body */}
+        {/* Scrollable Form */}
         <div style={{
           flex: 1,
           overflowY: 'auto',
@@ -115,89 +138,57 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
           padding: '16px 18px 24px 18px'
         }}>
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {/* Category Selector */}
-            <div>
-              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '6px' }}>
-                Catégorie de l'Œuvre
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                {[
-                  { id: 'Beatmaking', label: '🎛️ Beat & Prod' },
-                  { id: 'Master', label: '💿 Master Pro' },
-                  { id: 'SamplePack', label: '🎧 Sample Pack' },
-                  { id: 'Mixage', label: '🎚️ Service Mix' }
-                ].map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setCategory(cat.id)}
-                    style={{
-                      padding: '8px 10px',
-                      borderRadius: '12px',
-                      border: category === cat.id ? '2px solid #0066FF' : isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid #CBD5E1',
-                      background: category === cat.id ? (isDarkMode ? 'rgba(0,102,255,0.2)' : '#EFF6FF') : isDarkMode ? '#1E293B' : '#F8FAFC',
-                      color: category === cat.id ? '#0066FF' : isDarkMode ? '#F8FAFC' : '#0F172A',
-                      fontWeight: 700,
-                      fontSize: '0.78rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Title */}
             <div>
-              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Titre de l'Œuvre / Maquette *
+              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '6px' }}>
+                Titre de l'Œuvre / Beat *
               </label>
               <input
                 type="text"
                 required
-                placeholder="Ex: Pack Beat Afrobeat Gold & Stems Master"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                placeholder="Ex: Afrobeat Summer Hit & Stems Master"
                 style={{
                   width: '100%',
-                  padding: '11px 14px',
+                  padding: '10px 14px',
                   borderRadius: '14px',
-                  border: isDarkMode ? '1px solid rgba(255,255,255,0.15)' : '1px solid #CBD5E1',
-                  background: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  border: isDarkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid #CBD5E1',
+                  background: isDarkMode ? '#1E293B' : '#FFFFFF',
                   color: isDarkMode ? '#FFFFFF' : '#0F172A',
-                  fontSize: '0.88rem',
-                  outline: 'none'
+                  fontSize: '0.84rem'
                 }}
               />
             </div>
 
-            {/* Price & Genre Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            {/* Category & Genre */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                  Prix (€) *
+                <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
+                  Catégorie
                 </label>
-                <input
-                  type="number"
-                  required
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '11px 14px',
-                    borderRadius: '14px',
-                    border: isDarkMode ? '1px solid rgba(255,255,255,0.15)' : '1px solid #CBD5E1',
-                    background: isDarkMode ? '#1E293B' : '#F8FAFC',
+                    padding: '9px 12px',
+                    borderRadius: '12px',
+                    border: isDarkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid #CBD5E1',
+                    background: isDarkMode ? '#1E293B' : '#FFFFFF',
                     color: isDarkMode ? '#FFFFFF' : '#0F172A',
-                    fontSize: '0.88rem',
-                    outline: 'none'
+                    fontSize: '0.82rem'
                   }}
-                />
+                >
+                  <option value="Beatmaking">Beatmaking / Prod</option>
+                  <option value="Master">Master Complet</option>
+                  <option value="SamplePack">Sample Pack & MIDI</option>
+                  <option value="Topline">Topline & Voix</option>
+                </select>
               </div>
 
               <div>
-                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
+                <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
                   Genre Musical
                 </label>
                 <select
@@ -205,109 +196,245 @@ export default function SellWorkModal({ isOpen, onClose, onWorkCreated, isDarkMo
                   onChange={(e) => setGenre(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '11px',
-                    borderRadius: '14px',
-                    border: isDarkMode ? '1px solid rgba(255,255,255,0.15)' : '1px solid #CBD5E1',
-                    background: isDarkMode ? '#1E293B' : '#F8FAFC',
+                    padding: '9px 12px',
+                    borderRadius: '12px',
+                    border: isDarkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid #CBD5E1',
+                    background: isDarkMode ? '#1E293B' : '#FFFFFF',
                     color: isDarkMode ? '#FFFFFF' : '#0F172A',
-                    fontSize: '0.85rem'
+                    fontSize: '0.82rem'
                   }}
                 >
                   <option value="Afrobeat">Afrobeat</option>
-                  <option value="Gospel">Gospel</option>
+                  <option value="Gospel">Gospel / Worship</option>
                   <option value="Amapiano">Amapiano</option>
-                  <option value="Synthwave">Synthwave</option>
                   <option value="RnB / Soul">RnB / Soul</option>
-                  <option value="Trap / HipHop">Trap / HipHop</option>
+                  <option value="Rap / Hip-Hop">Rap / Hip-Hop</option>
+                  <option value="Pop / Variété">Pop / Variété</option>
+                  <option value="Zouk / Kompa">Zouk / Kompa</option>
+                  <option value="Cinematic">Cinématique / Synchro</option>
                 </select>
               </div>
             </div>
 
-            {/* License Type */}
+            {/* Price & License */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
+                  Prix (€)
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px 9px 30px',
+                      borderRadius: '12px',
+                      border: isDarkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid #CBD5E1',
+                      background: isDarkMode ? '#1E293B' : '#FFFFFF',
+                      color: isDarkMode ? '#FFFFFF' : '#0F172A',
+                      fontSize: '0.82rem',
+                      fontWeight: 700
+                    }}
+                  />
+                  <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#10B981', fontWeight: 800 }}>€</span>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
+                  Type de Licence
+                </label>
+                <select
+                  value={licenseType}
+                  onChange={(e) => setLicenseType(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: '12px',
+                    border: isDarkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid #CBD5E1',
+                    background: isDarkMode ? '#1E293B' : '#FFFFFF',
+                    color: isDarkMode ? '#FFFFFF' : '#0F172A',
+                    fontSize: '0.82rem'
+                  }}
+                >
+                  <option value="Licence Exclusive + Stems">Exclusive + Stems (WAV)</option>
+                  <option value="Licence Commerciale MP3/WAV">Commerciale MP3 + WAV</option>
+                  <option value="Licence Non-Exclusive (MP3)">Non-Exclusive (MP3)</option>
+                  <option value="Synchro TV & Film">Synchro Média / Film</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Description / Notes */}
             <div>
-              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Conditions de Licence & Droits
+              <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
+                Description & Détails de l'Œuvre
               </label>
-              <select
-                value={licenseType}
-                onChange={(e) => setLicenseType(e.target.value)}
+              <textarea
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Précisez le tempo (BPM), la tonalité, les instruments utilisés ou conditions..."
                 style={{
                   width: '100%',
-                  padding: '11px',
-                  borderRadius: '14px',
-                  border: isDarkMode ? '1px solid rgba(255,255,255,0.15)' : '1px solid #CBD5E1',
-                  background: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  padding: '9px 12px',
+                  borderRadius: '12px',
+                  border: isDarkMode ? '1px solid rgba(255,255,255,0.12)' : '1px solid #CBD5E1',
+                  background: isDarkMode ? '#1E293B' : '#FFFFFF',
                   color: isDarkMode ? '#FFFFFF' : '#0F172A',
-                  fontSize: '0.85rem'
+                  fontSize: '0.82rem',
+                  resize: 'none'
+                }}
+              />
+            </div>
+
+            {/* Image / Cover Upload */}
+            <div>
+              <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
+                Pochette / Visuel de l'Œuvre
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileImageInputRef}
+                onChange={handleImageChange}
+                style={{ display: 'none' }}
+              />
+              <div
+                onClick={() => fileImageInputRef.current?.click()}
+                style={{
+                  border: isDarkMode ? '2px dashed rgba(255,255,255,0.15)' : '2px dashed #CBD5E1',
+                  borderRadius: '14px',
+                  padding: '12px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  background: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px'
                 }}
               >
-                <option value="Licence Exclusive + Stems">Licence Exclusive + Stems (Transfert intégral)</option>
-                <option value="Licence Non-Exclusive (WAV)">Licence Non-Exclusive (Droits d'exploitation MP3/WAV)</option>
-                <option value="Synchro TV & Film">Licence Synchro TV, Film & Publicité</option>
-              </select>
+                {coverImage ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <img src={coverImage} alt="Cover" style={{ width: '44px', height: '44px', borderRadius: '10px', objectFit: 'cover' }} />
+                    <span style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 700 }}>Visuel sélectionné (Cliquer pour changer)</span>
+                  </div>
+                ) : (
+                  <>
+                    <Image size={20} color="#0066FF" />
+                    <span style={{ fontSize: '0.78rem', color: isDarkMode ? '#CBD5E1' : '#64748B' }}>
+                      Ajouter une pochette / photo
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
 
-            {/* Audio File Selection Dropzone */}
+            {/* Audio File Upload */}
             <div>
-              <label style={{ fontSize: '0.78rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
-                Fichier Audio / Extrait de Démo (MP3/WAV/ZIP)
+              <label style={{ fontSize: '0.76rem', fontWeight: 800, color: isDarkMode ? '#CBD5E1' : '#475569', display: 'block', marginBottom: '4px' }}>
+                Fichier Audio (Extrait Démo MP3 / WAV)
               </label>
-              <label style={{
-                border: isDarkMode ? '2px dashed rgba(0, 102, 255, 0.4)' : '2px dashed #0066FF',
-                borderRadius: '16px',
-                padding: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: isDarkMode ? '#1E293B' : '#EFF6FF',
-                cursor: 'pointer',
-                textAlign: 'center'
-              }}>
-                <FileAudio size={24} color="#0066FF" style={{ marginBottom: '6px' }} />
-                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0066FF' }}>
-                  {selectedFile ? selectedFile.name : 'Sélectionner le Fichier Audio MP3/WAV'}
-                </span>
-                <span style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '2px' }}>
-                  Aperçu de démo protégé par Watermark Audio automatique
-                </span>
-                <input type="file" accept="audio/*,.zip" onChange={handleFileChange} style={{ display: 'none' }} />
-              </label>
+              <input
+                type="file"
+                accept="audio/*"
+                ref={fileAudioInputRef}
+                onChange={handleAudioChange}
+                style={{ display: 'none' }}
+              />
+              <div
+                onClick={() => fileAudioInputRef.current?.click()}
+                style={{
+                  border: isDarkMode ? '2px dashed rgba(255,255,255,0.15)' : '2px dashed #CBD5E1',
+                  borderRadius: '14px',
+                  padding: '12px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  background: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px'
+                }}
+              >
+                {selectedAudioFile ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileAudio size={20} color="#10B981" />
+                    <span style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '240px' }}>
+                      {selectedAudioFile.name}
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <UploadCloud size={20} color="#0066FF" />
+                    <span style={{ fontSize: '0.78rem', color: isDarkMode ? '#CBD5E1' : '#64748B' }}>
+                      Importer un fichier audio démo
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
 
-            {/* Rights Guarantee Checkbox */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Feed Share Toggle */}
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              background: isDarkMode ? 'rgba(0,102,255,0.12)' : '#EFF6FF',
+              padding: '10px 12px',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              border: '1px solid rgba(0,102,255,0.2)'
+            }}>
               <input
                 type="checkbox"
-                id="rightsCheck"
+                checked={shareToFeed}
+                onChange={(e) => setShareToFeed(e.target.checked)}
+                style={{ accentColor: '#0066FF', width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0066FF' }}>
+                📢 Partager automatiquement dans le fil d'actualité (Feed)
+              </span>
+            </label>
+
+            {/* Rights Agreement */}
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                required
                 checked={agreeRights}
                 onChange={(e) => setAgreeRights(e.target.checked)}
-                style={{ width: '16px', height: '16px', accentColor: '#0066FF' }}
+                style={{ marginTop: '2px', accentColor: '#0066FF' }}
               />
-              <label htmlFor="rightsCheck" style={{ fontSize: '0.75rem', color: isDarkMode ? '#CBD5E1' : '#64748B', fontWeight: 600 }}>
-                Je certifie être l'auteur/détenteur original des droits sur cette œuvre.
-              </label>
-            </div>
+              <span style={{ fontSize: '0.72rem', color: isDarkMode ? '#94A3B8' : '#64748B', lineHeight: 1.35 }}>
+                Je certifie détenir 100% des droits sur cette composition et autorise sa mise à disposition sur StageLink.
+              </span>
+            </label>
 
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={!agreeRights}
+              disabled={!agreeRights || !title.trim()}
               style={{
-                width: '100%',
-                padding: '14px',
-                borderRadius: '16px',
-                border: 'none',
-                background: agreeRights ? 'linear-gradient(135deg, #0066FF 0%, #0047FF 100%)' : '#94A3B8',
+                background: 'linear-gradient(135deg, #0066FF 0%, #0047FF 100%)',
                 color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '16px',
+                padding: '14px',
+                fontSize: '0.88rem',
                 fontWeight: 800,
-                fontSize: '0.9rem',
-                cursor: agreeRights ? 'pointer' : 'not-allowed',
-                boxShadow: agreeRights ? '0 4px 14px rgba(0, 102, 255, 0.35)' : 'none',
+                cursor: agreeRights && title.trim() ? 'pointer' : 'not-allowed',
+                opacity: agreeRights && title.trim() ? 1 : 0.6,
+                boxShadow: '0 8px 20px rgba(0, 102, 255, 0.3)',
                 marginTop: '4px'
               }}
             >
-              🚀 Mettre à disposition sur le Catalogue Pro StageLink
+              🚀 Publier mon Œuvre ({price} €)
             </button>
           </form>
         </div>
