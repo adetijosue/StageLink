@@ -4,12 +4,12 @@ export default function AppSplashScreen({ onFinish }) {
   const [stage, setStage] = useState('active'); // active -> exiting
 
   useEffect(() => {
-    // Phase 5 Transition to main app at ~3.6s
+    // Transition to main app at ~3.6s
     const exitTimer = setTimeout(() => {
       setStage('exiting');
     }, 3600);
 
-    // Full unmount callback at ~4.0s
+    // Complete unmount callback at ~4.0s
     const finishTimer = setTimeout(() => {
       if (onFinish) onFinish();
     }, 4000);
@@ -42,14 +42,14 @@ export default function AppSplashScreen({ onFinish }) {
         userSelect: 'none'
       }}
       onClick={() => {
-        // Optional quick skip on tap if user wants instant entry
+        // Quick skip on tap
         if (stage === 'active') {
           setStage('exiting');
           setTimeout(() => { if (onFinish) onFinish(); }, 400);
         }
       }}
     >
-      {/* 1. Ambient Dynamic Glows */}
+      {/* 1. Ambient Background Glows */}
       <div className="splash-ambient-radial-1" />
       <div className="splash-ambient-radial-2" />
 
@@ -60,250 +60,122 @@ export default function AppSplashScreen({ onFinish }) {
       {/* 3. Main StageLink Logo Animated Container */}
       <div className="splash-brand-stage">
         
-        {/* SVG Animated Emblem */}
-        <div className="splash-logo-wrapper">
+        {/* Official StageLink App Icon Card */}
+        <div className="splash-official-icon-container">
+          
+          {/* Base Official Logo Image */}
+          <div className="splash-official-logo-card">
+            <img
+              src="/stagelink-logo.png"
+              alt="StageLink Official Logo"
+              className="splash-official-logo-img"
+            />
+            {/* Shimmer Light Glint Sweep */}
+            <div className="splash-shimmer-sweep" />
+          </div>
+
+          {/* Glowing Vector Stroke Trace Overlay (Stage 1: 0.0s - 1.2s) */}
           <svg
-            viewBox="0 0 340 300"
-            className="splash-svg-logo"
+            viewBox="0 0 200 200"
+            className="splash-trace-overlay-svg"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
           >
             <defs>
-              {/* Neon cyan glowing stroke filter */}
-              <filter id="splashGlow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="3.5" result="blur1" />
-                <feGaussianBlur stdDeviation="8" result="blur2" />
+              <filter id="neonStrokeGlow" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="2.5" result="blur1" />
+                <feGaussianBlur stdDeviation="6" result="blur2" />
                 <feMerge>
                   <feMergeNode in="blur2" />
                   <feMergeNode in="blur1" />
                   <feMergeNode in="SourceGraphic" />
                 </feMerge>
               </filter>
-
-              {/* Linear gradient shine mask */}
-              <linearGradient id="shineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
-                <stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.8" />
-                <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-              </linearGradient>
-
-              {/* Clip path for the bottom sweep */}
-              <clipPath id="logoClip">
-                {/* Outer S Ribbon */}
-                <path d="M 238,62 C 205,32 128,32 94,66 C 62,98 58,154 75,190 C 86,214 108,228 132,228 L 132,204 C 116,204 100,192 92,176 C 80,148 84,106 108,82 C 132,58 190,56 216,78 C 228,88 238,98 238,98 Z" />
-                <path d="M 94,228 C 94,268 144,292 196,290 C 238,288 258,252 258,206 L 234,206 C 234,240 218,266 188,266 C 148,266 118,246 118,228 Z" />
-                {/* Student */}
-                <circle cx="128" cy="120" r="14" />
-                <polygon points="104,104 128,92 152,104 128,114" />
-                {/* Professional */}
-                <circle cx="198" cy="112" r="14" />
-                {/* Handshake & Torso */}
-                <path d="M 104,196 C 104,160 120,144 140,144 C 150,144 158,154 164,166 L 174,178 L 184,166 C 190,154 198,144 208,144 C 218,144 224,152 228,162 L 254,124 L 274,104 L 268,136 L 256,150 L 236,182 C 232,192 222,196 212,196 L 188,196 L 174,182 L 160,196 Z" />
-              </clipPath>
             </defs>
 
-            {/* --- 1. STROKE OUTLINE TRACING (Stage 1: 0.0s - 1.2s) --- */}
-            <g className="splash-stroke-layer">
-              {/* Outer Top S-Arch */}
+            <g className="splash-vector-trace-group">
+              {/* Outer S-Curve Top */}
               <path
-                d="M 238,72 C 210,40 134,38 98,72 C 68,102 64,152 78,186 C 88,210 108,224 130,224"
+                d="M 132,48 C 118,34 82,34 66,48 C 50,62 48,88 56,104 C 62,116 72,122 84,122"
                 stroke="#FFFFFF"
-                strokeWidth="16"
+                strokeWidth="7"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 pathLength="100"
-                className="splash-draw-path path-s-top"
+                className="splash-trace-path p1"
               />
-
-              {/* Outer Bottom S-Arch */}
+              {/* Outer S-Curve Bottom */}
               <path
-                d="M 102,224 C 102,264 148,284 194,282 C 234,280 252,248 252,204"
+                d="M 68,122 C 68,142 90,154 114,152 C 134,150 144,136 144,116"
                 stroke="#FFFFFF"
-                strokeWidth="16"
+                strokeWidth="7"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 pathLength="100"
-                className="splash-draw-path path-s-bottom"
+                className="splash-trace-path p2"
               />
-
-              {/* Student Mortarboard Cap Diamond */}
-              <path
-                d="M 104,100 L 128,88 L 152,100 L 128,110 Z"
+              {/* Student Cap */}
+              <polygon
+                points="72,66 84,60 96,66 84,72"
                 stroke="#FFFFFF"
-                strokeWidth="4"
+                strokeWidth="2.5"
                 strokeLinejoin="round"
                 pathLength="100"
-                className="splash-draw-path path-cap"
+                className="splash-trace-path p3"
               />
-              {/* Cap Tassel */}
-              <path
-                d="M 110,103 C 104,110 102,118 104,124"
-                stroke="#FFFFFF"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                pathLength="100"
-                className="splash-draw-path path-tassel"
-              />
-
               {/* Student Head */}
               <circle
-                cx="128"
-                cy="118"
-                r="13"
+                cx="84"
+                cy="76"
+                r="7"
                 stroke="#FFFFFF"
-                strokeWidth="4"
+                strokeWidth="2.5"
                 pathLength="100"
-                className="splash-draw-path path-head-1"
+                className="splash-trace-path p4"
               />
-
-              {/* Student Torso & Left Arm */}
-              <path
-                d="M 106,192 C 106,162 118,146 136,146 C 146,146 154,154 162,166 L 172,178"
-                stroke="#FFFFFF"
-                strokeWidth="12"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                pathLength="100"
-                className="splash-draw-path path-body-student"
-              />
-
               {/* Professional Head */}
               <circle
-                cx="198"
-                cy="110"
-                r="13"
+                cx="120"
+                cy="72"
+                r="7"
                 stroke="#FFFFFF"
-                strokeWidth="4"
+                strokeWidth="2.5"
                 pathLength="100"
-                className="splash-draw-path path-head-2"
+                className="splash-trace-path p5"
               />
-
-              {/* Handshake Clasp (Connection) */}
+              {/* Handshake & Shoulders */}
               <path
-                d="M 160,170 L 172,182 L 184,170"
+                d="M 72,110 C 72,94 78,86 88,86 C 94,86 98,92 104,98 L 110,92 C 114,86 118,86 124,86 C 130,86 134,92 136,98 L 148,78"
                 stroke="#FFFFFF"
-                strokeWidth="10"
+                strokeWidth="6"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 pathLength="100"
-                className="splash-draw-path path-handshake"
+                className="splash-trace-path p6"
               />
-
-              {/* Professional Torso & Ascending Arrow Arm */}
-              <path
-                d="M 182,172 C 190,158 198,146 208,146 C 218,146 226,156 230,166 L 258,124"
-                stroke="#FFFFFF"
-                strokeWidth="12"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                pathLength="100"
-                className="splash-draw-path path-body-pro"
-              />
-
-              {/* Arrow Head */}
-              <path
-                d="M 242,122 L 278,98 L 268,140 Z"
-                stroke="#FFFFFF"
-                strokeWidth="4"
-                strokeLinejoin="round"
-                pathLength="100"
-                className="splash-draw-path path-arrowhead"
-              />
-            </g>
-
-            {/* --- 2. SOLID FILL SHAPES (Stage 2: 1.2s - 1.8s) --- */}
-            <g className="splash-fill-layer">
-              {/* Outer Top S-Arch Ribbon */}
-              <path
-                d="M 238,72 C 210,40 134,38 98,72 C 68,102 64,152 78,186 C 88,210 108,224 130,224"
-                stroke="#FFFFFF"
-                strokeWidth="16"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-
-              {/* Outer Bottom S-Arch Ribbon */}
-              <path
-                d="M 102,224 C 102,264 148,284 194,282 C 234,280 252,248 252,204"
-                stroke="#FFFFFF"
-                strokeWidth="16"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-
-              {/* Student Mortarboard Cap */}
+              {/* Ascending Arrow Tip */}
               <polygon
-                points="104,100 128,88 152,100 128,110"
-                fill="#FFFFFF"
-              />
-              {/* Cap Tassel */}
-              <path
-                d="M 110,103 C 104,110 102,118 104,124"
+                points="140,76 158,64 152,86"
                 stroke="#FFFFFF"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-              />
-              <circle cx="104" cy="125" r="2.5" fill="#FFFFFF" />
-
-              {/* Student Head */}
-              <circle cx="128" cy="118" r="13" fill="#FFFFFF" />
-
-              {/* Professional Head */}
-              <circle cx="198" cy="110" r="13" fill="#FFFFFF" />
-
-              {/* Combined Student Body, Handshake & Professional Suit Body */}
-              <path
-                d="M 106,192 C 106,162 118,146 136,146 C 146,146 154,154 162,166 L 172,178 L 182,166 C 190,154 198,146 208,146 C 218,146 226,156 230,166 L 258,124"
-                stroke="#FFFFFF"
-                strokeWidth="13"
-                strokeLinecap="round"
+                strokeWidth="2.5"
                 strokeLinejoin="round"
-                fill="none"
+                pathLength="100"
+                className="splash-trace-path p7"
               />
-
-              {/* Solid Student Torso Base */}
-              <path
-                d="M 104,196 C 104,166 116,152 134,152 C 146,152 154,162 162,176 L 172,188 L 160,196 Z"
-                fill="#FFFFFF"
-              />
-
-              {/* Solid Pro Torso Base */}
-              <path
-                d="M 184,176 C 192,162 200,152 212,152 C 224,152 232,166 234,196 L 184,196 Z"
-                fill="#FFFFFF"
-              />
-
-              {/* Solid Arrow Head */}
-              <polygon
-                points="242,122 280,96 268,140"
-                fill="#FFFFFF"
-              />
-
-              {/* Light Sweep Glint along Bottom Curve */}
-              <g clipPath="url(#logoClip)">
-                <rect
-                  className="splash-light-glint"
-                  x="-150"
-                  y="0"
-                  width="120"
-                  height="300"
-                  fill="url(#shineGradient)"
-                  transform="skewX(-25)"
-                />
-              </g>
-            </g>
-
-            {/* --- 3. DYNAMIC ARROW SPARK (Stage 4: 2.2s - 3.2s) --- */}
-            <g className="splash-arrow-spark-group" transform="translate(280, 96)">
-              {/* Bursting Star Rays */}
-              <path
-                d="M 0,-18 L 4,-5 L 18,0 L 4,5 L 0,18 L -4,5 L -18,0 L -4,-5 Z"
-                fill="#FFFFFF"
-                className="splash-spark-star"
-              />
-              <circle cx="0" cy="0" r="4" fill="#FFFFFF" className="splash-spark-center" />
             </g>
           </svg>
+
+          {/* Dynamic Arrow Sparkle Star on Top-Right Arrow Tip (Stage 4: 2.2s - 3.2s) */}
+          <div className="splash-arrow-sparkle-anchor">
+            <svg viewBox="0 0 40 40" className="splash-sparkle-svg">
+              <path
+                d="M 20,2 L 23.5,14.5 L 36,18 L 23.5,21.5 L 20,34 L 16.5,21.5 L 4,18 L 16.5,14.5 Z"
+                fill="#FFFFFF"
+                className="splash-sparkle-star"
+              />
+              <circle cx="20" cy="18" r="3.5" fill="#FFFFFF" />
+            </svg>
+          </div>
         </div>
 
         {/* --- 4. TYPOGRAPHY 'StageLink' (Stage 3: 1.6s - 2.4s) --- */}
@@ -323,7 +195,7 @@ export default function AppSplashScreen({ onFinish }) {
         Powered by <strong>JABE PRODUCTION</strong>
       </div>
 
-      {/* --- PURE CSS ANIMATION TIMELINE & KEYFRAMES --- */}
+      {/* --- CSS ANIMATION TIMELINE & KEYFRAMES --- */}
       <style>{`
         /* ============================================================
            GLOBAL SPLASH KEYFRAMES & EASING
@@ -334,28 +206,28 @@ export default function AppSplashScreen({ onFinish }) {
         /* Ambient Glow Pulses */
         .splash-ambient-radial-1 {
           position: absolute;
-          width: 500px;
-          height: 500px;
+          width: 520px;
+          height: 520px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(56, 189, 248, 0.22) 0%, rgba(13, 114, 209, 0) 70%);
-          top: 20%;
+          background: radial-gradient(circle, rgba(56, 189, 248, 0.25) 0%, rgba(13, 114, 209, 0) 70%);
+          top: 25%;
           left: 50%;
           transform: translate(-50%, -50%);
-          filter: blur(50px);
+          filter: blur(55px);
           pointer-events: none;
           animation: ambientFloat 4s ease-in-out infinite alternate;
         }
 
         .splash-ambient-radial-2 {
           position: absolute;
-          width: 350px;
-          height: 350px;
+          width: 380px;
+          height: 380px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, rgba(10, 60, 150, 0) 65%);
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.14) 0%, rgba(10, 60, 150, 0) 65%);
           top: 65%;
           left: 50%;
           transform: translate(-50%, -50%);
-          filter: blur(40px);
+          filter: blur(45px);
           pointer-events: none;
         }
 
@@ -373,22 +245,22 @@ export default function AppSplashScreen({ onFinish }) {
           left: 50%;
           transform: translate(-50%, -50%);
           border-radius: 50%;
-          border: 1.5px solid rgba(255, 255, 255, 0.7);
-          box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+          border: 1.5px solid rgba(255, 255, 255, 0.75);
+          box-shadow: 0 0 24px rgba(56, 189, 248, 0.6);
           pointer-events: none;
           opacity: 0;
         }
 
         .ripple-1 {
-          width: 140px;
-          height: 140px;
+          width: 170px;
+          height: 170px;
           animation: rippleExpand 1.1s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
           animation-delay: 2.2s;
         }
 
         .ripple-2 {
-          width: 140px;
-          height: 140px;
+          width: 170px;
+          height: 170px;
           animation: rippleExpand 1.1s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
           animation-delay: 2.45s;
         }
@@ -396,11 +268,11 @@ export default function AppSplashScreen({ onFinish }) {
         @keyframes rippleExpand {
           0% {
             transform: translate(-50%, -50%) scale(0.6);
-            opacity: 0.55;
+            opacity: 0.6;
             border-width: 2px;
           }
           100% {
-            transform: translate(-50%, -50%) scale(2.3);
+            transform: translate(-50%, -50%) scale(2.4);
             opacity: 0;
             border-width: 0.5px;
           }
@@ -422,118 +294,195 @@ export default function AppSplashScreen({ onFinish }) {
 
         @keyframes logoPulse {
           0% { transform: scale(1); }
-          50% { transform: scale(1.035); }
+          50% { transform: scale(1.04); }
           100% { transform: scale(1); }
         }
 
-        .splash-logo-wrapper {
-          width: 220px;
-          height: 195px;
+        /* ------------------------------------------------------------
+           OFFICIAL LOGO SQUIRCLE CARD
+           ------------------------------------------------------------ */
+        .splash-official-icon-container {
+          position: relative;
+          width: 165px;
+          height: 165px;
           display: flex;
           align-items: center;
           justifyContent: center;
-          position: relative;
         }
 
-        .splash-svg-logo {
+        .splash-official-logo-card {
           width: 100%;
           height: 100%;
-          overflow: visible;
-          filter: drop-shadow(0 12px 30px rgba(0, 20, 70, 0.35));
+          border-radius: 38px;
+          overflow: hidden;
+          position: relative;
+          box-shadow: 
+            0 24px 50px rgba(0, 15, 60, 0.45),
+            0 0 50px rgba(56, 189, 248, 0.3),
+            inset 0 1px 1px rgba(255, 255, 255, 0.35);
+          animation: cardEmerge 1.2s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+        }
+
+        .splash-official-logo-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+          transform: scale(1.01);
+        }
+
+        @keyframes cardEmerge {
+          0% {
+            opacity: 0;
+            transform: scale(0.85);
+            filter: brightness(1.4) blur(10px);
+          }
+          50% {
+            opacity: 0.7;
+            filter: brightness(1.2) blur(3px);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1);
+            filter: brightness(1) blur(0px);
+          }
         }
 
         /* ------------------------------------------------------------
-           STAGE 1: Stroke Path Tracing (0.0s – 1.2s)
+           STAGE 1: Stroke Path Tracing Overlay (0.0s – 1.2s)
            ------------------------------------------------------------ */
-        .splash-stroke-layer {
-          filter: url(#splashGlow);
-          animation: strokeFadeOut 0.4s ease-out forwards;
-          animation-delay: 1.4s;
+        .splash-trace-overlay-svg {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+          z-index: 5;
+          filter: url(#neonStrokeGlow);
+          animation: traceFadeOut 0.5s ease-out forwards;
+          animation-delay: 1.25s;
         }
 
-        .splash-draw-path {
+        .splash-trace-path {
           stroke-dasharray: 100;
           stroke-dashoffset: 100;
-          animation: drawPath 1.2s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+          animation: drawStrokePath 1.2s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
         }
 
-        .path-s-top { animation-delay: 0.0s; }
-        .path-s-bottom { animation-delay: 0.15s; }
-        .path-cap { animation-delay: 0.25s; }
-        .path-tassel { animation-delay: 0.35s; }
-        .path-head-1 { animation-delay: 0.3s; }
-        .path-body-student { animation-delay: 0.4s; }
-        .path-handshake { animation-delay: 0.5s; }
-        .path-head-2 { animation-delay: 0.45s; }
-        .path-body-pro { animation-delay: 0.55s; }
-        .path-arrowhead { animation-delay: 0.7s; }
+        .p1 { animation-delay: 0.0s; }
+        .p2 { animation-delay: 0.15s; }
+        .p3 { animation-delay: 0.25s; }
+        .p4 { animation-delay: 0.3s; }
+        .p5 { animation-delay: 0.4s; }
+        .p6 { animation-delay: 0.5s; }
+        .p7 { animation-delay: 0.65s; }
 
-        @keyframes drawPath {
-          0% {
-            stroke-dashoffset: 100;
-            opacity: 0.3;
-          }
-          30% {
-            opacity: 1;
-          }
-          100% {
-            stroke-dashoffset: 0;
-            opacity: 1;
-          }
+        @keyframes drawStrokePath {
+          0% { stroke-dashoffset: 100; opacity: 0.2; }
+          30% { opacity: 1; }
+          100% { stroke-dashoffset: 0; opacity: 1; }
         }
 
-        @keyframes strokeFadeOut {
+        @keyframes traceFadeOut {
           0% { opacity: 1; }
           100% { opacity: 0; }
         }
 
         /* ------------------------------------------------------------
-           STAGE 2: Solid Fill Emergence & Light Sweep (1.2s – 1.8s)
+           STAGE 2: Shimmer Glint Sweep (1.2s – 2.0s)
            ------------------------------------------------------------ */
-        .splash-fill-layer {
-          opacity: 0;
-          animation: fillEmerge 0.6s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
-          animation-delay: 1.2s;
+        .splash-shimmer-sweep {
+          position: absolute;
+          top: 0;
+          left: -120%;
+          width: 70%;
+          height: 100%;
+          background: linear-gradient(
+            to right,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, 0.55) 50%,
+            rgba(255, 255, 255, 0) 100%
+          );
+          transform: skewX(-25deg);
+          animation: shimmerSweepAnim 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+          animation-delay: 1.25s;
+          pointer-events: none;
+          z-index: 3;
         }
 
-        @keyframes fillEmerge {
-          0% {
-            opacity: 0;
-            filter: brightness(1.6) drop-shadow(0 0 16px rgba(255, 255, 255, 0.9));
-          }
-          100% {
-            opacity: 1;
-            filter: brightness(1) drop-shadow(0 4px 16px rgba(0, 0, 0, 0.15));
-          }
-        }
-
-        /* Glint Light Sweep (1.3s - 2.1s) */
-        .splash-light-glint {
-          animation: glintSweep 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-          animation-delay: 1.3s;
-        }
-
-        @keyframes glintSweep {
-          0% { transform: translateX(-120px) skewX(-25deg); opacity: 0; }
-          30% { opacity: 0.9; }
-          100% { transform: translateX(380px) skewX(-25deg); opacity: 0; }
+        @keyframes shimmerSweepAnim {
+          0% { left: -120%; }
+          100% { left: 220%; }
         }
 
         /* ------------------------------------------------------------
-           STAGE 3: Typography 'StageLink' (1.6s – 2.4s)
+           STAGE 4: Dynamic Arrow Sparkle (2.2s – 3.2s)
+           ------------------------------------------------------------ */
+        .splash-arrow-sparkle-anchor {
+          position: absolute;
+          top: 17%;
+          right: 17%;
+          width: 36px;
+          height: 36px;
+          z-index: 10;
+          pointer-events: none;
+          transform: translate(50%, -50%);
+          opacity: 0;
+          animation: sparkleBurstAnim 0.9s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+          animation-delay: 2.15s;
+        }
+
+        .splash-sparkle-svg {
+          width: 100%;
+          height: 100%;
+          overflow: visible;
+        }
+
+        .splash-sparkle-star {
+          filter: drop-shadow(0 0 8px rgba(255, 255, 255, 1)) drop-shadow(0 0 16px rgba(56, 189, 248, 0.9));
+          animation: idleShimmerAnim 2.2s ease-in-out infinite alternate;
+          animation-delay: 3.0s;
+        }
+
+        @keyframes sparkleBurstAnim {
+          0% {
+            transform: translate(50%, -50%) scale(0) rotate(0deg);
+            opacity: 0;
+          }
+          45% {
+            transform: translate(50%, -50%) scale(1.4) rotate(45deg);
+            opacity: 1;
+          }
+          80% {
+            transform: translate(50%, -50%) scale(0.95) rotate(90deg);
+            opacity: 0.95;
+          }
+          100% {
+            transform: translate(50%, -50%) scale(1) rotate(90deg);
+            opacity: 0.95;
+          }
+        }
+
+        @keyframes idleShimmerAnim {
+          0% { opacity: 0.55; transform: scale(0.85); }
+          100% { opacity: 1; transform: scale(1.2); filter: drop-shadow(0 0 14px rgba(255, 255, 255, 1)); }
+        }
+
+        /* ------------------------------------------------------------
+           STAGE 3: Typography & Slogan (1.6s – 2.4s)
            ------------------------------------------------------------ */
         .splash-brand-typography {
-          margin-top: 14px;
+          margin-top: 18px;
           display: flex;
           align-items: center;
           justifyContent: center;
           font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Outfit', 'Inter', sans-serif;
-          font-size: 2.35rem;
+          font-size: 2.25rem;
           color: #FFFFFF;
-          text-shadow: 0 4px 18px rgba(0, 20, 60, 0.35);
+          text-shadow: 0 4px 18px rgba(0, 20, 60, 0.4);
           opacity: 0;
-          transform: translateY(25px);
-          animation: textSlideUp 0.8s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+          transform: translateY(22px);
+          animation: textSlideUpAnim 0.8s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
           animation-delay: 1.6s;
         }
 
@@ -548,10 +497,10 @@ export default function AppSplashScreen({ onFinish }) {
           margin-left: 1px;
         }
 
-        @keyframes textSlideUp {
+        @keyframes textSlideUpAnim {
           0% {
             opacity: 0;
-            transform: translateY(25px);
+            transform: translateY(22px);
             letter-spacing: 2px;
           }
           100% {
@@ -564,63 +513,20 @@ export default function AppSplashScreen({ onFinish }) {
         .splash-tagline-text {
           margin-top: 6px;
           font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif;
-          font-size: 0.92rem;
+          font-size: 0.9rem;
           font-weight: 500;
           color: rgba(255, 255, 255, 0.85);
           letter-spacing: 0.2px;
           text-shadow: 0 2px 8px rgba(0,0,0,0.25);
           opacity: 0;
-          transform: translateY(15px);
-          animation: taglineFadeIn 0.8s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+          transform: translateY(14px);
+          animation: taglineFadeInAnim 0.8s cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
           animation-delay: 1.85s;
         }
 
-        @keyframes taglineFadeIn {
-          0% { opacity: 0; transform: translateY(15px); }
+        @keyframes taglineFadeInAnim {
+          0% { opacity: 0; transform: translateY(14px); }
           100% { opacity: 0.9; transform: translateY(0); }
-        }
-
-        /* ------------------------------------------------------------
-           STAGE 4: Dynamic Arrow Spark & Star (2.2s – 3.2s)
-           ------------------------------------------------------------ */
-        .splash-arrow-spark-group {
-          opacity: 0;
-          transform-origin: center;
-          animation: sparkBurst 0.9s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
-          animation-delay: 2.15s;
-        }
-
-        .splash-spark-star {
-          filter: drop-shadow(0 0 8px rgba(255, 255, 255, 1)) drop-shadow(0 0 14px rgba(56, 189, 248, 0.8));
-          animation: idleShimmer 2.2s ease-in-out infinite alternate;
-          animation-delay: 3.0s;
-        }
-
-        @keyframes sparkBurst {
-          0% {
-            transform: scale(0) rotate(0deg);
-            opacity: 0;
-          }
-          40% {
-            transform: scale(1.35) rotate(45deg);
-            opacity: 1;
-          }
-          75% {
-            transform: scale(0.9) rotate(90deg);
-            opacity: 0.9;
-          }
-          100% {
-            transform: scale(1) rotate(90deg);
-            opacity: 0.95;
-          }
-        }
-
-        /* ------------------------------------------------------------
-           STAGE 5: Idle Shimmer (3.2s+)
-           ------------------------------------------------------------ */
-        @keyframes idleShimmer {
-          0% { opacity: 0.55; transform: scale(0.85); }
-          100% { opacity: 1; transform: scale(1.15); filter: drop-shadow(0 0 12px rgba(255, 255, 255, 1)); }
         }
 
         /* ------------------------------------------------------------
@@ -629,12 +535,12 @@ export default function AppSplashScreen({ onFinish }) {
         .splash-brand-footer {
           position: absolute;
           bottom: 34px;
-          color: rgba(255, 255, 255, 0.6);
+          color: rgba(255, 255, 255, 0.65);
           font-size: 0.78rem;
           letter-spacing: 0.6px;
           font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
           opacity: 0;
-          animation: footerFade 0.8s ease-out forwards;
+          animation: footerFadeAnim 0.8s ease-out forwards;
           animation-delay: 2.1s;
         }
 
@@ -643,7 +549,7 @@ export default function AppSplashScreen({ onFinish }) {
           font-weight: 700;
         }
 
-        @keyframes footerFade {
+        @keyframes footerFadeAnim {
           0% { opacity: 0; transform: translateY(8px); }
           100% { opacity: 1; transform: translateY(0); }
         }
