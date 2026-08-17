@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-const InboxView = React.lazy(() => import('./components/messaging/instagram/InboxView'));
-const MessageThread = React.lazy(() => import('./components/messaging/instagram/MessageThread'));
+import InboxView from './components/messaging/instagram/InboxView';
+import MessageThread from './components/messaging/instagram/MessageThread';
 import { directChatService } from './services/directChatService';
 
 import { Plus, Volume2, User } from 'lucide-react';
@@ -23,7 +23,7 @@ const PublicProfileModal = React.lazy(() => import('./components/profile/PublicP
 const SwipeMatching = React.lazy(() => import('./components/matching/SwipeMatching'));
 const ChatList = React.lazy(() => import('./components/messaging/ChatList'));
 const ChatRoom = React.lazy(() => import('./components/messaging/ChatRoom'));
-const EphemeralModal = React.lazy(() => import('./components/messaging/EphemeralModal'));
+import EphemeralModal from './components/messaging/EphemeralModal';
 const VideoCallScreen = React.lazy(() => import('./components/messaging/VideoCallScreen'));
 const NewChatModal = React.lazy(() => import('./components/messaging/NewChatModal'));
 const CallHistoryModal = React.lazy(() => import('./components/messaging/CallHistoryModal'));
@@ -34,7 +34,7 @@ const CourseDetailsModal = React.lazy(() => import('./components/services/Course
 const EventTicketModal = React.lazy(() => import('./components/services/EventTicketModal'));
 const ProfileView = React.lazy(() => import('./components/premium/ProfileView'));
 const PaywallModal = React.lazy(() => import('./components/premium/PaywallModal'));
-const NotificationsDrawer = React.lazy(() => import('./components/notifications/NotificationsDrawer'));
+import NotificationsDrawer from './components/notifications/NotificationsDrawer';
 import AppSplashScreen from './components/common/AppSplashScreen';
 import GlobalAudioPlayer from './components/audio/GlobalAudioPlayer';
 import PWAInstallPrompt from './components/common/PWAInstallPrompt';
@@ -791,45 +791,7 @@ function MainApp() {
           return mergedChats;
         });
 
-        // Open target profile if query params exist (e.g. from QR Code Scan)
-        try {
-          const params = new URLSearchParams(window.location.search);
-          const targetProfileId = params.get('profile') || params.get('user');
-          if (targetProfileId) {
-            const target = (loadedUsers || []).find(
-              (u) => u.id === targetProfileId || (u.name && u.name.toLowerCase().replace(/[^a-z0-9]/g, '-') === targetProfileId)
-            );
-            if (target) {
-              setPublicProfileUser(target);
-            } else if (isSupabaseConfigured()) {
-              // Direct Supabase lookup for external QR Code scan
-              supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', targetProfileId)
-                .maybeSingle()
-                .then(({ data: spProfile }) => {
-                  if (spProfile) {
-                    const mappedTarget = {
-                      id: spProfile.id,
-                      name: spProfile.full_name || 'Artiste StageLink',
-                      avatar: spProfile.avatar_url || '',
-                      role: spProfile.role || 'Artiste',
-                      location: spProfile.location || 'Studio & En ligne',
-                      bio: spProfile.bio || '',
-                      badgeType: spProfile.badge_type || null,
-                      verified: spProfile.verified || false,
-                      tracks: spProfile.tracks || [],
-                      socials: spProfile.socials || {},
-                      gear: spProfile.gear || []
-                    };
-                    setPublicProfileUser(mappedTarget);
-                  }
-                })
-                .catch((qrErr) => console.warn("Supabase QR profile fetch note:", qrErr?.message));
-            }
-          }
-        } catch (e) { console.error("Suppressed error:", e); }
+
 
         // Handle One-Time Welcome Onboarding & Welcome Chat for New Registrations
         const alreadyShown = localStorage.getItem(welcomeSeenKey);
@@ -3443,6 +3405,85 @@ function MainApp() {
   );
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('StageLink Caught UI Exception:', error, errorInfo);
+  }
+
+  handleReload = () => {
+    try {
+      localStorage.removeItem('stagelink_cache_version');
+      sessionStorage.clear();
+    } catch (e) {}
+    window.location.reload();
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          padding: '30px 20px',
+          textAlign: 'center',
+          color: '#FFF',
+          background: '#0B0F19',
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            background: 'rgba(0, 102, 255, 0.15)',
+            border: '1px solid rgba(0, 102, 255, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '16px'
+          }}>
+            <span style={{ fontSize: '28px' }}>🎵</span>
+          </div>
+          <h2 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '8px' }}>
+            StageLink
+          </h2>
+          <p style={{ color: '#94A3B8', fontSize: '0.9rem', maxWidth: '340px', lineHeight: 1.5, marginBottom: '24px' }}>
+            Actualisation rapide nécessaire pour synchroniser votre session.
+          </p>
+          <button
+            onClick={this.handleReload}
+            style={{
+              padding: '14px 28px',
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, #0066FF 0%, #00C6FF 100%)',
+              color: '#FFF',
+              border: 'none',
+              fontWeight: 700,
+              fontSize: '0.95rem',
+              cursor: 'pointer',
+              boxShadow: '0 8px 24px rgba(0, 102, 255, 0.4)'
+            }}
+          >
+            Actualiser StageLink
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [showSplash, setShowSplash] = useState(() => {
     let isExplicitReload = false;
@@ -3518,11 +3559,14 @@ export default function App() {
   };
 
   return (
-    <LanguageProvider>
-      <AuthProvider>
-        <MainApp />
-        {showSplash && <AppSplashScreen onFinish={handleFinishSplash} />}
-      </AuthProvider>
-    </LanguageProvider>
+    <ErrorBoundary>
+      <LanguageProvider>
+        <AuthProvider>
+          <MainApp />
+          {showSplash && <AppSplashScreen onFinish={handleFinishSplash} />}
+        </AuthProvider>
+      </LanguageProvider>
+    </ErrorBoundary>
   );
 }
+
