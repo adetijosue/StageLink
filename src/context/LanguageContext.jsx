@@ -193,7 +193,10 @@ export const translations = {
     notifs_title: 'Notifications',
     notifs_empty: 'Aucune notification pour le moment',
     notifs_mark_all_read: 'Tout marquer comme lu',
-    notifs_clear_all: 'Effacer l\'historique',
+    notifs_clear_all: 'Tout effacer',
+    language_auto: 'Automatique (Appareil)',
+    language_device_detected: 'Langue de votre appareil détectée',
+    language_auto_desc: 'S\'adapte automatiquement à la langue de votre téléphone ou ordinateur',
 
     // Common Actions
     btn_back: 'Retour',
@@ -210,28 +213,28 @@ export const translations = {
   en: {
     // Navigation
     nav_home: 'Home',
-    nav_match: 'Match Pro',
+    nav_match: 'Pro Match',
     nav_discussions: 'Messages',
     nav_services: 'Pro Services',
     nav_profile: 'Profile',
 
     // TopBar & Header
-    topbar_search_tooltip: 'Search member or artist',
+    topbar_search_tooltip: 'Search for a member or artist',
     topbar_notifs_tooltip: 'Notifications',
     pass_gold: 'Gold Pass',
     vip_gold: 'Gold VIP',
 
     // Home / Feed
-    feed_title: 'Activity Feed',
+    feed_title: 'News Feed',
     feed_filter_for_you: 'For You',
     feed_filter_following: 'Following',
     feed_filter_trending: 'Trending',
-    create_post_placeholder: 'Share a demo, a project, or news...',
-    create_post_title: 'Create a Post',
+    create_post_placeholder: 'Share a demo, project, or news...',
+    create_post_title: 'Create a post',
     create_post_btn: 'Publish',
     create_post_cancel: 'Cancel',
-    create_post_add_audio: 'Add an audio snippet / demo',
-    create_post_add_media: 'Add a photo or video',
+    create_post_add_audio: 'Add audio demo / sample',
+    create_post_add_media: 'Add photo or video',
     create_post_location: 'Add location',
     create_post_collaborators: 'Tag artists',
     publish: 'Publish',
@@ -242,12 +245,12 @@ export const translations = {
     like_btn: 'Like',
     comment_btn: 'Comment',
     share_btn: 'Share',
-    listen_demo: 'Listen to demo',
+    listen_demo: 'Play demo',
     pause_demo: 'Pause',
     view_comments: 'View comments',
     add_comment_placeholder: 'Write a comment...',
     no_posts_found: 'No posts yet',
-    no_posts_subtitle: 'Be the first to share a demo or a music project!',
+    no_posts_subtitle: 'Be the first to share a demo or musical project!',
     post_deleted: 'Post deleted',
     report_post: 'Report',
     delete_post: 'Delete',
@@ -256,14 +259,14 @@ export const translations = {
     // Stories
     story_your_story: 'Your Story',
     story_reply_placeholder: 'Reply to story...',
-    story_seen_by: 'Seen by',
+    story_seen_by: 'Viewed by',
     story_delete: 'Delete my story',
-    story_record_video: 'Record a video',
-    story_take_photo: 'Take a photo',
+    story_record_video: 'Record video',
+    story_take_photo: 'Take photo',
 
     // Match Pro
-    match_title: 'Match Pro • Collaborations',
-    match_subtitle: 'Swipe right to Match or left to Skip.',
+    match_title: 'Pro Match • Collaborations',
+    match_subtitle: 'Swipe right to Match or swipe left to Pass.',
     match_live_talents: 'LIVE TALENTS',
     match_synergy: 'Synergy',
     filter_all: 'All',
@@ -271,16 +274,16 @@ export const translations = {
     filter_beatmakers: 'Beatmakers',
     filter_producers: 'Producers',
     filter_musicians: 'Musicians',
-    filter_engineers: 'Sound Engineers',
+    filter_engineers: 'Sound Eng.',
     btn_match: 'MATCH',
-    btn_skip: 'SKIP',
+    btn_skip: 'PASS',
     btn_favorite: 'FAVORITE',
     match_success_title: 'It\'s a Match!',
     match_success_sub: 'You and this artist are now connected to co-create.',
-    match_send_msg: 'Send a message',
+    match_send_msg: 'Send message',
     match_continue: 'Keep exploring',
     no_matches_left: 'You have seen all available profiles',
-    no_matches_refresh: 'Refresh live profiles',
+    no_matches_refresh: 'Refresh real profiles',
 
     // Discussions / Messaging
     msg_inbox_title: 'Messages',
@@ -288,9 +291,9 @@ export const translations = {
     tab_all: 'All',
     tab_unread: 'Unread',
     tab_groups: 'Groups',
-    no_conv_found: 'No discussions found',
-    start_new_chat: 'New Chat',
-    call_history: 'Call History',
+    no_conv_found: 'No conversations found',
+    start_new_chat: 'New conversation',
+    call_history: 'Call history',
     online_status: 'Online',
     offline_status: 'Offline',
     typing_status: 'Typing...',
@@ -301,15 +304,8 @@ export const translations = {
     doc_media: 'Document',
     hold_to_record: 'Hold to record...',
     release_to_send: 'Release to send',
-    audio_call: 'Voice call',
+    audio_call: 'Audio call',
     video_call: 'Video call',
-    vanish_mode: 'Vanish Mode (Disappearing)',
-    missed_call: 'Missed call',
-    incoming_call: 'Incoming call',
-    outgoing_call: 'Outgoing call',
-    call_back: 'Call back',
-    call_ended: 'Call ended',
-    calling: 'Calling...',
 
     // Services Pro & Marketplace
     services_title: 'Pro Services & Store',
@@ -398,6 +394,9 @@ export const translations = {
     notifs_empty: 'No notifications yet',
     notifs_mark_all_read: 'Mark all as read',
     notifs_clear_all: 'Clear history',
+    language_auto: 'Automatic (Device)',
+    language_device_detected: 'Language detected on your device',
+    language_auto_desc: 'Automatically adapts to the language of your phone or computer',
 
     // Common Actions
     btn_back: 'Back',
@@ -413,21 +412,110 @@ export const translations = {
   }
 };
 
+/**
+ * Detect device/system language (Audio 19)
+ * Checks navigator.languages, navigator.language, navigator.userLanguage
+ */
+export const getDeviceLanguage = () => {
+  try {
+    if (typeof navigator === 'undefined') return 'fr';
+    const navLangs = navigator.languages || [
+      navigator.language ||
+      navigator.userLanguage ||
+      navigator.browserLanguage ||
+      navigator.systemLanguage ||
+      ''
+    ];
+
+    for (const lang of navLangs) {
+      if (!lang || typeof lang !== 'string') continue;
+      const normalized = lang.toLowerCase().trim();
+      if (normalized.startsWith('en')) return 'en';
+      if (normalized.startsWith('fr')) return 'fr';
+    }
+
+    const primary = (navigator.language || '').toLowerCase().trim();
+    if (primary.startsWith('en')) return 'en';
+    if (primary.startsWith('fr')) return 'fr';
+
+    // If device is in another language (e.g. Spanish, German, etc.), default to English for international compatibility
+    if (primary && !primary.startsWith('fr')) return 'en';
+
+    return 'fr';
+  } catch (_) {
+    return 'fr';
+  }
+};
+
 export function LanguageProvider({ children }) {
+  // Device language dynamically resolved
+  const [deviceLang, setDeviceLang] = useState(() => getDeviceLanguage());
+
+  // Determine initial language:
+  // 1. Saved explicit setting in localStorage if present ('en', 'fr', or 'auto')
+  // 2. If 'auto' or not set at all: automatically use device language!
   const [language, setLanguage] = useState(() => {
     try {
-      return localStorage.getItem('stagelink_lang') || 'fr';
+      const saved = localStorage.getItem('stagelink_lang');
+      if (saved === 'en' || saved === 'fr') {
+        return saved;
+      }
+      return getDeviceLanguage();
     } catch (_) {
-      return 'fr';
+      return getDeviceLanguage();
     }
   });
 
-  const changeLanguage = (lang) => {
+  const [isAuto, setIsAuto] = useState(() => {
+    try {
+      const saved = localStorage.getItem('stagelink_lang');
+      return !saved || saved === 'auto';
+    } catch (_) {
+      return true;
+    }
+  });
+
+  // Listen to OS/browser language change events dynamically
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      const detected = getDeviceLanguage();
+      setDeviceLang(detected);
+      const saved = localStorage.getItem('stagelink_lang');
+      // If user hasn't forced a manual lock or selected auto, apply immediately
+      if (!saved || saved === 'auto') {
+        setLanguage(detected);
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('languagechange', handleLanguageChange);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('languagechange', handleLanguageChange);
+      }
+    };
+  }, []);
+
+  const changeLanguage = (lang, setAsAuto = false) => {
+    if (setAsAuto || lang === 'auto') {
+      const detected = getDeviceLanguage();
+      setLanguage(detected);
+      setIsAuto(true);
+      try {
+        localStorage.setItem('stagelink_lang', 'auto');
+        if (typeof document !== 'undefined') {
+          document.documentElement.lang = detected;
+        }
+      } catch (_) {}
+      return;
+    }
+
     if (lang === 'fr' || lang === 'en') {
       setLanguage(lang);
+      setIsAuto(false);
       try {
         localStorage.setItem('stagelink_lang', lang);
-        // Also update HTML lang attribute
         if (typeof document !== 'undefined') {
           document.documentElement.lang = lang;
         }
@@ -448,6 +536,8 @@ export function LanguageProvider({ children }) {
   return (
     <LanguageContext.Provider value={{
       language,
+      deviceLanguage: deviceLang,
+      isAuto,
       changeLanguage,
       t,
       isEnglish: language === 'en',

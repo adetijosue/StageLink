@@ -13,7 +13,7 @@ import DeleteAccountModal from './DeleteAccountModal';
  */
 export default function AppSettingsModal({ isOpen, onClose, onOpenEditProfile, isDarkMode, onToggleDarkMode }) {
   const { logout } = useAuth();
-  const { language, changeLanguage, t } = useLanguage();
+  const { language, deviceLanguage, isAuto, changeLanguage, t } = useLanguage();
 
   const [activeView, setActiveModal] = useState(null); // 'cgu' | 'privacy' | 'charter'
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -104,12 +104,91 @@ export default function AppSettingsModal({ isOpen, onClose, onOpenEditProfile, i
             </div>
 
             <div style={{ marginBottom: '24px' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0066FF', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{t('desired_language')}</span>
-              <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                {[{ c: 'fr', l: 'Français 🇫🇷' }, { c: 'en', l: 'English 🇬🇧' }].map(item => (
-                  <button key={item.c} onClick={() => { soundEngine.playPopSound(); changeLanguage(item.c); }} style={{ flex: 1, padding: '12px', borderRadius: '14px', border: language === item.c ? '2px solid #0066FF' : '1px solid #E2E8F0', background: language === item.c ? (isDarkMode ? 'rgba(0,102,255,0.1)' : '#EFF6FF') : 'transparent', color: language === item.c ? '#0066FF' : 'inherit', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s ease' }}>{item.l}</button>
-                ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0066FF', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <Globe size={13} style={{ display: 'inline', marginRight: '4px', verticalAlign: '-1px' }} />
+                  {t('desired_language')}
+                </span>
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isDarkMode ? '#94A3B8' : '#64748B', background: isDarkMode ? '#1E293B' : '#F1F5F9', padding: '2px 8px', borderRadius: '8px' }}>
+                  {deviceLanguage === 'en' ? 'Appareil: EN 🇬🇧' : 'Appareil: FR 🇫🇷'}
+                </span>
               </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginTop: '6px' }}>
+                <button
+                  onClick={() => { soundEngine.playPopSound(); changeLanguage('auto', true); }}
+                  style={{
+                    padding: '10px 6px',
+                    borderRadius: '14px',
+                    border: isAuto ? '2px solid #0066FF' : (isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E2E8F0'),
+                    background: isAuto ? (isDarkMode ? 'rgba(0,102,255,0.15)' : '#EFF6FF') : (isDarkMode ? '#1E293B' : '#FFFFFF'),
+                    color: isAuto ? '#0066FF' : 'inherit',
+                    fontWeight: 800,
+                    fontSize: '0.74rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '2px'
+                  }}
+                  title={t('language_auto_desc')}
+                >
+                  <span>⚡ Auto</span>
+                  <span style={{ fontSize: '0.64rem', opacity: 0.8 }}>({deviceLanguage.toUpperCase()})</span>
+                </button>
+
+                <button
+                  onClick={() => { soundEngine.playPopSound(); changeLanguage('fr'); }}
+                  style={{
+                    padding: '10px 6px',
+                    borderRadius: '14px',
+                    border: !isAuto && language === 'fr' ? '2px solid #0066FF' : (isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E2E8F0'),
+                    background: !isAuto && language === 'fr' ? (isDarkMode ? 'rgba(0,102,255,0.15)' : '#EFF6FF') : (isDarkMode ? '#1E293B' : '#FFFFFF'),
+                    color: !isAuto && language === 'fr' ? '#0066FF' : 'inherit',
+                    fontWeight: 800,
+                    fontSize: '0.74rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '2px'
+                  }}
+                >
+                  <span>Français</span>
+                  <span style={{ fontSize: '0.68rem' }}>🇫🇷</span>
+                </button>
+
+                <button
+                  onClick={() => { soundEngine.playPopSound(); changeLanguage('en'); }}
+                  style={{
+                    padding: '10px 6px',
+                    borderRadius: '14px',
+                    border: !isAuto && language === 'en' ? '2px solid #0066FF' : (isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E2E8F0'),
+                    background: !isAuto && language === 'en' ? (isDarkMode ? 'rgba(0,102,255,0.15)' : '#EFF6FF') : (isDarkMode ? '#1E293B' : '#FFFFFF'),
+                    color: !isAuto && language === 'en' ? '#0066FF' : 'inherit',
+                    fontWeight: 800,
+                    fontSize: '0.74rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '2px'
+                  }}
+                >
+                  <span>English</span>
+                  <span style={{ fontSize: '0.68rem' }}>🇬🇧</span>
+                </button>
+              </div>
+
+              <p style={{ fontSize: '0.68rem', color: isDarkMode ? '#94A3B8' : '#64748B', margin: '6px 0 0 2px' }}>
+                {isAuto ? `✨ ${t('language_auto_desc')}` : (language === 'en' ? '🔒 Fixed to English' : '🔒 Fixé en Français')}
+              </p>
             </div>
 
             <div style={{ marginBottom: '24px' }}>
