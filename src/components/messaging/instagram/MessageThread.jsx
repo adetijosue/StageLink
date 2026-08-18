@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Phone, Video, Flame, X, Download, Music } from 'lucide-react';
+import { ArrowLeft, Phone, Video, Flame, X, Download, Music, Trash2, MoreVertical } from 'lucide-react';
 import UserAvatar from '../../common/UserAvatar';
 import MessageBubble from './MessageBubble';
 import InputBar from './InputBar';
@@ -7,6 +7,8 @@ import ReactionOverlay from './ReactionOverlay';
 import { useChatThread } from '../../../hooks/useChatThread';
 import { useDirectPresence } from '../../../hooks/useDirectPresence';
 import { supabase, isSupabaseConfigured } from '../../../services/supabaseClient';
+import { directChatService } from '../../../services/directChatService';
+import { soundEngine } from '../../../services/audioService';
 import { useLanguage } from '../../../context/LanguageContext';
 import { haptics } from '../../../services/hapticsService';
 
@@ -24,6 +26,8 @@ export default function MessageThread({
   const [reactionOverlayData, setReactionOverlayData] = useState(null);
   const [partnerProfile, setPartnerProfile] = useState(partner || null);
   const [previewMedia, setPreviewMedia] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeletingConv, setIsDeletingConv] = useState(false);
 
   // Sync internal partner state if prop changes
   useEffect(() => {
@@ -291,6 +295,29 @@ export default function MessageThread({
           >
             <Video size={18} />
           </button>
+
+          <button
+            onClick={() => {
+              soundEngine.playPopSound();
+              setShowDeleteModal(true);
+            }}
+            title={language === 'en' ? 'Delete conversation' : 'Supprimer la discussion'}
+            style={{
+              background: 'rgba(239, 68, 68, 0.08)',
+              color: '#EF4444',
+              border: 'none',
+              borderRadius: '50%',
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'background 0.15s ease'
+            }}
+          >
+            <Trash2 size={17} />
+          </button>
         </div>
       </div>
 
@@ -472,6 +499,143 @@ export default function MessageThread({
         onSendMessage={sendMessage}
         onTyping={sendTypingEvent}
       />
+
+      {/* 7. Delete Conversation Confirmation Modal */}
+      {showDeleteModal && (
+        <div
+          onClick={() => !isDeletingConv && setShowDeleteModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            background: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'fadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: '380px',
+              background: 'var(--card-bg, #FFFFFF)',
+              borderRadius: '24px',
+              padding: '24px',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
+              border: '1px solid var(--border-light, #E2E8F0)',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px'
+            }}
+          >
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.1)',
+              color: '#EF4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
+            }}>
+              <Trash2 size={28} />
+            </div>
+
+            <div>
+              <h3 style={{
+                fontSize: '1.2rem',
+                fontWeight: 800,
+                color: 'var(--text-dark, #0F172A)',
+                margin: '0 0 8px 0'
+              }}>
+                {language === 'en' ? 'Delete conversation?' : 'Supprimer la discussion ?'}
+              </h3>
+              <p style={{
+                fontSize: '0.88rem',
+                color: 'var(--text-muted, #64748B)',
+                margin: 0,
+                lineHeight: 1.45
+              }}>
+                {language === 'en'
+                  ? `Are you sure you want to delete this conversation with "${partnerName}"? You will return to your inbox.`
+                  : `Voulez-vous vraiment supprimer votre discussion avec "${partnerName}" ? Vous retournerez à votre liste de messages.`
+                }
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', width: '100%', marginTop: '8px' }}>
+              <button
+                disabled={isDeletingConv}
+                onClick={() => setShowDeleteModal(false)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '14px',
+                  border: '1px solid var(--border-light, #CBD5E1)',
+                  background: 'transparent',
+                  color: 'var(--text-dark, #334155)',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  cursor: isDeletingConv ? 'not-allowed' : 'pointer',
+                  transition: 'background 0.15s ease'
+                }}
+              >
+                {language === 'en' ? 'Cancel' : 'Annuler'}
+              </button>
+
+              <button
+                disabled={isDeletingConv}
+                onClick={async () => {
+                  setIsDeletingConv(true);
+                  try {
+                    soundEngine.playPopSound();
+                    await directChatService.deleteConversation(conversationId, currentUser?.id);
+                    onBack();
+                  } catch (err) {
+                    console.warn('Error deleting conversation from thread:', err);
+                  } finally {
+                    setIsDeletingConv(false);
+                    setShowDeleteModal(false);
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '14px',
+                  border: 'none',
+                  background: '#EF4444',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  cursor: isDeletingConv ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'transform 0.1s ease'
+                }}
+              >
+                {isDeletingConv ? (
+                  <span>{language === 'en' ? 'Deleting...' : 'Suppression...'}</span>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    <span>{language === 'en' ? 'Delete' : 'Supprimer'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

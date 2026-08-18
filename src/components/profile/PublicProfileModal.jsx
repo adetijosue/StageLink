@@ -10,26 +10,17 @@ import {
   MessageSquare, 
   Music, 
   Disc, 
-  Cpu, 
   Play, 
   Pause, 
   Sparkles, 
   Globe, 
-  Mail, 
-  Phone, 
   ExternalLink, 
   QrCode, 
   Share2, 
   FileText, 
   Crown, 
-  Award,
-  Users,
-  Flame,
   Radio,
   Sliders,
-  Grid,
-  Layers,
-  Headphones,
   CheckCircle2,
   Mic
 } from 'lucide-react';
@@ -40,7 +31,6 @@ import { soundEngine } from '../../services/audioService';
 import confetti from 'canvas-confetti';
 import ProfileQRCodeModal from './ProfileQRCodeModal';
 import MusicalCVModal from './MusicalCVModal';
-import SocialBrandLogo, { getBrandLogoSVG } from '../common/SocialBrandLogo';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { presenceService } from '../../services/presenceService';
 
@@ -59,7 +49,6 @@ export default function PublicProfileModal({
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isCvModalOpen, setIsCvModalOpen] = useState(false);
   const [showFullAvatar, setShowFullAvatar] = useState(false);
-  const [userPosts, setUserPosts] = useState([]);
   const [isOnline, setIsOnline] = useState(false);
 
   // Subscribe to real-time online presence for this user
@@ -91,13 +80,6 @@ export default function PublicProfileModal({
     } catch (e) {}
 
     setHydratedUser(initial);
-
-    // Fetch live posts by this artist
-    try {
-      const allPosts = JSON.parse(localStorage.getItem('stagelink_posts') || '[]');
-      const filtered = allPosts.filter(p => p.userId === targetId || p.userName === (initial.name || initial.full_name));
-      setUserPosts(filtered);
-    } catch (e) {}
 
     // Fetch live profile from Supabase
     if (isSupabaseConfigured() && targetId) {
@@ -173,7 +155,7 @@ export default function PublicProfileModal({
     soundEngine?.playPopSound?.();
     if (!isFollowing) {
       try {
-        confetti({ particleCount: 45, spread: 65, origin: { y: 0.6 } });
+        confetti({ particleCount: 40, spread: 60, origin: { y: 0.6 } });
       } catch (e) {}
       setIsFollowing(true);
       if (onConnectUser && targetUserId) onConnectUser(targetUserId);
@@ -223,7 +205,7 @@ export default function PublicProfileModal({
   };
 
   const sampleTracks = [
-    { id: 'ptr_1', title: 'Session Studio & Démo 2026', genre: userRole || 'Afrobeat', duration: '03:20', plays: '2.4k' },
+    { id: 'ptr_1', title: 'Session Studio & Démo', genre: userRole || 'Afrobeat', duration: '03:20', plays: '2.4k' },
     { id: 'ptr_2', title: 'Live Performance / Instrumental', genre: 'Live Production', duration: '02:45', plays: '1.8k' }
   ];
 
@@ -249,13 +231,14 @@ export default function PublicProfileModal({
         position: 'fixed', 
         inset: 0, 
         zIndex: 1050, 
-        background: 'rgba(15, 23, 42, 0.88)',
-        backdropFilter: 'blur(16px)', 
+        background: 'rgba(15, 23, 42, 0.78)',
+        backdropFilter: 'blur(10px)', 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center', 
-        padding: '12px',
-        animation: 'fadeIn 0.2s ease'
+        padding: '16px 12px',
+        animation: 'fadeIn 0.2s ease',
+        boxSizing: 'border-box'
       }} 
       onClick={onClose}
     >
@@ -263,56 +246,65 @@ export default function PublicProfileModal({
         onClick={(e) => e.stopPropagation()} 
         style={{
           width: '100%', 
-          maxWidth: '500px', 
+          maxWidth: '460px', 
           background: 'var(--card-bg, #FFFFFF)', 
-          borderRadius: '32px',
-          maxHeight: '94vh', 
+          borderRadius: '24px',
+          maxHeight: 'calc(90vh - 20px)', 
           overflowY: 'auto', 
-          boxShadow: '0 25px 60px rgba(0,0,0,0.5)', 
+          boxShadow: '0 20px 50px -10px rgba(0,0,0,0.4)', 
           position: 'relative',
-          border: '1px solid rgba(255, 255, 255, 0.25)',
-          animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+          border: '1px solid var(--border-light, #E2E8F0)',
+          animation: 'scaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1)',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          boxSizing: 'border-box'
         }}
       >
-        {/* 1. Header Cover Hero with Integrated Floating Controls */}
-        <div style={{ position: 'relative', height: '180px', background: '#0F172A', overflow: 'hidden', borderTopLeftRadius: '32px', borderTopRightRadius: '32px' }}>
+        {/* 1. Header Cover Hero with Sleek Glass Controls */}
+        <div style={{ 
+          position: 'relative', 
+          height: '150px', 
+          background: '#0F172A', 
+          overflow: 'hidden', 
+          borderTopLeftRadius: '24px', 
+          borderTopRightRadius: '24px',
+          flexShrink: 0
+        }}>
           <img
             src={userCover}
             style={{ 
               width: '100%', 
               height: '100%', 
               objectFit: 'cover',
-              filter: 'brightness(0.82)'
+              filter: 'brightness(0.85)'
             }}
             alt={language === 'en' ? `${userName}'s Cover` : `Couverture de ${userName}`}
           />
           <div style={{ 
             position: 'absolute', 
             inset: 0, 
-            background: 'linear-gradient(to bottom, rgba(15, 23, 42, 0.5) 0%, transparent 40%, rgba(15, 23, 42, 0.85) 100%)' 
+            background: 'linear-gradient(to bottom, rgba(15, 23, 42, 0.4) 0%, transparent 40%, rgba(15, 23, 42, 0.8) 100%)' 
           }} />
 
-          {/* Floating Top Left: Back Button */}
+          {/* Floating Top Left: Back / Close Button */}
           <button
             onClick={onClose}
             style={{
               position: 'absolute',
-              top: '14px',
-              left: '16px',
+              top: '12px',
+              left: '12px',
               background: 'rgba(15, 23, 42, 0.65)',
               backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
+              border: '1px solid rgba(255, 255, 255, 0.25)',
               borderRadius: '50%',
-              width: '38px',
-              height: '38px',
+              width: '36px',
+              height: '36px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: '#FFF',
               cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
               zIndex: 10
             }}
             title={language === 'en' ? 'Back' : 'Retour'}
@@ -320,30 +312,30 @@ export default function PublicProfileModal({
             <ArrowLeft size={18} />
           </button>
 
-          {/* Floating Top Center: Official Artist Pill */}
+          {/* Floating Top Center: Official Artist Tag */}
           <div style={{
             position: 'absolute',
-            top: '16px',
+            top: '14px',
             left: '50%',
             transform: 'translateX(-50%)',
             background: 'rgba(15, 23, 42, 0.75)',
             color: '#38BDF8',
             border: '1px solid rgba(56, 189, 248, 0.35)',
-            padding: '4px 12px',
-            borderRadius: '20px',
-            fontSize: '0.70rem',
+            padding: '3px 10px',
+            borderRadius: '16px',
+            fontSize: '0.68rem',
             fontWeight: 800,
             display: 'flex',
             alignItems: 'center',
-            gap: '5px',
+            gap: '4px',
             backdropFilter: 'blur(8px)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            boxShadow: '0 4px 10px rgba(0,0,0,0.25)',
             zIndex: 10
           }}>
-            <Sparkles size={12} color="#38BDF8" /> {language === 'en' ? 'OFFICIAL ARTIST' : 'ARTISTE OFFICIEL'}
+            <Sparkles size={11} color="#38BDF8" /> {language === 'en' ? 'ARTIST PROFILE' : 'PROFIL ARTISTE'}
           </div>
 
-          {/* Floating Top Right: Share / QR Code Button */}
+          {/* Floating Top Right: Share & QR Code */}
           <button
             onClick={() => {
               soundEngine?.playPopSound?.();
@@ -351,31 +343,31 @@ export default function PublicProfileModal({
             }}
             style={{
               position: 'absolute',
-              top: '14px',
-              right: '16px',
-              background: 'rgba(0, 102, 255, 0.75)',
+              top: '12px',
+              right: '12px',
+              background: 'rgba(0, 102, 255, 0.8)',
               backdropFilter: 'blur(8px)',
               border: '1px solid rgba(255, 255, 255, 0.3)',
               borderRadius: '50%',
-              width: '38px',
-              height: '38px',
+              width: '36px',
+              height: '36px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: '#FFFFFF',
               cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(0, 102, 255, 0.4)',
+              boxShadow: '0 4px 12px rgba(0, 102, 255, 0.35)',
               zIndex: 10
             }}
             title={language === 'en' ? 'Share Profile & QR' : 'Partager Profil & QR'}
           >
-            <Share2 size={17} />
+            <Share2 size={16} />
           </button>
         </div>
 
-        {/* 2. Identity Card Row (Avatar + Clear Typography) */}
-        <div style={{ padding: '0 20px', marginTop: '-52px', position: 'relative', zIndex: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap' }}>
+        {/* 2. Identity Row (Avatar + Name & Status) */}
+        <div style={{ padding: '0 16px', marginTop: '-42px', position: 'relative', zIndex: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px' }}>
             {/* Avatar with Presence Indicator */}
             <div 
               onClick={(e) => {
@@ -392,37 +384,37 @@ export default function PublicProfileModal({
                   loading="lazy"
                   decoding="async"
                   style={{
-                    width: '92px',
-                    height: '92px',
+                    width: '84px',
+                    height: '84px',
                     borderRadius: '50%',
                     objectFit: 'cover',
-                    border: '4px solid #FFFFFF',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                    border: '3.5px solid var(--card-bg, #FFFFFF)',
+                    boxShadow: '0 6px 18px rgba(0,0,0,0.2)',
                     background: '#1E293B'
                   }}
                 />
               ) : (
                 <UserAvatar 
                   user={{ avatar: userAvatarUrl, name: userName }} 
-                  size={92} 
-                  border="4px solid #FFFFFF" 
-                  style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }} 
+                  size={84} 
+                  border="3.5px solid var(--card-bg, #FFFFFF)" 
+                  style={{ boxShadow: '0 6px 18px rgba(0,0,0,0.2)' }} 
                 />
               )}
 
-              {/* Realtime Online Dot */}
+              {/* Online Presence Indicator */}
               <span
                 title={isOnline ? (language === 'en' ? 'Online' : 'En ligne') : (language === 'en' ? 'Offline' : 'Hors ligne')}
                 style={{
                   position: 'absolute',
-                  bottom: '4px',
-                  right: '4px',
-                  width: '18px',
-                  height: '18px',
+                  bottom: '2px',
+                  right: '2px',
+                  width: '16px',
+                  height: '16px',
                   borderRadius: '50%',
                   background: isOnline ? '#10B981' : '#94A3B8',
-                  border: '3px solid #FFFFFF',
-                  boxShadow: isOnline ? '0 0 10px rgba(16, 185, 129, 0.7)' : 'none',
+                  border: '2.5px solid var(--card-bg, #FFFFFF)',
+                  boxShadow: isOnline ? '0 0 8px rgba(16, 185, 129, 0.7)' : 'none',
                   transition: 'all 0.25s ease',
                   zIndex: 10
                 }}
@@ -431,37 +423,37 @@ export default function PublicProfileModal({
               {isVip && (
                 <div style={{
                   position: 'absolute',
-                  top: '0px',
-                  right: '-4px',
+                  top: '-2px',
+                  right: '-2px',
                   background: 'linear-gradient(135deg, #F59E0B, #D97706)',
                   color: '#FFF',
                   borderRadius: '50%',
-                  width: '24px',
-                  height: '24px',
+                  width: '22px',
+                  height: '22px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   border: '2px solid #FFF',
-                  boxShadow: '0 2px 8px rgba(245, 158, 11, 0.5)'
+                  boxShadow: '0 2px 6px rgba(245, 158, 11, 0.4)'
                 }}>
-                  <Crown size={13} />
+                  <Crown size={12} />
                 </div>
               )}
             </div>
 
-            {/* Quick Badges / Status on Right */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+            {/* Online Status Pill */}
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
               <span style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '5px',
-                background: isOnline ? 'rgba(16, 185, 129, 0.12)' : 'rgba(148, 163, 184, 0.15)',
+                gap: '4px',
+                background: isOnline ? 'rgba(16, 185, 129, 0.1)' : 'rgba(148, 163, 184, 0.12)',
                 color: isOnline ? '#059669' : '#64748B',
-                border: `1px solid ${isOnline ? 'rgba(16, 185, 129, 0.3)' : 'rgba(148, 163, 184, 0.25)'}`,
+                border: `1px solid ${isOnline ? 'rgba(16, 185, 129, 0.25)' : 'rgba(148, 163, 184, 0.2)'}`,
                 borderRadius: '12px',
-                padding: '3px 10px',
-                fontSize: '0.72rem',
-                fontWeight: 800
+                padding: '3px 9px',
+                fontSize: '0.70rem',
+                fontWeight: 700
               }}>
                 <span style={{
                   width: '6px',
@@ -474,11 +466,11 @@ export default function PublicProfileModal({
             </div>
           </div>
 
-          {/* Artist Name & Title */}
-          <div style={{ marginTop: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Artist Name & Role Header */}
+          <div style={{ marginTop: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               <h2 style={{ 
-                fontSize: '1.38rem', 
+                fontSize: '1.25rem', 
                 fontWeight: 900, 
                 color: 'var(--text-dark, #0F172A)', 
                 margin: 0, 
@@ -487,93 +479,93 @@ export default function PublicProfileModal({
               }}>
                 {userName}
               </h2>
-              {isVip && <CheckCircle2 size={19} color="#0066FF" fill="#0066FF" />}
+              {isVip && <CheckCircle2 size={18} color="#0066FF" fill="#0066FF" />}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '5px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
               <span style={{
                 background: 'rgba(0, 102, 255, 0.08)',
                 color: '#0066FF',
-                padding: '4px 10px',
-                borderRadius: '10px',
-                fontSize: '0.78rem',
+                padding: '3px 8px',
+                borderRadius: '8px',
+                fontSize: '0.75rem',
                 fontWeight: 800,
                 border: '1px solid rgba(0, 102, 255, 0.15)'
               }}>
                 {userRole}
               </span>
 
-              <span style={{ fontSize: '0.78rem', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
-                <MapPin size={13} color="#64748B" /> {userLocation}
+              <span style={{ fontSize: '0.75rem', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+                <MapPin size={12} color="#64748B" /> {userLocation}
               </span>
             </div>
           </div>
 
-          {/* Micro Stats Counter Row */}
+          {/* 3-Column Stats Row */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '8px',
-            marginTop: '14px',
+            gap: '6px',
+            marginTop: '12px',
             background: 'var(--bg-light, #F8FAFC)',
-            padding: '10px 12px',
-            borderRadius: '16px',
+            padding: '8px 10px',
+            borderRadius: '14px',
             border: '1px solid var(--border-light, #E2E8F0)'
           }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '0.95rem', fontWeight: 900, color: 'var(--text-dark, #0F172A)' }}>
+              <div style={{ fontSize: '0.90rem', fontWeight: 900, color: 'var(--text-dark, #0F172A)' }}>
                 {isFollowing ? '143' : '142'}
               </div>
-              <div style={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>
+              <div style={{ fontSize: '0.65rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>
                 {language === 'en' ? 'Followers' : 'Abonnés'}
               </div>
             </div>
 
             <div style={{ textAlign: 'center', borderLeft: '1px solid var(--border-light, #E2E8F0)', borderRight: '1px solid var(--border-light, #E2E8F0)' }}>
-              <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0066FF' }}>
+              <div style={{ fontSize: '0.90rem', fontWeight: 900, color: '#0066FF' }}>
                 4.2k
               </div>
-              <div style={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>
+              <div style={{ fontSize: '0.65rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>
                 {language === 'en' ? 'Plays' : 'Écoutes'}
               </div>
             </div>
 
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#10B981' }}>
+              <div style={{ fontSize: '0.90rem', fontWeight: 900, color: '#10B981' }}>
                 98%
               </div>
-              <div style={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>
+              <div style={{ fontSize: '0.65rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>
                 Match Pro
               </div>
             </div>
           </div>
         </div>
 
-        {/* 3. Action Toolbar (Suivre, Message Direct, Partager/QR) */}
-        <div style={{ padding: '16px 20px 0 20px' }}>
+        {/* 3. Action Toolbar (Suivre, Message, QR) */}
+        <div style={{ padding: '14px 16px 0 16px' }}>
           {!isSelf ? (
             <div style={{ display: 'flex', gap: '8px' }}>
               <button 
                 onClick={handleFollowClick} 
                 style={{ 
                   flex: 1.2, 
-                  padding: '12px 14px', 
-                  borderRadius: '16px', 
+                  padding: '10px 12px', 
+                  borderRadius: '14px', 
                   border: isFollowing ? '1.5px solid #10B981' : 'none', 
                   background: isFollowing ? '#ECFDF5' : '#0066FF', 
                   color: isFollowing ? '#047857' : '#FFFFFF', 
                   fontWeight: 800, 
-                  fontSize: '0.86rem', 
+                  fontSize: '0.84rem', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
                   gap: '6px',
                   cursor: 'pointer',
-                  boxShadow: isFollowing ? 'none' : '0 4px 14px rgba(0, 102, 255, 0.3)',
-                  transition: 'all 0.2s ease'
+                  boxShadow: isFollowing ? 'none' : '0 4px 12px rgba(0, 102, 255, 0.25)',
+                  transition: 'all 0.15s ease'
                 }}
               >
-                {isFollowing ? <><UserCheck size={17} /> {language === 'en' ? 'Following' : 'Suivi'}</> : <><UserPlus size={17} /> {language === 'en' ? 'Follow' : 'Suivre'}</>}
+                {isFollowing ? <><UserCheck size={16} /> {language === 'en' ? 'Following' : 'Suivi'}</> : <><UserPlus size={16} /> {language === 'en' ? 'Follow' : 'Suivre'}</>}
               </button>
 
               <button 
@@ -586,22 +578,22 @@ export default function PublicProfileModal({
                 }} 
                 style={{ 
                   flex: 1.2, 
-                  padding: '12px 14px', 
-                  borderRadius: '16px', 
+                  padding: '10px 12px', 
+                  borderRadius: '14px', 
                   border: '1.5px solid #0066FF', 
                   background: 'rgba(0, 102, 255, 0.05)', 
-                  color: '#0066FF',
+                  color: '#0066FF', 
                   fontWeight: 800, 
-                  fontSize: '0.86rem', 
+                  fontSize: '0.84rem', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
                   gap: '6px',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.15s ease'
                 }}
               >
-                <MessageSquare size={17} /> {language === 'en' ? 'Message' : 'Message'}
+                <MessageSquare size={16} /> {language === 'en' ? 'Message' : 'Message'}
               </button>
 
               <button
@@ -610,23 +602,23 @@ export default function PublicProfileModal({
                   setIsQrModalOpen(true);
                 }}
                 style={{
-                  padding: '12px 14px',
-                  borderRadius: '16px',
+                  padding: '10px 12px',
+                  borderRadius: '14px',
                   border: '1px solid var(--border-light, #CBD5E1)',
                   background: 'var(--bg-light, #F8FAFC)',
                   color: 'var(--text-dark, #0F172A)',
                   fontWeight: 800,
-                  fontSize: '0.86rem',
+                  fontSize: '0.84rem',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '6px',
+                  gap: '4px',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease'
+                  transition: 'all 0.15s ease'
                 }}
                 title={language === 'en' ? 'Share Profile' : 'Partager le Profil'}
               >
-                <QrCode size={17} color="#0066FF" />
+                <QrCode size={16} color="#0066FF" />
               </button>
             </div>
           ) : (
@@ -637,55 +629,55 @@ export default function PublicProfileModal({
               }}
               style={{
                 width: '100%',
-                padding: '12px',
-                borderRadius: '16px',
+                padding: '11px',
+                borderRadius: '14px',
                 border: 'none',
                 background: 'linear-gradient(135deg, #0066FF, #0047FF)',
                 color: '#FFF',
                 fontWeight: 800,
-                fontSize: '0.88rem',
+                fontSize: '0.86rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
+                gap: '6px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(0, 102, 255, 0.3)'
+                boxShadow: '0 4px 12px rgba(0, 102, 255, 0.25)'
               }}
             >
-              <Share2 size={17} /> {language === 'en' ? 'Share My Profile & QR Code' : 'Partager Mon Profil & QR Code'}
+              <Share2 size={16} /> {language === 'en' ? 'Share My Profile & QR Code' : 'Partager Mon Profil & QR Code'}
             </button>
           )}
         </div>
 
-        {/* 4. Main Profile Content Body */}
-        <div style={{ padding: '16px 20px 24px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {/* 4. Structured Main Body Content */}
+        <div style={{ padding: '14px 16px 20px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-          {/* Location & Studio Details */}
+          {/* Location & Studio Card */}
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: '8px', 
-            fontSize: '0.78rem', 
+            gap: '6px', 
+            fontSize: '0.76rem', 
             color: '#64748B', 
             fontWeight: 600,
             background: 'rgba(0, 102, 255, 0.03)',
-            padding: '10px 14px',
-            borderRadius: '14px',
-            border: '1px solid rgba(0, 102, 255, 0.1)'
+            padding: '8px 12px',
+            borderRadius: '12px',
+            border: '1px solid rgba(0, 102, 255, 0.08)'
           }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <MapPin size={14} color="#0066FF" /> {userLocation}
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <MapPin size={13} color="#0066FF" /> {userLocation}
             </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Briefcase size={14} color="#10B981" /> {userCompany}
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Briefcase size={13} color="#10B981" /> {userCompany}
             </span>
           </div>
 
           {/* Social Links Row if present */}
           {(profile.spotifyUrl || profile.instagramUrl || profile.youtubeUrl || profile.tiktokUrl) && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               {profile.spotifyUrl && !profile.spotifyUrl.startsWith('javascript:') && (
                 <a 
                   href={profile.spotifyUrl.startsWith('http') ? profile.spotifyUrl : `https://${profile.spotifyUrl}`} 
@@ -694,18 +686,18 @@ export default function PublicProfileModal({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
+                    gap: '5px',
                     background: '#F0FDF4',
                     color: '#16A34A',
-                    padding: '6px 12px',
-                    borderRadius: '12px',
-                    fontSize: '0.76rem',
+                    padding: '5px 10px',
+                    borderRadius: '10px',
+                    fontSize: '0.74rem',
                     fontWeight: 700,
                     textDecoration: 'none',
                     border: '1px solid #BBF7D0'
                   }}
                 >
-                  <Music size={14} /> Spotify
+                  <Music size={13} /> Spotify
                 </a>
               )}
 
@@ -717,18 +709,18 @@ export default function PublicProfileModal({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
+                    gap: '5px',
                     background: '#FDF2F8',
                     color: '#DB2777',
-                    padding: '6px 12px',
-                    borderRadius: '12px',
-                    fontSize: '0.76rem',
+                    padding: '5px 10px',
+                    borderRadius: '10px',
+                    fontSize: '0.74rem',
                     fontWeight: 700,
                     textDecoration: 'none',
                     border: '1px solid #FBCFE8'
                   }}
                 >
-                  <Globe size={14} /> Instagram
+                  <Globe size={13} /> Instagram
                 </a>
               )}
 
@@ -740,46 +732,46 @@ export default function PublicProfileModal({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
+                    gap: '5px',
                     background: '#FEF2F2',
                     color: '#DC2626',
-                    padding: '6px 12px',
-                    borderRadius: '12px',
-                    fontSize: '0.76rem',
+                    padding: '5px 10px',
+                    borderRadius: '10px',
+                    fontSize: '0.74rem',
                     fontWeight: 700,
                     textDecoration: 'none',
                     border: '1px solid #FECACA'
                   }}
                 >
-                  <Play size={14} /> YouTube
+                  <Play size={13} /> YouTube
                 </a>
               )}
             </div>
           )}
 
-          {/* Bio Description */}
+          {/* Bio Box */}
           <div style={{ 
             background: 'var(--bg-light, #F8FAFC)', 
             border: '1px solid var(--border-light, #E2E8F0)', 
-            padding: '14px 16px', 
-            borderRadius: '18px' 
+            padding: '12px 14px', 
+            borderRadius: '16px' 
           }}>
             <h4 style={{ 
-              fontSize: '0.74rem', 
+              fontSize: '0.72rem', 
               fontWeight: 800, 
               textTransform: 'uppercase', 
               color: '#0066FF', 
-              margin: '0 0 6px 0',
+              margin: '0 0 5px 0',
               letterSpacing: '0.04em'
             }}>
               {language === 'en' ? 'Biography & Presentation' : 'Biographie & Présentation'}
             </h4>
             <p style={{ 
-              fontSize: '0.86rem', 
+              fontSize: '0.84rem', 
               color: 'var(--text-dark, #334155)', 
-              lineHeight: 1.5, 
+              lineHeight: 1.45, 
               margin: 0,
-              whiteSpace: 'pre-line'
+              wordBreak: 'break-word'
             }}>
               {userBio}
             </p>
@@ -788,11 +780,11 @@ export default function PublicProfileModal({
           {/* Specialties & Musical Skills */}
           <div>
             <h4 style={{ 
-              fontSize: '0.76rem', 
+              fontSize: '0.74rem', 
               fontWeight: 800, 
               textTransform: 'uppercase', 
               color: '#64748B', 
-              marginBottom: '8px',
+              marginBottom: '6px',
               letterSpacing: '0.04em'
             }}>
               {language === 'en' ? 'Specialties & Instruments' : 'Spécialités & Instruments'}
@@ -804,14 +796,14 @@ export default function PublicProfileModal({
                   style={{ 
                     background: 'rgba(0, 102, 255, 0.08)', 
                     color: '#0066FF', 
-                    padding: '6px 12px', 
-                    borderRadius: '12px', 
-                    fontSize: '0.78rem', 
+                    padding: '5px 10px', 
+                    borderRadius: '10px', 
+                    fontSize: '0.76rem', 
                     fontWeight: 700,
-                    border: '1px solid rgba(0, 102, 255, 0.2)',
+                    border: '1px solid rgba(0, 102, 255, 0.18)',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px'
+                    gap: '5px'
                   }}
                 >
                   {renderSkillIcon(skill)}
@@ -821,29 +813,29 @@ export default function PublicProfileModal({
             </div>
           </div>
 
-          {/* Musical Genres if available */}
+          {/* Musical Genres */}
           {Array.isArray(profile.genres) && profile.genres.length > 0 && (
             <div>
               <h4 style={{ 
-                fontSize: '0.76rem', 
+                fontSize: '0.74rem', 
                 fontWeight: 800, 
                 textTransform: 'uppercase', 
                 color: '#64748B', 
-                marginBottom: '8px',
+                marginBottom: '6px',
                 letterSpacing: '0.04em'
               }}>
                 {language === 'en' ? 'Musical Genres' : 'Genres Musicaux'}
               </h4>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
                 {profile.genres.map((genre, idx) => (
                   <span 
                     key={idx} 
                     style={{ 
                       background: '#F1F5F9', 
                       color: '#475569', 
-                      padding: '4px 10px', 
-                      borderRadius: '10px', 
-                      fontSize: '0.74rem', 
+                      padding: '4px 9px', 
+                      borderRadius: '8px', 
+                      fontSize: '0.72rem', 
                       fontWeight: 700
                     }}
                   >
@@ -854,60 +846,61 @@ export default function PublicProfileModal({
             </div>
           )}
 
-          {/* Top Audio Productions / Tracks */}
+          {/* Audio Tracks / Demo Studio */}
           <div>
             <h4 style={{ 
-              fontSize: '0.76rem', 
+              fontSize: '0.74rem', 
               fontWeight: 800, 
               textTransform: 'uppercase', 
               color: '#64748B', 
-              marginBottom: '8px',
+              marginBottom: '6px',
               letterSpacing: '0.04em'
             }}>
               {language === 'en' ? 'Studio Demos & Tracks' : 'Extraits & Démo Studio'}
             </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {sampleTracks.map(tr => (
                 <div 
                   key={tr.id} 
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
-                    gap: '12px', 
-                    padding: '10px 14px', 
+                    gap: '10px', 
+                    padding: '8px 12px', 
                     background: 'var(--bg-light, #F8FAFC)', 
-                    borderRadius: '14px', 
+                    borderRadius: '12px', 
                     border: '1px solid var(--border-light, #E2E8F0)' 
                   }}
                 >
                   <button 
                     onClick={() => toggleTrackPlay(tr.id)} 
                     style={{ 
-                      width: '36px', 
-                      height: '36px', 
+                      width: '32px', 
+                      height: '32px', 
                       borderRadius: '50%', 
                       background: playingTrackId === tr.id ? '#10B981' : '#0066FF', 
                       color: '#FFF', 
                       border: 'none', 
                       display: 'flex', 
                       alignItems: 'center', 
-                      justifyContent: 'center',
+                      justifyContent: 'center', 
                       cursor: 'pointer',
-                      boxShadow: '0 4px 10px rgba(0, 102, 255, 0.25)',
-                      transition: 'transform 0.15s ease'
+                      boxShadow: '0 3px 8px rgba(0, 102, 255, 0.2)',
+                      transition: 'transform 0.15s ease',
+                      flexShrink: 0
                     }}
                   >
-                    {playingTrackId === tr.id ? <Pause size={16} fill="white" /> : <Play size={16} fill="white" style={{ marginLeft: 2 }} />}
+                    {playingTrackId === tr.id ? <Pause size={14} fill="white" /> : <Play size={14} fill="white" style={{ marginLeft: 1.5 }} />}
                   </button>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-dark, #0F172A)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.80rem', fontWeight: 800, color: 'var(--text-dark, #0F172A)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {tr.title}
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: '#64748B' }}>
+                    <div style={{ fontSize: '0.68rem', color: '#64748B' }}>
                       {tr.genre} • {tr.duration}
                     </div>
                   </div>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#10B981' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#10B981', flexShrink: 0 }}>
                     {tr.plays} {language === 'en' ? 'plays' : 'écoutes'}
                   </span>
                 </div>
@@ -915,12 +908,13 @@ export default function PublicProfileModal({
             </div>
           </div>
 
-          {/* Pro Links & Interactive Portfolios */}
+          {/* Pro Resume & QR Buttons Footer */}
           <div style={{ 
             display: 'flex', 
-            justifyContent: 'center', 
-            gap: '16px', 
-            paddingTop: '12px', 
+            justifyContent: 'space-around', 
+            alignItems: 'center',
+            gap: '12px', 
+            paddingTop: '10px', 
             borderTop: '1px solid var(--border-light, #E2E8F0)' 
           }}>
             <button 
@@ -929,15 +923,16 @@ export default function PublicProfileModal({
                 background: 'transparent', 
                 border: 'none', 
                 color: '#0066FF', 
-                fontSize: '0.82rem', 
+                fontSize: '0.78rem', 
                 fontWeight: 800, 
                 display: 'flex', 
                 alignItems: 'center', 
-                gap: '6px',
-                cursor: 'pointer'
+                gap: '5px',
+                cursor: 'pointer',
+                padding: '6px 8px'
               }}
             >
-              <FileText size={16} /> {language === 'en' ? 'VIEW MUSICAL EPK / RESUME' : 'VOIR EPK / CV MUSICAL'}
+              <FileText size={15} /> {language === 'en' ? 'VIEW MUSICAL EPK' : 'VOIR EPK / CV MUSICAL'}
             </button>
 
             <button 
@@ -946,15 +941,16 @@ export default function PublicProfileModal({
                 background: 'transparent', 
                 border: 'none', 
                 color: '#64748B', 
-                fontSize: '0.82rem', 
+                fontSize: '0.78rem', 
                 fontWeight: 800, 
                 display: 'flex', 
                 alignItems: 'center', 
-                gap: '6px',
-                cursor: 'pointer'
+                gap: '5px',
+                cursor: 'pointer',
+                padding: '6px 8px'
               }}
             >
-              <QrCode size={16} /> {language === 'en' ? 'QR CONTACT CARD' : 'CARTE CONTACT QR'}
+              <QrCode size={15} /> {language === 'en' ? 'QR CONTACT CARD' : 'CARTE CONTACT QR'}
             </button>
           </div>
 
@@ -986,16 +982,16 @@ export default function PublicProfileModal({
               background: 'rgba(255,255,255,0.2)', 
               border: 'none', 
               borderRadius: '50%', 
-              width: '44px',
-              height: '44px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              width: '40px', 
+              height: '40px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
               color: '#FFF', 
               cursor: 'pointer' 
             }}
           >
-            <X size={24} />
+            <X size={22} />
           </button>
           <div onClick={(e) => e.stopPropagation()} style={{ padding: '20px' }}>
             {userAvatarUrl ? (
@@ -1007,7 +1003,7 @@ export default function PublicProfileModal({
                 style={{
                   maxWidth: '85vw',
                   maxHeight: '80vh',
-                  borderRadius: '24px',
+                  borderRadius: '20px',
                   objectFit: 'contain',
                   boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
                 }}
@@ -1015,7 +1011,7 @@ export default function PublicProfileModal({
             ) : (
               <UserAvatar 
                 user={{ avatar: userAvatarUrl, name: userName }} 
-                size={300} 
+                size={260} 
                 style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }} 
               />
             )}

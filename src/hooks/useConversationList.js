@@ -222,9 +222,21 @@ export function useConversationList(currentUser) {
     };
     window.addEventListener('update_conversation_local', handleLocalUpdate);
 
+    const handleDeleted = (e) => {
+      if (e.detail?.conversationId) {
+        setConversations(prev => {
+          const nextList = prev.filter(c => String(c.id) !== String(e.detail.conversationId));
+          try { localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(nextList)); } catch(err) {}
+          return nextList;
+        });
+      }
+    };
+    window.addEventListener('conversation_deleted', handleDeleted);
+
     if (!isSupabaseConfigured() || !currentUser?.id) {
       window.removeEventListener('refresh_conversations', handleRefresh);
       window.removeEventListener('update_conversation_local', handleLocalUpdate);
+      window.removeEventListener('conversation_deleted', handleDeleted);
       return;
     }
 
@@ -299,9 +311,29 @@ export function useConversationList(currentUser) {
     return () => {
       window.removeEventListener('refresh_conversations', handleRefresh);
       window.removeEventListener('update_conversation_local', handleLocalUpdate);
+      window.removeEventListener('conversation_deleted', handleDeleted);
       supabase.removeChannel(channel);
     };
   }, [loadInboxData, currentUser?.id]);
+
+  /**
+   * Delete / leave a conversation
+   */
+  const deleteConversation = useCallback(async (conversationId) => {
+    if (!conversationId || !currentUser?.id) return { success: false };
+    
+    // 1. Instant optimistic local state update (0ms latency)
+    setConversations(prev => {
+      const nextList = prev.filter(c => String(c.id) !== String(conversationId));
+      try {
+        localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(nextList));
+      } catch (e) {}
+      return nextList;
+    });
+
+    // 2. Persist removal to database & storage
+    return await directChatService.deleteConversation(conversationId, currentUser.id);
+  }, [currentUser?.id]);
 
   /**
    * Post a new Direct Note
@@ -359,6 +391,7 @@ export function useConversationList(currentUser) {
     setSearchQuery,
     isLoading,
     postNote,
+    deleteConversation,
     refreshInbox: () => loadInboxData(false)
   };
 }

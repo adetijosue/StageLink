@@ -426,6 +426,77 @@ export const directChatService = {
   },
 
   /**
+   * Delete / leave conversation for a user
+   */
+  async deleteConversation(conversationId, userId) {
+    if (!conversationId || !userId) return { success: false };
+
+    // 0. Update LocalStorage conversation cache immediately (0ms instant UI removal)
+    try {
+      const cacheKey = `stagelink_cached_conversations_${userId}`;
+      const cachedStr = localStorage.getItem(cacheKey);
+      if (cachedStr) {
+        const cached = JSON.parse(cachedStr);
+        const updated = cached.filter(c => String(c.id) !== String(conversationId));
+        localStorage.setItem(cacheKey, JSON.stringify(updated));
+      }
+    } catch (_) {}
+
+    // Dispatch UI refresh event immediately
+    window.dispatchEvent(new CustomEvent('conversation_deleted', { detail: { conversationId } }));
+    window.dispatchEvent(new CustomEvent('refresh_conversations'));
+
+    if (!isSupabaseConfigured()) return { success: true };
+
+    try {
+      // 1. Remove or mark left_at in conversation_participants
+      const { error: partErr } = await supabase
+        .from('conversation_participants')
+        .delete()
+        .eq('conversation_id', conversationId)
+        .eq('user_id', userId);
+
+      if (partErr) {
+        // Fallback to update left_at if delete policy restricts hard delete
+        await supabase
+          .from('conversation_participants')
+          .update({ left_at: new Date().toISOString() })
+          .eq('conversation_id', conversationId)
+          .eq('user_id', userId);
+      }
+
+      // 2. Clean up notifications for this conversation
+      try {
+        await supabase
+          .from('notifications')
+          .delete()
+          .eq('user_id', userId)
+          .eq('reference_id', conversationId);
+      } catch (_) {}
+
+      // 3. If no active participants remain, purge conversation and messages
+      try {
+        const { data: remainingParts } = await supabase
+          .from('conversation_participants')
+          .select('id')
+          .eq('conversation_id', conversationId)
+          .is('left_at', null);
+
+        if (!remainingParts || remainingParts.length === 0) {
+          await supabase.from('direct_messages').delete().eq('conversation_id', conversationId);
+          await supabase.from('conversation_participants').delete().eq('conversation_id', conversationId);
+          await supabase.from('conversations').delete().eq('id', conversationId);
+        }
+      } catch (_) {}
+
+      return { success: true };
+    } catch (err) {
+      console.warn('Delete conversation note:', err?.message || err);
+      return { success: false, error: err?.message };
+    }
+  },
+
+  /**
    * Post a 24h Direct Note (with optional music track)
    */
   async postDirectNote(userId, { content, audioTrackUrl = null, audioTrackTitle = null, audioTrackArtist = null }) {

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Search, Plus, PhoneCall } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Search, Plus, PhoneCall, Trash2, MoreVertical, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import UserAvatar from '../../common/UserAvatar';
 import MessageStatusTicks from '../MessageStatusTicks';
 
@@ -16,9 +16,16 @@ const InboxView = React.memo(function InboxView({
   onOpenProfile
 }) {
   const { t, language } = useLanguage();
-  const [onlineUserIds, setOnlineUserIds] = React.useState(() => presenceService.getOnlineUserIds());
+  const [onlineUserIds, setOnlineUserIds] = useState(() => presenceService.getOnlineUserIds());
+  
+  // Deletion modal & feedback state
+  const [confirmDeleteConv, setConfirmDeleteConv] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
 
-  React.useEffect(() => {
+  const longPressTimerRef = useRef(null);
+
+  useEffect(() => {
     const unsubscribe = presenceService.subscribe((ids) => {
       setOnlineUserIds(ids);
     });
@@ -33,15 +40,53 @@ const InboxView = React.memo(function InboxView({
     searchQuery,
     setSearchQuery,
     isLoading,
-    postNote
+    postNote,
+    deleteConversation
   } = useConversationList(currentUser);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteConv) return;
+    setIsDeleting(true);
+    try {
+      soundEngine.playPopSound();
+      await deleteConversation(confirmDeleteConv.id);
+      showToast(language === 'en' ? 'Conversation deleted' : 'Discussion supprimée');
+    } catch (err) {
+      console.warn('Error deleting conversation:', err);
+    } finally {
+      setIsDeleting(false);
+      setConfirmDeleteConv(null);
+    }
+  };
+
+  const startLongPress = (conv) => {
+    longPressTimerRef.current = setTimeout(() => {
+      soundEngine.playPopSound();
+      setConfirmDeleteConv(conv);
+    }, 600);
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
 
   return (
     <div style={{
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      background: 'var(--bg-light)'
+      background: 'var(--bg-light)',
+      position: 'relative'
     }}>
       {/* 1. Header Bar */}
       <div style={{
@@ -107,8 +152,7 @@ const InboxView = React.memo(function InboxView({
         </div>
       </div>
 
-
-      {/* 3. Search Bar */}
+      {/* 2. Search Bar */}
       <div style={{ padding: '12px 16px 6px 16px' }}>
         <div style={{
           display: 'flex',
@@ -137,7 +181,7 @@ const InboxView = React.memo(function InboxView({
         </div>
       </div>
 
-      {/* 4. Filter Tabs */}
+      {/* 3. Filter Tabs */}
       <div style={{
         display: 'flex',
         gap: '8px',
@@ -172,7 +216,7 @@ const InboxView = React.memo(function InboxView({
         ))}
       </div>
 
-      {/* 5. Conversations List */}
+      {/* 4. Conversations List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px' }}>
         {conversations.filter(c => Boolean(c && c.lastMessage)).length === 0 ? (
           <div style={{
@@ -199,6 +243,12 @@ const InboxView = React.memo(function InboxView({
                   soundEngine.playPopSound();
                   onSelectConversation(conv);
                 }}
+                onTouchStart={() => startLongPress(conv)}
+                onTouchEnd={cancelLongPress}
+                onTouchMove={cancelLongPress}
+                onMouseDown={() => startLongPress(conv)}
+                onMouseUp={cancelLongPress}
+                onMouseLeave={cancelLongPress}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -209,8 +259,9 @@ const InboxView = React.memo(function InboxView({
                   marginBottom: '8px',
                   cursor: 'pointer',
                   border: '1px solid var(--border-light)',
-                  transition: 'transform 0.1s ease',
-                  boxShadow: conv.unreadCount > 0 ? '0 4px 12px rgba(0, 102, 255, 0.08)' : 'none'
+                  transition: 'all 0.15s ease',
+                  boxShadow: conv.unreadCount > 0 ? '0 4px 12px rgba(0, 102, 255, 0.08)' : 'none',
+                  position: 'relative'
                 }}
               >
                 <div
@@ -260,7 +311,7 @@ const InboxView = React.memo(function InboxView({
                       {conv.title}
                     </h4>
                     {lastMsg && (
-                      <span style={{ fontSize: '0.7rem', color: '#94A3B8', flexShrink: 0 }}>
+                      <span style={{ fontSize: '0.7rem', color: '#94A3B8', flexShrink: 0, marginLeft: '8px' }}>
                         {new Date(lastMsg.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     )}
@@ -300,15 +351,49 @@ const InboxView = React.memo(function InboxView({
                       ) : (language === 'en' ? 'New conversation' : 'Nouvelle discussion')}
                     </div>
 
-                    {conv.unreadCount > 0 && (
-                      <span style={{
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        background: '#0066FF',
-                        flexShrink: 0
-                      }} />
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                      {conv.unreadCount > 0 && (
+                        <span style={{
+                          width: '10px',
+                          height: '10px',
+                          borderRadius: '50%',
+                          background: '#0066FF',
+                          flexShrink: 0
+                        }} />
+                      )}
+
+                      {/* Discreet Delete Discussion Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          soundEngine.playPopSound();
+                          setConfirmDeleteConv(conv);
+                        }}
+                        title={language === 'en' ? 'Delete conversation' : 'Supprimer la discussion'}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#94A3B8',
+                          padding: '6px',
+                          borderRadius: '50%',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = '#EF4444';
+                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = '#94A3B8';
+                          e.currentTarget.style.background = 'transparent';
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -316,6 +401,157 @@ const InboxView = React.memo(function InboxView({
           })
         )}
       </div>
+
+      {/* 5. Sleek Confirmation Modal for Deleting Conversation */}
+      {confirmDeleteConv && (
+        <div
+          onClick={() => !isDeleting && setConfirmDeleteConv(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            background: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'fadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: '380px',
+              background: 'var(--card-bg, #FFFFFF)',
+              borderRadius: '24px',
+              padding: '24px',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
+              border: '1px solid var(--border-light, #E2E8F0)',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px'
+            }}
+          >
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.1)',
+              color: '#EF4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
+            }}>
+              <Trash2 size={28} />
+            </div>
+
+            <div>
+              <h3 style={{
+                fontSize: '1.2rem',
+                fontWeight: 800,
+                color: 'var(--text-dark, #0F172A)',
+                margin: '0 0 8px 0'
+              }}>
+                {language === 'en' ? 'Delete conversation?' : 'Supprimer la discussion ?'}
+              </h3>
+              <p style={{
+                fontSize: '0.88rem',
+                color: 'var(--text-muted, #64748B)',
+                margin: 0,
+                lineHeight: 1.45
+              }}>
+                {language === 'en'
+                  ? `Are you sure you want to delete your conversation with "${confirmDeleteConv.title}"? It will be permanently removed from your inbox.`
+                  : `Voulez-vous vraiment supprimer votre discussion avec "${confirmDeleteConv.title}" ? Elle disparaîtra définitivement de votre boîte de réception.`
+                }
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', width: '100%', marginTop: '8px' }}>
+              <button
+                disabled={isDeleting}
+                onClick={() => setConfirmDeleteConv(null)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '14px',
+                  border: '1px solid var(--border-light, #CBD5E1)',
+                  background: 'transparent',
+                  color: 'var(--text-dark, #334155)',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  transition: 'background 0.15s ease'
+                }}
+              >
+                {language === 'en' ? 'Cancel' : 'Annuler'}
+              </button>
+
+              <button
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '14px',
+                  border: 'none',
+                  background: '#EF4444',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'transform 0.1s ease'
+                }}
+              >
+                {isDeleting ? (
+                  <span>{language === 'en' ? 'Deleting...' : 'Suppression...'}</span>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    <span>{language === 'en' ? 'Delete' : 'Supprimer'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Success Toast Notification */}
+      {toastMessage && (
+        <div style={{
+          position: 'fixed',
+          bottom: '80px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1100,
+          background: 'rgba(15, 23, 42, 0.92)',
+          backdropFilter: 'blur(8px)',
+          color: '#FFFFFF',
+          padding: '10px 18px',
+          borderRadius: '30px',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '0.88rem',
+          fontWeight: 600,
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <CheckCircle2 size={18} color="#10B981" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 });
