@@ -129,7 +129,7 @@ const uploadChatMediaToSupabase = async (dataUrl, fileName) => {
 
 function MainApp() {
   const { isAuthenticated, currentUser, updateUserProfile } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   useGlobalPresence(currentUser);
 
   // Theme & Global Audio States
@@ -3971,18 +3971,50 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.warn('StageLink Caught UI Exception:', error, errorInfo);
-    // Automatically reset error after 50ms so user is never locked out
-    setTimeout(() => {
-      if (this.state.hasError) {
-        this.setState({ hasError: false, error: null });
-      }
-    }, 50);
+    console.error('StageLink Caught UI Exception:', error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
-      return this.props.children || null;
+      return (
+        <div style={{
+          padding: '40px 20px',
+          textAlign: 'center',
+          color: '#fff',
+          background: '#0B0F19',
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <img src="/stagelink-logo.png" alt="StageLink" style={{ width: '64px', height: '64px', borderRadius: '16px', marginBottom: '20px' }} />
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '8px' }}>Une erreur inattendue est survenue</h2>
+          <p style={{ color: '#94A3B8', fontSize: '0.85rem', maxWidth: '360px', lineHeight: '1.5', marginBottom: '24px' }}>
+            {this.state.error?.message || 'Erreur lors du rendu de l\'interface.'}
+          </p>
+          <button
+            onClick={() => {
+              localStorage.removeItem('stagelink_posts');
+              localStorage.removeItem('stagelink_stories');
+              window.location.reload();
+            }}
+            style={{
+              padding: '12px 28px',
+              background: '#0066FF',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '24px',
+              fontWeight: 700,
+              fontSize: '0.88rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(0,102,255,0.4)'
+            }}
+          >
+            Recharger l'application
+          </button>
+        </div>
+      );
     }
     return this.props.children;
   }
