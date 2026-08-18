@@ -66,19 +66,45 @@ const dataURLtoFile = (dataurl, filename = 'media_upload') => {
     while (n--) {
       u8arr[n] = bstr.charCodeAt(n);
     }
-    return new File([u8arr], `${filename}.${mime.split('/')[1] || 'jpg'}`, { type: mime });
+    const ext = mime.includes('video/mp4') ? 'mp4' : mime.includes('video/webm') ? 'webm' : mime.includes('video/quicktime') ? 'mov' : mime.includes('video/3gpp') ? '3gp' : mime.includes('video/x-m4v') ? 'm4v' : mime.includes('audio') ? 'webm' : (mime.split('/')[1] || 'jpg');
+    return new File([u8arr], `${filename}.${ext}`, { type: mime });
   } catch (e) {
     console.error('DataURL conversion error:', e);
     return null;
   }
 };
 
+const isVideoMediaUrl = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  return (
+    url.startsWith('data:video') ||
+    url.includes('.mp4') ||
+    url.includes('.webm') ||
+    url.includes('.mov') ||
+    url.includes('.m4v') ||
+    url.includes('.3gp') ||
+    url.includes('.mkv') ||
+    url.includes('.avi') ||
+    url.includes('/videos/')
+  );
+};
+
 // Safe wrapper for Supabase storage upload that falls back to compressed Base64 Data URL if bucket/RLS fails
 const safeUploadToStorage = async (bucketName, filePath, dataUrl) => {
   if (!dataUrl) return '';
   
-  // 1. Always compress the image client-side first
-  const optimizedDataUrl = await compressImage(dataUrl, { maxWidth: 1200, maxHeight: 1200, quality: 0.82 });
+  const isVideo = isVideoMediaUrl(dataUrl);
+  const isAudio = typeof dataUrl === 'string' && (dataUrl.startsWith('data:audio') || dataUrl.includes('.mp3') || dataUrl.includes('.wav') || dataUrl.includes('.webm') || dataUrl.includes('.ogg') || dataUrl.includes('.m4a'));
+
+  // 1. Only compress images client-side (skip videos and audio to prevent corruption)
+  let optimizedDataUrl = dataUrl;
+  if (!isVideo && !isAudio && typeof dataUrl === 'string' && dataUrl.startsWith('data:image')) {
+    try {
+      optimizedDataUrl = await compressImage(dataUrl, { maxWidth: 1200, maxHeight: 1200, quality: 0.82 });
+    } catch (ce) {
+      optimizedDataUrl = dataUrl;
+    }
+  }
   
   if (!isSupabaseConfigured()) {
     return optimizedDataUrl;
@@ -89,7 +115,8 @@ const safeUploadToStorage = async (bucketName, filePath, dataUrl) => {
     if (!file) return optimizedDataUrl;
 
     let uploadedSuccessfully = false;
-    const { error: uploadError } = await supabase.storage.from(bucketName).upload(filePath, file, {
+    let targetBucket = isVideo ? 'posts' : bucketName;
+    const { error: uploadError } = await supabase.storage.from(targetBucket).upload(filePath, file, {
       upsert: true,
       contentType: file.type
     });
@@ -97,22 +124,23 @@ const safeUploadToStorage = async (bucketName, filePath, dataUrl) => {
     if (!uploadError) {
       uploadedSuccessfully = true;
     } else {
-      console.warn(`Storage upload attempt 1 failed (${bucketName}):`, uploadError.message);
-      // Fallback: try fallback bucket 'posts' or 'stories' if targeted bucket is restricted
-      const fallbackBucket = bucketName === 'stories' ? 'posts' : 'stories';
-      const { error: retryError } = await supabase.storage.from(fallbackBucket).upload(filePath, file, {
-        upsert: true,
-        contentType: file.type
-      });
-      if (!retryError) {
-        uploadedSuccessfully = true;
-        bucketName = fallbackBucket;
+      console.warn(`Storage upload attempt failed (${targetBucket}):`, uploadError.message);
+      if (!uploadError.message?.includes('Bucket not found')) {
+        const fallbackBucket = targetBucket === 'chat_media' ? 'posts' : 'chat_media';
+        const { error: retryError } = await supabase.storage.from(fallbackBucket).upload(filePath, file, {
+          upsert: true,
+          contentType: file.type
+        });
+        if (!retryError) {
+          uploadedSuccessfully = true;
+          targetBucket = fallbackBucket;
+        }
       }
     }
 
     // ONLY return public URL if upload ACTUALLY succeeded on storage!
     if (uploadedSuccessfully) {
-      const { data: publicUrlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
+      const { data: publicUrlData } = supabase.storage.from(targetBucket).getPublicUrl(filePath);
       if (publicUrlData && publicUrlData.publicUrl) {
         return publicUrlData.publicUrl;
       }
@@ -713,6 +741,11 @@ function MainApp() {
                 const isVerified = isCurrentUser ? currentUser.verified : (authorProfile.verified || authorProfile.verified_badge === 'gold' || authorProfile.verified_badge === 'blue' || p.profiles?.verified_badge === 'gold');
                 const badgeType = isCurrentUser ? currentUser.badgeType : (authorProfile.badgeType || authorProfile.verified_badge || p.profiles?.verified_badge || 'none');
 
+                const isVideo = isVideoMediaUrl(p.media_url);
+                const postMediaList = Array.isArray(p.metadata?.mediaList) && p.metadata.mediaList.length > 0
+                  ? p.metadata.mediaList
+                  : (p.media_url ? [{ type: isVideo ? 'video' : 'image', url: p.media_url }] : []);
+
                 return {
                   id: p.id,
                   userId: p.user_id,
@@ -722,7 +755,10 @@ function MainApp() {
                   isVerified: isVerified,
                   badgeType: badgeType,
                   text: p.content || '',
-                  image: p.media_url || null,
+                  image: !isVideo ? p.media_url : null,
+                  video: isVideo ? p.media_url : null,
+                  media_url: p.media_url || null,
+                  mediaList: postMediaList,
                   proServiceData: p.metadata?.proServiceData || null,
                   hasAudio: Boolean(p.audio_url),
                   audioTitle: p.audio_title || 'Extrait Audio',
@@ -2698,13 +2734,31 @@ function MainApp() {
       let rawMedia = newPostData.image || (newPostData.mediaList && newPostData.mediaList[0]?.url) || (newPostData.mediaList && typeof newPostData.mediaList[0] === 'string' ? newPostData.mediaList[0] : null);
       let finalMediaUrl = rawMedia;
 
+      const isVideoMedia = (newPostData.mediaList && newPostData.mediaList[0]?.type === 'video') || isVideoMediaUrl(finalMediaUrl) || isVideoMediaUrl(rawMedia);
+
       if (rawMedia && typeof rawMedia === 'string' && rawMedia.startsWith('data:')) {
-        finalMediaUrl = await uploadChatMediaToSupabase(rawMedia, `post_${Date.now()}`);
+        finalMediaUrl = await safeUploadToStorage(isVideoMedia ? 'posts' : 'chat_media', `post_${Date.now()}`, rawMedia);
       }
 
       let finalAudioUrl = newPostData.audioUrl || null;
       if (finalAudioUrl && typeof finalAudioUrl === 'string' && finalAudioUrl.startsWith('data:')) {
-        finalAudioUrl = await uploadChatMediaToSupabase(finalAudioUrl, `audio_${Date.now()}`);
+        finalAudioUrl = await safeUploadToStorage('chat_media', `audio_${Date.now()}`, finalAudioUrl);
+      }
+
+      let finalMediaList = [];
+      if (Array.isArray(newPostData.mediaList) && newPostData.mediaList.length > 0) {
+        finalMediaList = await Promise.all(newPostData.mediaList.map(async (m, idx) => {
+          let itemUrl = m.url || (typeof m === 'string' ? m : '');
+          let itemType = m.type || (isVideoMediaUrl(itemUrl) ? 'video' : 'image');
+          if (itemUrl && typeof itemUrl === 'string' && itemUrl.startsWith('data:')) {
+            itemUrl = await safeUploadToStorage(itemType === 'video' ? 'posts' : 'chat_media', `post_media_${Date.now()}_${idx}`, itemUrl);
+          }
+          return {
+            type: itemType,
+            url: itemUrl,
+            name: m.name || `media_${idx}`
+          };
+        }));
       }
 
       const newPost = {
@@ -2716,8 +2770,10 @@ function MainApp() {
         isVerified: currentUser.verified,
         badgeType: currentUser.badgeType,
         text: newPostData.text || '',
-        mediaList: newPostData.mediaList || [],
-        image: finalMediaUrl,
+        mediaList: finalMediaList.length > 0 ? finalMediaList : (finalMediaUrl ? [{ type: isVideoMedia ? 'video' : 'image', url: finalMediaUrl }] : []),
+        image: !isVideoMedia ? finalMediaUrl : null,
+        video: isVideoMedia ? finalMediaUrl : null,
+        media_url: finalMediaUrl,
         proServiceData: newPostData.proServiceData || null,
         hasAudio: !!newPostData.hasAudio || !!finalAudioUrl,
         audioUrl: finalAudioUrl,

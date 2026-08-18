@@ -495,6 +495,22 @@ export default function CreatePostModal({ isOpen, onClose, onSubmitPost }) {
             </div>
           </form>
         )}
+
+        {/* Hidden File Inputs for universal photo and video picking */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*,video/mp4,video/quicktime,video/webm,video/x-m4v,video/3gpp,video/avi,video/x-matroska"
+          onChange={handleImageSelect}
+          style={{ display: 'none' }}
+        />
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/*,video/mp4,video/quicktime,video/webm,video/x-m4v,video/3gpp,video/avi,video/x-matroska"
+          onChange={handleVideoSelect}
+          style={{ display: 'none' }}
+        />
       </div>
     </div>
   );

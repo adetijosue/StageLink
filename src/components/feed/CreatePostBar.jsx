@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { Image, Send } from 'lucide-react';
+import { Image, Video, Send } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 
 export default function CreatePostBar({ onClickOpenModal }) {
@@ -68,7 +68,7 @@ export default function CreatePostBar({ onClickOpenModal }) {
         {/* Photo Button */}
         <button
           type="button"
-          title={language === 'en' ? 'Add photo or video' : 'Ajouter une photo ou vidéo'}
+          title={language === 'en' ? 'Add photo' : 'Ajouter une photo'}
           style={{
             width: '34px',
             height: '34px',
@@ -84,6 +84,27 @@ export default function CreatePostBar({ onClickOpenModal }) {
           }}
         >
           <Image size={17} strokeWidth={2.2} />
+        </button>
+
+        {/* Video Button */}
+        <button
+          type="button"
+          title={language === 'en' ? 'Add video' : 'Ajouter une vidéo'}
+          style={{
+            width: '34px',
+            height: '34px',
+            borderRadius: '50%',
+            background: 'var(--input-bg, #ECFDF5)',
+            border: 'none',
+            color: '#10B981',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'background 0.15s ease, transform 0.15s ease'
+          }}
+        >
+          <Video size={17} strokeWidth={2.2} />
         </button>
 
         {/* Publish / Send Action Button */}

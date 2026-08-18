@@ -13,7 +13,7 @@ export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
     return localStorage.getItem('stagelink_post_draft_text') || '';
   });
 
-  const [selectedMediaList, setSelectedMediaList] = useState([]); // Array of { type: 'image' | 'video', url: string }
+  const [selectedMediaList, setSelectedMediaList] = useState([]); // Array of { type: 'image' | 'video', url: string, name?: string, size?: number }
   const [hasAudio, setHasAudio] = useState(false);
   const [recordedAudioUrl, setRecordedAudioUrl] = useState(null);
   const [isRecordingMic, setIsRecordingMic] = useState(false);
@@ -25,6 +25,7 @@ export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
 
   const fileInputRef = useRef(null);
   const videoInputRef = useRef(null);
+  const mediaInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
@@ -37,30 +38,43 @@ export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
 
   if (!currentUser) return null;
 
+  const processFiles = (files) => {
+    if (!files || files.length === 0) return;
+    soundEngine.playPopSound();
+
+    Array.from(files).forEach(file => {
+      const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|m4v|3gp|mkv|avi|ogv)$/i.test(file.name);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (reader.result) {
+          setSelectedMediaList(prev => [
+            ...prev,
+            {
+              type: isVideo ? 'video' : 'image',
+              url: reader.result,
+              name: file.name,
+              size: file.size
+            }
+          ]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleImageSelect = (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length > 0) {
-      soundEngine.playPopSound();
-      files.forEach(file => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setSelectedMediaList(prev => [...prev, { type: 'image', url: reader.result }]);
-        };
-        reader.readAsDataURL(file);
-      });
-    }
+    processFiles(e.target.files);
+    e.target.value = '';
   };
 
   const handleVideoSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      soundEngine.playPopSound();
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedMediaList(prev => [...prev, { type: 'video', url: reader.result }]);
-      };
-      reader.readAsDataURL(file);
-    }
+    processFiles(e.target.files);
+    e.target.value = '';
+  };
+
+  const handleMediaSelect = (e) => {
+    processFiles(e.target.files);
+    e.target.value = '';
   };
 
   const removeMedia = (index) => {
@@ -208,8 +222,8 @@ export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
 
       {/* Tabs */}
       <div style={{ background: isDarkMode ? '#151D2A' : '#FFFFFF', padding: '8px 16px', borderBottom: '1px solid var(--border-light)', display: 'flex', gap: '12px' }}>
-        <button onClick={() => setActiveTabMode('edit')} style={{ flex: 1, padding: '8px', borderRadius: '12px', border: 'none', background: activeTabMode === 'edit' ? '#0066FF' : 'transparent', color: activeTabMode === 'edit' ? '#FFF' : 'inherit', fontWeight: 700 }}>Éditer</button>
-        <button onClick={() => setActiveTabMode('preview')} style={{ flex: 1, padding: '8px', borderRadius: '12px', border: 'none', background: activeTabMode === 'preview' ? '#0066FF' : 'transparent', color: activeTabMode === 'preview' ? '#FFF' : 'inherit', fontWeight: 700 }}>Aperçu</button>
+        <button onClick={() => setActiveTabMode('edit')} style={{ flex: 1, padding: '8px', borderRadius: '12px', border: 'none', background: activeTabMode === 'edit' ? '#0066FF' : 'transparent', color: activeTabMode === 'edit' ? '#FFF' : 'inherit', fontWeight: 700, cursor: 'pointer' }}>Éditer</button>
+        <button onClick={() => setActiveTabMode('preview')} style={{ flex: 1, padding: '8px', borderRadius: '12px', border: 'none', background: activeTabMode === 'preview' ? '#0066FF' : 'transparent', color: activeTabMode === 'preview' ? '#FFF' : 'inherit', fontWeight: 700, cursor: 'pointer' }}>Aperçu</button>
       </div>
 
       {/* Content */}
@@ -222,8 +236,12 @@ export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
             </div>
             <p style={{ whiteSpace: 'pre-line', fontSize: '0.95rem' }}>{postText || 'Texte de la publication...'}</p>
             {selectedMediaList.map((media, i) => (
-              <div key={i} style={{ marginBottom: '10px', borderRadius: '12px', overflow: 'hidden' }}>
-                {media.type === 'image' ? <img src={media.url} style={{ width: '100%' }} /> : <video src={media.url} controls style={{ width: '100%' }} />}
+              <div key={i} style={{ marginBottom: '10px', borderRadius: '14px', overflow: 'hidden', background: '#000', border: '1px solid var(--border-light)' }}>
+                {media.type === 'video' ? (
+                  <video src={media.url} controls playsInline preload="metadata" style={{ width: '100%', maxHeight: '420px', display: 'block', objectFit: 'contain' }} />
+                ) : (
+                  <img src={media.url} alt={`Media ${i}`} style={{ width: '100%', display: 'block', objectFit: 'contain' }} />
+                )}
               </div>
             ))}
             {hasAudio && (
@@ -236,7 +254,7 @@ export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Visibility Selector */}
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={() => setVisibility(v => v === 'public' ? 'members' : 'public')} style={{ background: '#EFF6FF', color: '#0066FF', border: 'none', borderRadius: '12px', padding: '6px 12px', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button onClick={() => setVisibility(v => v === 'public' ? 'members' : 'public')} style={{ background: '#EFF6FF', color: '#0066FF', border: 'none', borderRadius: '12px', padding: '6px 12px', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                 {visibility === 'public' ? <Globe size={14} /> : <Lock size={14} />} {visibility === 'public' ? 'Public' : 'Membres'}
               </button>
             </div>
@@ -244,7 +262,7 @@ export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
             {/* Textarea */}
             <textarea
               rows={6}
-              placeholder="Qu'avez-vous à partager ?"
+              placeholder="Qu'avez-vous à partager ? Ajoutez du texte, des photos, des vidéos ou un vocal..."
               value={postText}
               onChange={(e) => setPostText(e.target.value)}
               style={{ width: '100%', background: isDarkMode ? '#151D2A' : '#FFF', border: '1px solid var(--border-light)', borderRadius: '20px', padding: '16px', fontSize: '1rem', color: 'inherit', resize: 'none', outline: 'none' }}
@@ -253,24 +271,49 @@ export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
             {/* Media List */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
               {selectedMediaList.map((media, i) => (
-                <div key={i} style={{ position: 'relative', width: '100px', height: '100px', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-light)' }}>
-                  {media.type === 'image' ? <img src={media.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <video src={media.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-                  <button onClick={() => removeMedia(i)} style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', padding: 4, color: '#FFF' }}><X size={12} /></button>
+                <div key={i} style={{ position: 'relative', width: '100px', height: '100px', borderRadius: '14px', overflow: 'hidden', border: '1px solid var(--border-light)', background: '#0F172A' }}>
+                  {media.type === 'video' ? (
+                    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                      <video src={media.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.35)', pointerEvents: 'none' }}>
+                        <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Video size={14} color="#FFF" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <img src={media.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={`Preview ${i}`} />
+                  )}
+                  <button
+                    onClick={() => removeMedia(i)}
+                    style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF', cursor: 'pointer' }}
+                    title="Supprimer ce média"
+                  >
+                    <X size={13} />
+                  </button>
                 </div>
               ))}
-              <button onClick={() => fileInputRef.current?.click()} style={{ width: '100px', height: '100px', borderRadius: '12px', border: '2px dashed var(--border-light)', background: 'transparent', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={24} /></button>
+              <button
+                type="button"
+                onClick={() => mediaInputRef.current?.click()}
+                style={{ width: '100px', height: '100px', borderRadius: '14px', border: '2px dashed var(--border-light)', background: 'transparent', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', cursor: 'pointer' }}
+                title="Ajouter photos ou vidéos"
+              >
+                <Plus size={22} />
+                <span style={{ fontSize: '0.68rem', fontWeight: 700 }}>Photo / Vidéo</span>
+              </button>
             </div>
 
             {/* Audio Widget */}
             {hasAudio && (
               <div style={{ background: '#EFF6FF', padding: '12px', borderRadius: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #BFDBFE' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#0066FF' }}>
-                  <button onClick={toggleAudioPlayback} style={{ background: '#0066FF', color: '#FFF', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <button onClick={toggleAudioPlayback} style={{ background: '#0066FF', color: '#FFF', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                     {isPlayingAudioPreview ? <Pause size={14} fill="white" /> : <Play size={14} fill="white" />}
                   </button>
                   <span style={{ fontWeight: 700 }}>Vocal enregistré ({recordingTime}s)</span>
                 </div>
-                <button onClick={() => { setHasAudio(false); setRecordedAudioUrl(null); }} style={{ background: 'transparent', border: 'none', color: '#EF4444' }}><Trash2 size={18} /></button>
+                <button onClick={() => { setHasAudio(false); setRecordedAudioUrl(null); }} style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer' }}><Trash2 size={18} /></button>
               </div>
             )}
           </div>
@@ -280,22 +323,60 @@ export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
       {/* Toolbar */}
       {activeTabMode === 'edit' && (
         <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: isDarkMode ? '#151D2A' : '#FFF', borderTop: '1px solid var(--border-light)', padding: '12px 16px max(16px, env(safe-area-inset-bottom, 16px))', display: 'flex', gap: '10px' }}>
-          <button onClick={() => fileInputRef.current?.click()} style={{ flex: 1, padding: '12px', borderRadius: '16px', border: 'none', background: '#EFF6FF', color: '#0066FF', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}><Image size={20} /> Photo</button>
-          <button onClick={() => videoInputRef.current?.click()} style={{ flex: 1, padding: '12px', borderRadius: '16px', border: 'none', background: '#ECFDF5', color: '#10B981', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}><Video size={20} /> Vidéo</button>
           <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            style={{ flex: 1, padding: '12px', borderRadius: '16px', border: 'none', background: '#EFF6FF', color: '#0066FF', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer' }}
+          >
+            <Image size={20} /> Photo
+          </button>
+
+          <button
+            type="button"
+            onClick={() => videoInputRef.current?.click()}
+            style={{ flex: 1, padding: '12px', borderRadius: '16px', border: 'none', background: '#ECFDF5', color: '#10B981', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer' }}
+          >
+            <Video size={20} /> Vidéo
+          </button>
+
+          <button
+            type="button"
             onMouseDown={handleStartMicRecord}
             onMouseUp={handleStopMicRecord}
             onTouchStart={handleStartMicRecord}
             onTouchEnd={handleStopMicRecord}
-            style={{ flex: 1, padding: '12px', borderRadius: '16px', border: 'none', background: isRecordingMic ? '#FEF2F2' : '#F5F3FF', color: isRecordingMic ? '#EF4444' : '#8B5CF6', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transform: isRecordingMic ? 'scale(1.05)' : 'none', transition: 'all 0.2s' }}
+            style={{ flex: 1, padding: '12px', borderRadius: '16px', border: 'none', background: isRecordingMic ? '#FEF2F2' : '#F5F3FF', color: isRecordingMic ? '#EF4444' : '#8B5CF6', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transform: isRecordingMic ? 'scale(1.05)' : 'none', transition: 'all 0.2s', cursor: 'pointer' }}
           >
             <Mic size={20} /> {isRecordingMic ? 'Rec...' : 'Vocal'}
           </button>
         </div>
       )}
 
-      <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageSelect} style={{ display: 'none' }} />
-      <input ref={videoInputRef} type="file" accept="video/*" onChange={handleVideoSelect} style={{ display: 'none' }} />
+      {/* Hidden File Inputs with Robust Universal Mobile & Desktop Video Acceptance */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,video/*,video/mp4,video/quicktime,video/webm,video/x-m4v,video/3gpp,video/avi,video/x-matroska"
+        multiple
+        onChange={handleImageSelect}
+        style={{ display: 'none' }}
+      />
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*,video/mp4,video/quicktime,video/webm,video/x-m4v,video/3gpp,video/avi,video/x-matroska"
+        multiple
+        onChange={handleVideoSelect}
+        style={{ display: 'none' }}
+      />
+      <input
+        ref={mediaInputRef}
+        type="file"
+        accept="image/*,video/*,video/mp4,video/quicktime,video/webm,video/x-m4v,video/3gpp,video/avi,video/x-matroska"
+        multiple
+        onChange={handleMediaSelect}
+        style={{ display: 'none' }}
+      />
     </div>
   );
 }

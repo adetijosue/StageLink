@@ -12,6 +12,21 @@ import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
 import confetti from 'canvas-confetti';
 import UserAvatar from '../common/UserAvatar';
 
+const isVideoMediaUrl = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  return (
+    url.startsWith('data:video') ||
+    url.includes('.mp4') ||
+    url.includes('.webm') ||
+    url.includes('.mov') ||
+    url.includes('.m4v') ||
+    url.includes('.3gp') ||
+    url.includes('.mkv') ||
+    url.includes('.avi') ||
+    url.includes('/videos/')
+  );
+};
+
 function FeedCard({ 
   post, 
   onLike, 
@@ -508,35 +523,63 @@ function FeedCard({
       {/* Multi-Media List (Carousel-like vertical list) */}
       {!pro && post.mediaList && post.mediaList.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-          {post.mediaList.map((m, i) => (
-            <div key={i} style={{ borderRadius: '14px', overflow: 'hidden', background: '#000', border: '1px solid #E2E8F0' }}>
-              {m.type === 'video' ? (
-                <video src={m.url} controls playsInline style={{ width: '100%', maxHeight: '420px', display: 'block', objectFit: 'contain' }} />
-              ) : (
-                <img src={m.url} alt={`Media ${i}`} loading="lazy" decoding="async" style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain' }} />
-              )}
-            </div>
-          ))}
+          {post.mediaList.map((m, i) => {
+            const isVid = m.type === 'video' || isVideoMediaUrl(m.url);
+            return (
+              <div key={i} style={{ borderRadius: '16px', overflow: 'hidden', background: '#0F172A', border: '1px solid var(--border-light, #E2E8F0)' }}>
+                {isVid ? (
+                  <div style={{ position: 'relative', width: '100%', background: '#000000' }} onClick={(e) => e.stopPropagation()}>
+                    <video
+                      src={m.url}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      style={{ width: '100%', maxHeight: '460px', display: 'block', objectFit: 'contain' }}
+                    />
+                  </div>
+                ) : (
+                  <img
+                    src={m.url}
+                    alt={`Media ${i}`}
+                    loading="lazy"
+                    decoding="async"
+                    style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain' }}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       ) : !pro && (
         <>
-          {/* Legacy single media support */}
-          {post.video && (
+          {/* Direct single video or video disguised in image/media_url */}
+          {(post.video || isVideoMediaUrl(post.image) || isVideoMediaUrl(post.media_url)) ? (
             <div
               onClick={(e) => e.stopPropagation()}
-              style={{ borderRadius: '14px', overflow: 'hidden', marginBottom: '12px', background: '#000000', border: '1px solid #CBD5E1' }}
+              style={{
+                borderRadius: '16px',
+                overflow: 'hidden',
+                marginBottom: '12px',
+                background: '#000000',
+                border: '1px solid #1E293B'
+              }}
             >
               <video
-                src={post.video}
+                src={post.video || (isVideoMediaUrl(post.image) ? post.image : post.media_url)}
                 controls
                 playsInline
-                style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '420px', objectFit: 'contain' }}
+                preload="metadata"
+                style={{
+                  width: '100%',
+                  height: 'auto',
+                  display: 'block',
+                  maxHeight: '460px',
+                  objectFit: 'contain'
+                }}
               />
             </div>
-          )}
-
-          {post.image && (
-            <div style={{ borderRadius: '14px', overflow: 'hidden', marginBottom: '12px', background: '#F8FAFC', border: '1px solid #E2E8F0', cursor: 'pointer' }}>
+          ) : post.image ? (
+            <div style={{ borderRadius: '16px', overflow: 'hidden', marginBottom: '12px', background: '#F8FAFC', border: '1px solid var(--border-light, #E2E8F0)', cursor: 'pointer' }}>
               <img
                 src={post.image}
                 alt="Media Attachment"
@@ -545,7 +588,7 @@ function FeedCard({
                 style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain' }}
               />
             </div>
-          )}
+          ) : null}
         </>
       )}
 
