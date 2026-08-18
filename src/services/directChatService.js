@@ -38,6 +38,28 @@ export const directChatService = {
   },
 
   /**
+   * Automatically delete/clean up empty conversation drafts where no message was sent
+   */
+  async cleanupEmptyConversation(conversationId) {
+    if (!conversationId || !isSupabaseConfigured()) return;
+    try {
+      // Check if conversation has any message
+      const { data: msgs, error: msgErr } = await supabase
+        .from('direct_messages')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .limit(1);
+
+      if (!msgErr && (!msgs || msgs.length === 0)) {
+        await supabase.from('conversation_participants').delete().eq('conversation_id', conversationId);
+        await supabase.from('conversations').delete().eq('id', conversationId);
+      }
+    } catch (err) {
+      console.warn('Cleanup empty conversation note:', err?.message || err);
+    }
+  },
+
+  /**
    * Upload media (photo, video, audio note, document) to Supabase Storage
    */
   async uploadMedia(fileOrBlob, fileName, mediaType = 'image') {

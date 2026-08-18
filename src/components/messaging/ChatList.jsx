@@ -16,8 +16,11 @@ export default function ChatList({ chats, onSelectChat, onOpenNewChatModal, onOp
   });
 
   const filteredChats = (chats || []).filter(chat => {
+    if (!chat) return false;
+    const hasMessages = (Array.isArray(chat.messages) && chat.messages.length > 0) || Boolean(chat.lastMessage);
+    if (!hasMessages) return false;
     if (!searchQuery) return true;
-    const partnerName = chat.participant?.name?.toLowerCase() || '';
+    const partnerName = chat.participant?.name?.toLowerCase() || chat.title?.toLowerCase() || '';
     return partnerName.includes(searchQuery.toLowerCase());
   });
 

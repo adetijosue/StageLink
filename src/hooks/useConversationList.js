@@ -8,7 +8,9 @@ export function useConversationList(currentUser) {
     if (!currentUser?.id) return [];
     try {
       const cached = localStorage.getItem(`stagelink_cached_conversations_${currentUser.id}`);
-      return cached ? JSON.parse(cached) : [];
+      if (!cached) return [];
+      const parsed = JSON.parse(cached);
+      return Array.isArray(parsed) ? parsed.filter(c => Boolean(c && c.lastMessage)) : [];
     } catch (e) {
       console.warn("Storage read error (conversations):", e);
       return [];
@@ -124,6 +126,13 @@ export function useConversationList(currentUser) {
           ? [...conv.last_message].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
           : [];
         const lastMsg = sortedMsgs[0] || null;
+
+        // CRITICAL USER DIRECTIVE (Audio 25):
+        // If no message has ever been written/sent in this conversation (empty draft),
+        // it MUST NOT appear in the user's discussions list!
+        if (!lastMsg) {
+          return null;
+        }
 
         const partnerName = otherParticipant?.full_name || otherParticipant?.username || otherParticipant?.name || 'Artiste';
         const partnerUsername = otherParticipant?.username || '';
@@ -330,6 +339,9 @@ export function useConversationList(currentUser) {
 
   // Filter conversations based on search and active tab
   const filteredConversations = conversations.filter((conv) => {
+    // Exclude conversations with no messages
+    if (!conv || !conv.lastMessage) return false;
+
     const matchesSearch = (conv.title || '').toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
 

@@ -174,7 +174,7 @@ const InboxView = React.memo(function InboxView({
 
       {/* 5. Conversations List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px' }}>
-        {conversations.length === 0 ? (
+        {conversations.filter(c => Boolean(c && c.lastMessage)).length === 0 ? (
           <div style={{
             display: 'flex',
             flexDirection: 'column',
@@ -186,7 +186,7 @@ const InboxView = React.memo(function InboxView({
             <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>{language === 'en' ? 'No conversations found' : 'Aucune discussion trouvée'}</p>
           </div>
         ) : (
-          conversations.map((conv) => {
+          conversations.filter(c => Boolean(c && c.lastMessage)).map((conv) => {
             const partnerId = conv.partner?.id || conv.participant?.id || conv.participantId || conv.partnerId;
             const isOnline = Boolean(partnerId && onlineUserIds.includes(String(partnerId)));
             const lastMsg = conv.lastMessage;

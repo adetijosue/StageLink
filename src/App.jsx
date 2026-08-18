@@ -3819,6 +3819,7 @@ function MainApp() {
             onBack={() => {
                 setSelectedConversation(null);
                 setActiveTab('discussions');
+                window.dispatchEvent(new Event('refresh_conversations'));
             }}
             onStartAudioCall={() => {
               initiateOutgoingCall(resolvedPartner || { id: partnerId, name: 'Artiste' }, true);

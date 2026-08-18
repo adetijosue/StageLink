@@ -37,8 +37,13 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      // If thread had 0 messages when closed, clean up stub conversation from DB
+      if (conversationId && messages.length === 0) {
+        directChatService.cleanupEmptyConversation(conversationId);
+        window.dispatchEvent(new Event('refresh_conversations'));
+      }
     };
-  }, []);
+  }, [conversationId, messages.length]);
 
   const persistMessagesCache = useCallback((msgs) => {
     if (!conversationId || !Array.isArray(msgs)) return;
