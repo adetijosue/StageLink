@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, Heart, MessageSquare, Phone, Video, Sparkles, Eye, X, ChevronRight, Flame } from 'lucide-react';
+import { MessageCircle, Heart, MessageSquare, Phone, Video, Sparkles, Eye, X, ChevronRight, Flame, CheckCircle2 } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 import { soundEngine } from '../../services/audioService';
 
@@ -26,11 +26,12 @@ export default function TopNotificationBanner({
     setIsExiting(false);
     setSwipeOffsetY(0);
 
-    // Auto-dismiss after 4.5 seconds
+    // Auto-dismiss after 3.8 seconds for success/info, or 4.5 seconds for calls/messages
+    const duration = (notification.type === 'success' || notification.type === 'post_published') ? 3500 : 4500;
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       handleDismiss();
-    }, 4500);
+    }, duration);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -81,8 +82,8 @@ export default function TopNotificationBanner({
 
   if (!notification) return null;
 
-  const actorName = notification.title || notification.actorName || notification.senderName || 'Nouveau message';
-  const messageText = notification.message || notification.content || notification.text || 'Appuyez pour voir';
+  const actorName = notification.title || notification.actorName || notification.senderName || 'Notification';
+  const messageText = notification.message || notification.content || notification.text || 'Action effectuée';
   const avatarUrl = notification.avatar || notification.actorAvatar || notification.avatar_url;
   const notifType = notification.type || 'message';
 
@@ -93,6 +94,13 @@ export default function TopNotificationBanner({
   let typeLabel = 'Message direct';
 
   switch (notifType) {
+    case 'success':
+    case 'post_published':
+    case 'published':
+      BadgeIcon = CheckCircle2;
+      badgeBg = '#10B981';
+      typeLabel = 'Succès';
+      break;
     case 'like_post':
     case 'post_like':
       BadgeIcon = Heart;

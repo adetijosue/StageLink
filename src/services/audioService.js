@@ -132,6 +132,45 @@ class SoundSynthesizer {
     this.playPopSound();
   }
 
+  /**
+   * High-quality subtle melodic chime for successful actions (e.g. post publication)
+   */
+  playSuccessSound() {
+    try {
+      this.initContext();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      
+      // Elegant 2-tone melodic chime: F5 (698.46Hz) -> C6 (1046.50Hz)
+      const notes = [
+        { f: 698.46, t: 0, d: 0.14, gain: 0.22 },
+        { f: 1046.50, t: 0.08, d: 0.32, gain: 0.28 }
+      ];
+
+      notes.forEach(({ f, t, d, gain: maxGain }) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, now + t);
+        gain.gain.setValueAtTime(0, now + t);
+        gain.gain.linearRampToValueAtTime(maxGain, now + t + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + t + d);
+        osc.connect(gain);
+        gain.connect(this.masterGain || this.ctx.destination);
+        osc.start(now + t);
+        osc.stop(now + t + d);
+      });
+
+      if (this.vibrationEnabled && typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([25, 35, 30]);
+      }
+    } catch (e) {}
+  }
+
+  playPostPublishedSound() {
+    this.playSuccessSound();
+  }
+
   playMessageSentSound() {
     try {
       this.initContext();

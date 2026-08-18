@@ -1169,6 +1169,7 @@ function MainApp() {
                 } catch(e) {}
               }
 
+              const isVid = isVideoMediaUrl(p.media_url);
               return {
                 id: p.id,
                 userId: p.user_id,
@@ -1179,7 +1180,10 @@ function MainApp() {
                 badgeType: badgeType,
                 text: textContent,
                 proServiceData: proServiceData,
-                image: p.media_url || null,
+                image: !isVid ? (p.media_url || null) : null,
+                video: isVid ? p.media_url : null,
+                media_url: p.media_url || null,
+                mediaList: p.media_url ? [{ type: isVid ? 'video' : 'image', url: p.media_url }] : [],
                 hasAudio: Boolean(p.audio_url),
                 audioTitle: p.audio_title || 'Extrait Audio',
                 audioUrl: p.audio_url || null,
@@ -1197,8 +1201,15 @@ function MainApp() {
               };
             });
             const sanitizedPosts = freshPosts.filter(p => !isTestArtifact(p));
-            setPosts(sanitizedPosts);
-            setStoredItem(STORAGE_KEYS.POSTS, sanitizedPosts);
+
+            // Preserve any pending local optimistic posts created recently by current user
+            const currentLocalPosts = getStoredItem(STORAGE_KEYS.POSTS, []) || [];
+            const supaPostIds = new Set(sanitizedPosts.map(sp => sp.id));
+            const pendingLocalPosts = currentLocalPosts.filter(lp => lp && lp.userId === currentUser?.id && !supaPostIds.has(lp.id));
+            const mergedPosts = [...pendingLocalPosts, ...sanitizedPosts];
+
+            setPosts(mergedPosts);
+            setStoredItem(STORAGE_KEYS.POSTS, mergedPosts);
           }
 
           // 3. Sync Live Stories with resilient fallback
@@ -2729,74 +2740,134 @@ function MainApp() {
 
   const handleCreatePost = async (newPostData) => {
     setIsUploadingPost(true);
-    try {
-      const postUuid = generateUUID();
-      let rawMedia = newPostData.image || (newPostData.mediaList && newPostData.mediaList[0]?.url) || (newPostData.mediaList && typeof newPostData.mediaList[0] === 'string' ? newPostData.mediaList[0] : null);
-      let finalMediaUrl = rawMedia;
+    const postUuid = generateUUID();
 
-      const isVideoMedia = (newPostData.mediaList && newPostData.mediaList[0]?.type === 'video') || isVideoMediaUrl(finalMediaUrl) || isVideoMediaUrl(rawMedia);
+    // 1. Resolve preliminary media (instant Data URLs or existing URLs) for 0ms instantaneous display
+    let rawMedia = newPostData.image || (newPostData.mediaList && newPostData.mediaList[0]?.url) || (newPostData.mediaList && typeof newPostData.mediaList[0] === 'string' ? newPostData.mediaList[0] : null);
+    let preliminaryMediaUrl = rawMedia;
+    const isVideoMedia = Boolean(
+      newPostData.video ||
+      (newPostData.mediaList && newPostData.mediaList[0]?.type === 'video') ||
+      isVideoMediaUrl(preliminaryMediaUrl) ||
+      isVideoMediaUrl(rawMedia)
+    );
 
-      if (rawMedia && typeof rawMedia === 'string' && rawMedia.startsWith('data:')) {
-        finalMediaUrl = await safeUploadToStorage(isVideoMedia ? 'posts' : 'chat_media', `post_${Date.now()}`, rawMedia);
-      }
+    let preliminaryAudioUrl = newPostData.audioUrl || null;
 
-      let finalAudioUrl = newPostData.audioUrl || null;
-      if (finalAudioUrl && typeof finalAudioUrl === 'string' && finalAudioUrl.startsWith('data:')) {
-        finalAudioUrl = await safeUploadToStorage('chat_media', `audio_${Date.now()}`, finalAudioUrl);
-      }
+    let preliminaryMediaList = [];
+    if (Array.isArray(newPostData.mediaList) && newPostData.mediaList.length > 0) {
+      preliminaryMediaList = newPostData.mediaList.map((m, idx) => ({
+        type: m.type || (isVideoMediaUrl(m.url || m) ? 'video' : 'image'),
+        url: m.url || (typeof m === 'string' ? m : ''),
+        name: m.name || `media_${idx}`
+      }));
+    } else if (preliminaryMediaUrl) {
+      preliminaryMediaList = [{
+        type: isVideoMedia ? 'video' : 'image',
+        url: preliminaryMediaUrl
+      }];
+    }
 
-      let finalMediaList = [];
-      if (Array.isArray(newPostData.mediaList) && newPostData.mediaList.length > 0) {
-        finalMediaList = await Promise.all(newPostData.mediaList.map(async (m, idx) => {
-          let itemUrl = m.url || (typeof m === 'string' ? m : '');
-          let itemType = m.type || (isVideoMediaUrl(itemUrl) ? 'video' : 'image');
-          if (itemUrl && typeof itemUrl === 'string' && itemUrl.startsWith('data:')) {
-            itemUrl = await safeUploadToStorage(itemType === 'video' ? 'posts' : 'chat_media', `post_media_${Date.now()}_${idx}`, itemUrl);
-          }
-          return {
-            type: itemType,
-            url: itemUrl,
-            name: m.name || `media_${idx}`
-          };
-        }));
-      }
+    // 2. Build instant optimistic post object
+    const optimisticPost = {
+      id: postUuid,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      userRole: `${currentUser.role || 'Artiste'}, ${currentUser.company || 'StageLink'}`,
+      userAvatar: currentUser.avatar,
+      isVerified: currentUser.verified,
+      badgeType: currentUser.badgeType,
+      text: newPostData.text || '',
+      mediaList: preliminaryMediaList,
+      image: !isVideoMedia ? preliminaryMediaUrl : null,
+      video: isVideoMedia ? (newPostData.video || preliminaryMediaUrl) : null,
+      media_url: preliminaryMediaUrl,
+      proServiceData: newPostData.proServiceData || null,
+      hasAudio: !!newPostData.hasAudio || !!preliminaryAudioUrl,
+      audioUrl: preliminaryAudioUrl,
+      audioTitle: newPostData.audioTitle || (newPostData.hasAudio ? 'Note Vocale' : null),
+      timeAgo: 'À l\'instant',
+      likesCount: 0,
+      isLiked: false,
+      commentsCount: 0,
+      comments: []
+    };
 
-      const newPost = {
-        id: postUuid,
-        userId: currentUser.id,
-        userName: currentUser.name,
-        userRole: `${currentUser.role || 'Artiste'}, ${currentUser.company || 'StageLink'}`,
-        userAvatar: currentUser.avatar,
-        isVerified: currentUser.verified,
-        badgeType: currentUser.badgeType,
-        text: newPostData.text || '',
-        mediaList: finalMediaList.length > 0 ? finalMediaList : (finalMediaUrl ? [{ type: isVideoMedia ? 'video' : 'image', url: finalMediaUrl }] : []),
-        image: !isVideoMedia ? finalMediaUrl : null,
-        video: isVideoMedia ? finalMediaUrl : null,
-        media_url: finalMediaUrl,
-        proServiceData: newPostData.proServiceData || null,
-        hasAudio: !!newPostData.hasAudio || !!finalAudioUrl,
-        audioUrl: finalAudioUrl,
-        audioTitle: newPostData.audioTitle || (newPostData.hasAudio ? 'Note Vocale' : null),
-        timeAgo: 'À l\'instant',
-        likesCount: 0,
-        isLiked: false,
-        commentsCount: 0,
-        comments: []
-      };
+    // 3. INSTANT OPTIMISTIC STATE & LOCAL STORAGE UPDATE (0ms)
+    setPosts(prev => [optimisticPost, ...(prev || [])]);
+    const currentLocal = getStoredItem(STORAGE_KEYS.POSTS, []) || [];
+    setStoredItem(STORAGE_KEYS.POSTS, [optimisticPost, ...currentLocal]);
 
-      const updated = [newPost, ...posts];
-      setPosts(updated);
-      setStoredItem(STORAGE_KEYS.POSTS, updated);
+    // 4. Play subtle success sound chime & show sleek minimalist toast
+    soundEngine.playSuccessSound();
+    setToastNotification({
+      type: 'success',
+      title: newPostData.proServiceData ? 'Offre partagée dans le Feed !' : 'Publication en ligne ✨',
+      message: newPostData.proServiceData ? 'Votre offre est désormais visible par les artistes.' : 'Votre publication a été partagée avec succès.',
+      avatar: currentUser?.avatar
+    });
+    setTimeout(() => setToastNotification(null), 3800);
 
-      let textContent = newPostData.text || '';
-      if (newPostData.proServiceData) {
-        textContent += `\n\n___PRO_SERVICE___:${JSON.stringify(newPostData.proServiceData)}`;
-      }
+    if (optimisticPost.hasAudio) {
+      handleStartGlobalAudio({
+        title: optimisticPost.audioTitle || 'Composition Audio',
+        artist: currentUser.name,
+        genre: 'Afro-Gospel'
+      });
+    }
 
-      // Save post directly to Supabase Database for all users
-      if (isSupabaseConfigured()) {
-        try {
+    // 5. ASYNCHRONOUS BACKGROUND UPLOAD & SUPABASE PERSISTENCE
+    (async () => {
+      try {
+        let finalMediaUrl = preliminaryMediaUrl;
+        if (rawMedia && typeof rawMedia === 'string' && rawMedia.startsWith('data:')) {
+          finalMediaUrl = await safeUploadToStorage(isVideoMedia ? 'posts' : 'chat_media', `post_${Date.now()}`, rawMedia);
+        }
+
+        let finalAudioUrl = preliminaryAudioUrl;
+        if (finalAudioUrl && typeof finalAudioUrl === 'string' && finalAudioUrl.startsWith('data:')) {
+          finalAudioUrl = await safeUploadToStorage('chat_media', `audio_${Date.now()}`, finalAudioUrl);
+        }
+
+        let finalMediaList = [];
+        if (Array.isArray(newPostData.mediaList) && newPostData.mediaList.length > 0) {
+          finalMediaList = await Promise.all(newPostData.mediaList.map(async (m, idx) => {
+            let itemUrl = m.url || (typeof m === 'string' ? m : '');
+            let itemType = m.type || (isVideoMediaUrl(itemUrl) ? 'video' : 'image');
+            if (itemUrl && typeof itemUrl === 'string' && itemUrl.startsWith('data:')) {
+              itemUrl = await safeUploadToStorage(itemType === 'video' ? 'posts' : 'chat_media', `post_media_${Date.now()}_${idx}`, itemUrl);
+            }
+            return {
+              type: itemType,
+              url: itemUrl,
+              name: m.name || `media_${idx}`
+            };
+          }));
+        } else if (finalMediaUrl) {
+          finalMediaList = [{
+            type: isVideoMedia ? 'video' : 'image',
+            url: finalMediaUrl
+          }];
+        }
+
+        // If storage uploaded new URLs, silently update the post in state & storage
+        if (finalMediaUrl !== preliminaryMediaUrl || finalAudioUrl !== preliminaryAudioUrl) {
+          setPosts(prev => (prev || []).map(p => p.id === postUuid ? {
+            ...p,
+            image: !isVideoMedia ? finalMediaUrl : null,
+            video: isVideoMedia ? finalMediaUrl : null,
+            media_url: finalMediaUrl,
+            audioUrl: finalAudioUrl,
+            mediaList: finalMediaList
+          } : p));
+        }
+
+        let textContent = newPostData.text || '';
+        if (newPostData.proServiceData) {
+          textContent += `\n\n___PRO_SERVICE___:${JSON.stringify(newPostData.proServiceData)}`;
+        }
+
+        if (isSupabaseConfigured()) {
           const { error } = await supabase.from('posts').insert({
             id: postUuid,
             user_id: currentUser.id,
@@ -2807,37 +2878,25 @@ function MainApp() {
           });
           if (error) console.error("Post insert error:", error);
 
-          // Broadcast instant realtime notification to other connected clients / devices
           try {
             supabase.channel('realtime:posts_interactions').send({
               type: 'broadcast',
               event: 'new_post',
-              payload: newPost
+              payload: {
+                ...optimisticPost,
+                media_url: finalMediaUrl,
+                audio_url: finalAudioUrl,
+                mediaList: finalMediaList
+              }
             });
           } catch (be) {}
-        } catch (pe) {
-          console.warn('Supabase post creation note:', pe?.message || pe);
         }
+      } catch (err) {
+        console.warn('Background post upload note:', err);
+      } finally {
+        setIsUploadingPost(false);
       }
-
-      // Success Notification Toast
-      setToastNotification({
-        title: newPostData.proServiceData ? 'Offre partagée dans le Feed ! 📢' : 'Publication mise en ligne ! ✨',
-        message: newPostData.proServiceData ? 'Votre offre est désormais visible par tous les artistes.' : 'Votre publication est maintenant visible par toute la communauté.',
-        avatar: currentUser?.avatar
-      });
-      setTimeout(() => setToastNotification(null), 5000);
-
-      if (newPost.hasAudio) {
-        handleStartGlobalAudio({
-          title: newPost.audioTitle || 'Composition Audio',
-          artist: currentUser.name,
-          genre: 'Afro-Gospel'
-        });
-      }
-    } finally {
-      setIsUploadingPost(false);
-    }
+    })();
   };
 
   const handleOpenProServiceFromFeed = (proItem) => {

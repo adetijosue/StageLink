@@ -24,19 +24,17 @@ const INITIAL_POSTS = [];
 const INITIAL_SWIPE_MATCHES = [];
 const INITIAL_CHATS = [];
 
-// Helper to detect test/dummy artifacts
+// Helper to detect test/dummy artifacts (strictly targeting purged test subagent accounts)
 export const isTestArtifact = (item) => {
-  if (!item) return true;
-  const content = String(item.text || item.content || item.caption || '').toLowerCase().trim();
+  if (!item) return false;
+  if (item.is_test === true || item.is_test_account === true) return true;
+  const author = String(item.userName || item.authorName || item.user_name || item.name || '').toLowerCase().trim();
+  const userId = String(item.userId || item.user_id || item.id || '').toLowerCase().trim();
+  
   if (
-    content.includes('test post') ||
-    content.includes('test realtime') ||
-    content.includes('realtime') ||
-    content.includes('real time') ||
-    content.includes('publication test') ||
-    content.includes('essai realtime') ||
-    content.includes('post test') ||
-    content === 'test'
+    author === 'test subagent' ||
+    author.includes('subagent') ||
+    userId === 'd0b0e7b9-648f-4d77-96a6-a527ae2b4939'
   ) {
     return true;
   }

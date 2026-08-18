@@ -3,9 +3,8 @@ import { X, Image, Video, Eye, Trash2, Send, Mic, Play, Pause } from 'lucide-rea
 import { useAuth } from '../../context/AuthContext';
 import { soundEngine } from '../../services/audioService';
 import UserAvatar from '../common/UserAvatar';
-import confetti from 'canvas-confetti';
 
-export default function CreatePostModal({ isOpen, onClose, onSubmitPost }) {
+export default function CreatePostModal({ isOpen, onClose, onSubmitPost, isDarkMode = true }) {
   const { currentUser } = useAuth();
   const [postText, setPostText] = useState('');
   const [selectedMedia, setSelectedMedia] = useState(null); // image URL or Data URL
@@ -139,11 +138,7 @@ export default function CreatePostModal({ isOpen, onClose, onSubmitPost }) {
     e.preventDefault();
     if (!postText.trim() && !selectedMedia && !selectedVideo && !hasAudio) return;
 
-    confetti({
-      particleCount: 60,
-      spread: 70,
-      origin: { y: 0.6 }
-    });
+    soundEngine.playSuccessSound();
 
     onSubmitPost({
       text: postText,

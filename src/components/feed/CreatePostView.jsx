@@ -3,7 +3,6 @@ import { ArrowLeft, Image, Video, Trash2, Send, Eye, Globe, Lock, Mic, Play, Pau
 import { useAuth } from '../../context/AuthContext';
 import { soundEngine } from '../../services/audioService';
 import UserAvatar from '../common/UserAvatar';
-import confetti from 'canvas-confetti';
 
 export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
   const { currentUser } = useAuth();
@@ -151,10 +150,7 @@ export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
   const handlePublish = () => {
     if (!postText.trim() && selectedMediaList.length === 0 && !hasAudio) return;
 
-    soundEngine.playPopSound();
-    try {
-      confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
-    } catch (e) { console.error("Suppressed error", e); }
+    soundEngine.playSuccessSound();
 
     onSubmitPost({
       text: postText,
