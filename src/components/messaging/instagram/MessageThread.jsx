@@ -374,14 +374,25 @@ export default function MessageThread({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 4. Floating Reaction Overlay */}
+      {/* 4. Floating Reaction Overlay (WhatsApp / Instagram style) */}
       <ReactionOverlay
         isOpen={Boolean(reactionOverlayData)}
         position={reactionOverlayData?.position}
+        message={reactionOverlayData?.message}
+        isMine={reactionOverlayData?.message?.sender_id === currentUser?.id}
         onSelectEmoji={(emoji) => {
           if (reactionOverlayData?.message?.id) {
             toggleReaction(reactionOverlayData.message.id, emoji);
           }
+        }}
+        onReply={(msg) => {
+          setReplyingTo(msg);
+        }}
+        onCopy={(msg) => {
+          // Handled inside ReactionOverlay with clipboard API
+        }}
+        onDelete={(msg) => {
+          setMessages(prev => prev.filter(m => m.id !== msg.id));
         }}
         onClose={() => setReactionOverlayData(null)}
       />

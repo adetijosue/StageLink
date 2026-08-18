@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Play, Pause, Heart, Eye, FileText, Download, Film, Music, Reply, File } from 'lucide-react';
 import { soundEngine } from '../../../services/audioService';
+import { haptics } from '../../../services/hapticsService';
 import MessageStatusTicks from '../MessageStatusTicks';
 
 export default function MessageBubble({
@@ -22,6 +23,10 @@ export default function MessageBubble({
   const audioRef = useRef(null);
   const lastTapRef = useRef(0);
   const touchStartRef = useRef(0);
+  const touchStartPosRef = useRef({ x: 0, y: 0 });
+  const longPressTimerRef = useRef(null);
+  const isLongPressTriggeredRef = useRef(false);
+  const bubbleContainerRef = useRef(null);
 
   // Dynamic grouping corner radii
   const borderRadius = isMine
@@ -33,6 +38,7 @@ export default function MessageBubble({
     const now = Date.now();
     if (now - lastTapRef.current < 300) {
       soundEngine.playPopSound();
+      haptics.selection();
       setHeartAnim(true);
       setTimeout(() => setHeartAnim(false), 900);
       if (onReact) onReact(message.id, '❤️');
@@ -40,24 +46,119 @@ export default function MessageBubble({
     lastTapRef.current = now;
   };
 
-  // Swipe-to-Reply Touch Handlers
+  // WhatsApp-style Long Press Gesture Recognizer
+  const triggerLongPress = (clientX, clientY, targetElem) => {
+    isLongPressTriggeredRef.current = true;
+    haptics.impact('medium');
+    soundEngine.playPopSound();
+    const target = targetElem || bubbleContainerRef.current;
+    const rect = target?.getBoundingClientRect ? target.getBoundingClientRect() : {
+      left: clientX - 50,
+      width: 100,
+      top: clientY
+    };
+    if (onOpenReactionOverlay) {
+      onOpenReactionOverlay(message, {
+        x: rect.left + rect.width / 2,
+        y: rect.top
+      });
+    }
+  };
+
+  const startLongPressTimer = (clientX, clientY, targetElem) => {
+    touchStartPosRef.current = { x: clientX, y: clientY };
+    isLongPressTriggeredRef.current = false;
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+    longPressTimerRef.current = setTimeout(() => {
+      triggerLongPress(clientX, clientY, targetElem);
+    }, 380);
+  };
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  // Touch Handlers for Mobile (Prevents browser text selection & starts long press)
   const handleTouchStart = (e) => {
-    touchStartRef.current = e.touches[0].clientX;
+    const touch = e.touches[0];
+    touchStartRef.current = touch.clientX;
+    startLongPressTimer(touch.clientX, touch.clientY, e.currentTarget);
   };
 
   const handleTouchMove = (e) => {
-    const deltaX = e.touches[0].clientX - touchStartRef.current;
+    const touch = e.touches[0];
+    const dist = Math.hypot(
+      touch.clientX - touchStartPosRef.current.x,
+      touch.clientY - touchStartPosRef.current.y
+    );
+    if (dist > 8) {
+      clearLongPressTimer();
+    }
+    const deltaX = touch.clientX - touchStartRef.current;
     if (deltaX > 0 && deltaX < 80) {
       setSwipeOffset(deltaX);
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e) => {
+    clearLongPressTimer();
+    if (isLongPressTriggeredRef.current) {
+      e?.preventDefault?.();
+      e?.stopPropagation?.();
+      return;
+    }
     if (swipeOffset > 45 && onReply) {
       soundEngine.playPopSound();
+      haptics.light();
       onReply(message);
     }
     setSwipeOffset(0);
+  };
+
+  const handleTouchCancel = () => {
+    clearLongPressTimer();
+    setSwipeOffset(0);
+  };
+
+  // Mouse Handlers for Desktop (Hold to react)
+  const handleMouseDown = (e) => {
+    if (e.button !== 0) return; // Only left-click
+    startLongPressTimer(e.clientX, e.clientY, e.currentTarget);
+  };
+
+  const handleMouseMove = (e) => {
+    const dist = Math.hypot(
+      e.clientX - touchStartPosRef.current.x,
+      e.clientY - touchStartPosRef.current.y
+    );
+    if (dist > 8) {
+      clearLongPressTimer();
+    }
+  };
+
+  const handleMouseUp = (e) => {
+    clearLongPressTimer();
+    if (isLongPressTriggeredRef.current) {
+      e?.preventDefault?.();
+      e?.stopPropagation?.();
+    }
+  };
+
+  const handleMouseLeave = () => {
+    clearLongPressTimer();
+  };
+
+  const handleTapWrapper = (e) => {
+    if (isLongPressTriggeredRef.current) {
+      isLongPressTriggeredRef.current = false;
+      return;
+    }
+    handleDoubleTap();
   };
 
   // Toggle Voice Note Audio
@@ -123,11 +224,24 @@ export default function MessageBubble({
       : `${(message.metadata.fileSize / 1024).toFixed(0)} KB`
     : 'Fichier joint';
 
+  const noSelectStyle = {
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    MozUserSelect: 'none',
+    msUserSelect: 'none',
+    WebkitTouchCallout: 'none'
+  };
+
   return (
     <div
+      ref={bubbleContainerRef}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchCancel}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
       onContextMenu={(e) => {
         e.preventDefault();
         const rect = e.currentTarget.getBoundingClientRect();
@@ -135,7 +249,7 @@ export default function MessageBubble({
           onOpenReactionOverlay(message, { x: rect.x + rect.width / 2, y: rect.top });
         }
       }}
-      onClick={handleDoubleTap}
+      onClick={handleTapWrapper}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -143,7 +257,8 @@ export default function MessageBubble({
         marginBottom: isNextSameSender ? '3px' : '10px',
         position: 'relative',
         transform: `translateX(${swipeOffset}px)`,
-        transition: swipeOffset === 0 ? 'transform 0.2s ease' : 'none'
+        transition: swipeOffset === 0 ? 'transform 0.2s ease' : 'none',
+        ...noSelectStyle
       }}
     >
       {/* Swipe to reply icon indicator */}
@@ -188,7 +303,7 @@ export default function MessageBubble({
         boxShadow: isMine ? '0 4px 14px rgba(0, 102, 255, 0.2)' : '0 2px 6px rgba(0,0,0,0.05)',
         border: isMine ? 'none' : '1px solid var(--border-light)',
         position: 'relative',
-        userSelect: 'none'
+        ...noSelectStyle
       }}>
         {/* 1. Reshared Story / Post Preview Card */}
         {message.message_type === 'story_share' && (
@@ -502,7 +617,8 @@ export default function MessageBubble({
             fontSize: '0.9rem',
             lineHeight: 1.4,
             wordBreak: 'break-word',
-            marginTop: (message.message_type === 'image' || message.message_type === 'video') ? '6px' : 0
+            marginTop: (message.message_type === 'image' || message.message_type === 'video') ? '6px' : 0,
+            ...noSelectStyle
           }}>
             {message.content}
           </p>

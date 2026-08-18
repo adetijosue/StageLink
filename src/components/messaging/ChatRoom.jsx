@@ -1,11 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Phone, Video, MoreVertical, Send, Paperclip, Smile, Mic, Play, Pause, ShieldCheck, CheckCheck, Trash2, Trash, Copy, X, PhoneCall, VideoOff, Reply, PhoneMissed, Eye, Forward, Image, FileText, Camera, Download, Film, Music, Maximize2, FileAudio } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
+import { haptics } from '../../services/hapticsService';
 import TopBar from '../navigation/TopBar';
 import UserAvatar from '../common/UserAvatar';
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
 import MessageStatusTicks from './MessageStatusTicks';
 import { presenceService } from '../../services/presenceService';
+
+const reactionEmojis = ['❤️', '🔥', '😂', '😮', '😢', '🙏', '👏', '💯'];
 
 export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoCall, onOpenEphemeralModal, onSendMessage, onDeleteMessageForMe, onDeleteMessageForEveryone, onOpenPublicProfile, onOpenStory }) {
   const [inputText, setInputText] = useState('');
@@ -22,7 +25,9 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
   const [highlightedMsgId, setHighlightedMsgId] = useState(null);
   const touchStartXRef = useRef(0);
   const touchStartYRef = useRef(0);
+  const touchStartPosRef = useRef({ x: 0, y: 0 });
   const isSwipingRef = useRef(false);
+  const isLongPressTriggeredRef = useRef(false);
   const longPressTimerRef = useRef(null);
 
   // Full-Screen Media Lightbox Preview & Download State
@@ -105,49 +110,98 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
 
   if (!chat) return null;
 
-  // Universal Touch & Pointer Swipe Gesture Handling (Mobile Touch + Mouse Drag) + Long Press
-  const handlePointerDownMessage = (e, msg) => {
+  // Universal Touch & Mouse Long Press & Swipe Gesture Handlers
+  const startMessageLongPress = (clientX, clientY, msg) => {
+    touchStartPosRef.current = { x: clientX, y: clientY };
+    isLongPressTriggeredRef.current = false;
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
     }
-    touchStartXRef.current = e.clientX || (e.touches && e.touches[0].clientX) || 0;
-    touchStartYRef.current = e.clientY || (e.touches && e.touches[0].clientY) || 0;
-    isSwipingRef.current = true;
-    setSwipedMsgId(msg.id);
-
     longPressTimerRef.current = setTimeout(() => {
+      isLongPressTriggeredRef.current = true;
       handleMessageLongPressSelect(msg);
       longPressTimerRef.current = null;
       isSwipingRef.current = false;
       setSwipedMsgId(null);
-    }, 500);
+    }, 380);
   };
 
-  const handlePointerMoveMessage = (e, msgId) => {
-    if (!isSwipingRef.current || swipedMsgId !== msgId) return;
-    const currentX = (e.clientX !== undefined) ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
-    const currentY = (e.clientY !== undefined) ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
-    const deltaX = currentX - touchStartXRef.current;
-    const deltaY = currentY - touchStartYRef.current;
-    
-    // Cancel long press if user moves finger
-    if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
-      }
+  const clearMessageLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
     }
+  };
 
+  // Mobile Touch Handlers
+  const handleTouchStartMessage = (e, msg) => {
+    const touch = e.touches[0];
+    touchStartXRef.current = touch.clientX;
+    touchStartYRef.current = touch.clientY;
+    isSwipingRef.current = true;
+    setSwipedMsgId(msg.id);
+    startMessageLongPress(touch.clientX, touch.clientY, msg);
+  };
+
+  const handleTouchMoveMessage = (e, msgId) => {
+    if (!isSwipingRef.current || swipedMsgId !== msgId) return;
+    const touch = e.touches[0];
+    const dist = Math.hypot(touch.clientX - touchStartPosRef.current.x, touch.clientY - touchStartPosRef.current.y);
+    if (dist > 8) {
+      clearMessageLongPress();
+    }
+    const deltaX = touch.clientX - touchStartXRef.current;
     if (deltaX > 0 && deltaX < 110) {
       setSwipeOffset(deltaX);
     }
   };
 
-  const handlePointerUpMessage = (msg) => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
+  const handleTouchEndMessage = (e, msg) => {
+    clearMessageLongPress();
+    if (isLongPressTriggeredRef.current) {
+      e?.preventDefault?.();
+      isSwipingRef.current = false;
+      setSwipeOffset(0);
+      setSwipedMsgId(null);
+      return;
+    }
+    if (isSwipingRef.current && swipeOffset > 40) {
+      handleSelectMessageToQuote(msg);
+    }
+    isSwipingRef.current = false;
+    setSwipeOffset(0);
+    setSwipedMsgId(null);
+  };
+
+  // Desktop Mouse Handlers
+  const handleMouseDownMessage = (e, msg) => {
+    if (e.button !== 0) return;
+    touchStartXRef.current = e.clientX;
+    touchStartYRef.current = e.clientY;
+    isSwipingRef.current = true;
+    setSwipedMsgId(msg.id);
+    startMessageLongPress(e.clientX, e.clientY, msg);
+  };
+
+  const handleMouseMoveMessage = (e, msgId) => {
+    if (!isSwipingRef.current || swipedMsgId !== msgId) return;
+    const dist = Math.hypot(e.clientX - touchStartPosRef.current.x, e.clientY - touchStartPosRef.current.y);
+    if (dist > 8) {
+      clearMessageLongPress();
+    }
+    const deltaX = e.clientX - touchStartXRef.current;
+    if (deltaX > 0 && deltaX < 110) {
+      setSwipeOffset(deltaX);
+    }
+  };
+
+  const handleMouseUpMessage = (e, msg) => {
+    clearMessageLongPress();
+    if (isLongPressTriggeredRef.current) {
+      isSwipingRef.current = false;
+      setSwipeOffset(0);
+      setSwipedMsgId(null);
+      return;
     }
     if (isSwipingRef.current && swipeOffset > 40) {
       handleSelectMessageToQuote(msg);
@@ -347,13 +401,19 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
   };
 
   const handleMessageLongPressSelect = (msg) => {
-    try {
-      if (navigator.vibrate) {
-        navigator.vibrate(40);
-      }
-    } catch (e) { console.error("Suppressed error", e); }
+    haptics.impact('medium');
     soundEngine.playPopSound();
     setSelectedMessageForAction(msg);
+  };
+
+  const handleAddReaction = (msgId, emoji) => {
+    haptics.selection();
+    soundEngine.playPopSound();
+    setReactions(prev => ({
+      ...prev,
+      [msgId]: prev[msgId] === emoji ? null : emoji
+    }));
+    setSelectedMessageForAction(null);
   };
 
   const handleGenericFileAttach = (e, fileTypeCategory) => {
@@ -405,18 +465,6 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
 
   const handleAddEmoji = (emoji) => {
     setInputText((prev) => prev + emoji);
-  };
-
-  const handleAddReaction = (msgId, emoji) => {
-    try {
-      if (navigator.vibrate) navigator.vibrate(25);
-    } catch (e) { console.error("Suppressed error", e); }
-    soundEngine.playPopSound();
-    setReactions({
-      ...reactions,
-      [msgId]: emoji
-    });
-    setSelectedMessageForAction(null);
   };
 
   const togglePlayAudioMessage = (msgId, realAudioUrl) => {
@@ -616,14 +664,13 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
             <div
               key={msg.id}
               id={`msg_bubble_${msg.id}`}
-              onPointerDown={(e) => handlePointerDownMessage(e, msg)}
-              onPointerMove={(e) => handlePointerMoveMessage(e, msg.id)}
-              onPointerUp={() => handlePointerUpMessage(msg)}
-              onPointerLeave={() => handlePointerUpMessage(msg)}
-              onTouchStart={(e) => handlePointerDownMessage(e, msg)}
-              onTouchMove={(e) => handlePointerMoveMessage(e, msg.id)}
-              onTouchEnd={() => handlePointerUpMessage(msg)}
-              onTouchCancel={() => handlePointerUpMessage(msg)}
+              onTouchStart={(e) => handleTouchStartMessage(e, msg)}
+              onTouchMove={(e) => handleTouchMoveMessage(e, msg.id)}
+              onTouchEnd={(e) => handleTouchEndMessage(e, msg)}
+              onTouchCancel={(e) => handleTouchEndMessage(e, msg)}
+              onMouseDown={(e) => handleMouseDownMessage(e, msg)}
+              onMouseMove={(e) => handleMouseMoveMessage(e, msg.id)}
+              onMouseUp={(e) => handleMouseUpMessage(e, msg)}
               onContextMenu={(e) => {
                 e.preventDefault();
                 handleMessageLongPressSelect(msg);
@@ -639,7 +686,8 @@ export default function ChatRoom({ chat, onBack, onStartAudioCall, onStartVideoC
                 borderRadius: '20px',
                 cursor: 'pointer',
                 WebkitUserSelect: 'none',
-                userSelect: 'none'
+                userSelect: 'none',
+                WebkitTouchCallout: 'none'
               }}
             >
               {/* Special Clickable Call Card Banner (Unified & Professional) */}
