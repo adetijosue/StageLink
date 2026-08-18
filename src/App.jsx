@@ -592,6 +592,20 @@ function MainApp() {
     }
   };
 
+  // Automatic sync for offline queue upon network restoration (Called unconditionally)
+  useEffect(() => {
+    const handleOnlineSync = () => {
+      if (isSupabaseConfigured()) {
+        offlineQueue.processQueue(supabase);
+      }
+    };
+    window.addEventListener('online', handleOnlineSync);
+    if (typeof navigator !== 'undefined' && navigator.onLine && isSupabaseConfigured()) {
+      offlineQueue.processQueue(supabase);
+    }
+    return () => window.removeEventListener('online', handleOnlineSync);
+  }, []);
+
   useEffect(() => {
     if (isAuthenticated && currentUser) {
       const welcomeSeenKey = `stagelink_welcome_shown_${currentUser.id}`;
@@ -2492,21 +2506,6 @@ function MainApp() {
     setActiveStory(reconstructedStory);
   };
 
-  // Automatic sync for offline queue upon network restoration
-  useEffect(() => {
-    const handleOnlineSync = () => {
-      if (isSupabaseConfigured()) {
-        offlineQueue.processQueue(supabase);
-      }
-    };
-    window.addEventListener('online', handleOnlineSync);
-    // Also trigger immediately on mount if online and has pending items
-    if (typeof navigator !== 'undefined' && navigator.onLine && isSupabaseConfigured()) {
-      offlineQueue.processQueue(supabase);
-    }
-    return () => window.removeEventListener('online', handleOnlineSync);
-  }, []);
-
   const handleDeletePost = async (postId) => {
     const updated = posts.filter((p) => p.id !== postId);
     setPosts(updated);
@@ -3655,10 +3654,10 @@ function MainApp() {
       </div>
 
       {/* GLOBAL AUDIO MINI-PLAYER (Floating Background Music & Spectrum Player) */}
-      {showGlobalPlayer && (
+      {activeGlobalTrack && (
         <GlobalAudioPlayer
           currentTrack={activeGlobalTrack}
-          onClose={() => setShowGlobalPlayer(false)}
+          onClose={() => setActiveGlobalTrack(null)}
           isDarkMode={isDarkMode}
         />
       )}
@@ -4021,15 +4020,6 @@ function MainApp() {
         onClose={() => setToastNotification(null)}
         isDarkMode={isDarkMode}
       />
-
-      {/* Global Interactive Audio Player (Persistent across tabs) */}
-      {activeGlobalTrack && (
-        <GlobalAudioPlayer
-          currentTrack={activeGlobalTrack}
-          onClose={() => setActiveGlobalTrack(null)}
-          isDarkMode={isDarkMode}
-        />
-      )}
     </div>
     </React.Suspense>
   );
