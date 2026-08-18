@@ -19,7 +19,8 @@ import {
   Square,
   Smartphone,
   Sparkles,
-  Check
+  Check,
+  Volume2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -155,14 +156,34 @@ export default function AppSettingsModal({
 
             {/* 1. Account Section */}
             <div style={{ marginBottom: '24px' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0066FF', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{t('account_section') || 'Compte & Profil'}</span>
+              <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#0066FF', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                {t('account_section') || 'Compte & Profil'}
+              </span>
               <button
                 onClick={() => { onClose(); onOpenEditProfile(); }}
-                style={{ width: '100%', marginTop: '10px', padding: '14px', borderRadius: '16px', border: isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E2E8F0', background: isDarkMode ? '#1E293B' : '#F8FAFC', display: 'flex', justifyContent: 'space-between', color: 'inherit', cursor: 'pointer' }}
+                style={{
+                  width: '100%',
+                  marginTop: '10px',
+                  padding: '14px 16px',
+                  borderRadius: '16px',
+                  border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
+                  background: isDarkMode ? '#1E293B' : '#F8FAFC',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  color: 'inherit',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <User size={18} color="#0066FF" />
-                  <span style={{ fontWeight: 700, fontSize: '0.88rem' }}>{t('edit_profile') || 'Modifier le profil'}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: isDarkMode ? 'rgba(0,102,255,0.15)' : '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0066FF' }}>
+                    <User size={16} />
+                  </div>
+                  <div style={{ textAlign: 'left' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.88rem', display: 'block' }}>{t('edit_profile') || 'Modifier le profil'}</span>
+                    <span style={{ fontSize: '0.70rem', color: isDarkMode ? '#94A3B8' : '#64748B' }}>{language === 'en' ? 'Name, bio, musical skills & social links' : 'Nom, bio, instruments & réseaux sociaux'}</span>
+                  </div>
                 </div>
                 <ChevronRight size={16} color="#94A3B8" />
               </button>
@@ -170,18 +191,18 @@ export default function AppSettingsModal({
 
             {/* 2. Ringtones & Incoming Calls Section (AUDIO MESSAGE 24) */}
             <div style={{ marginBottom: '26px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0066FF', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <BellRing size={14} color="#0066FF" />
-                  {t('ringtone_section')}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#0066FF', textTransform: 'uppercase', letterSpacing: '0.6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <BellRing size={13} />
+                  {t('ringtone_section') || 'Sonneries & Appels'}
                 </span>
-                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#10B981', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 8px', borderRadius: '8px' }}>
-                  Loud & Clear
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#10B981', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 8px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Volume2 size={11} /> Audio HD
                 </span>
               </div>
 
               {/* Ringtone selector cards */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {ringtoneOptions.map(opt => {
                   const isSelected = currentRingtone === opt.key;
                   return (
@@ -191,8 +212,8 @@ export default function AppSettingsModal({
                       style={{
                         padding: '12px 14px',
                         borderRadius: '16px',
-                        border: isSelected ? '2px solid #0066FF' : (isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0'),
-                        background: isSelected ? (isDarkMode ? 'rgba(0,102,255,0.15)' : '#EFF6FF') : (isDarkMode ? '#1E293B' : '#F8FAFC'),
+                        border: isSelected ? '1.5px solid #0066FF' : (isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0'),
+                        background: isSelected ? (isDarkMode ? 'rgba(0,102,255,0.12)' : '#EFF6FF') : (isDarkMode ? '#1E293B' : '#F8FAFC'),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
@@ -202,10 +223,10 @@ export default function AppSettingsModal({
                     >
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontWeight: 800, fontSize: '0.86rem', color: isSelected ? '#0066FF' : 'inherit' }}>
+                          <span style={{ fontWeight: 700, fontSize: '0.86rem', color: isSelected ? '#0066FF' : 'inherit' }}>
                             {opt.label}
                           </span>
-                          {isSelected && <Check size={16} color="#0066FF" strokeWidth={3} />}
+                          {isSelected && <Check size={15} color="#0066FF" strokeWidth={2.5} />}
                         </div>
                         <div style={{ fontSize: '0.70rem', color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: '2px' }}>
                           {opt.desc}
@@ -220,27 +241,27 @@ export default function AppSettingsModal({
                         }}
                         style={{
                           padding: '6px 12px',
-                          borderRadius: '12px',
+                          borderRadius: '10px',
                           border: 'none',
                           background: isSelected ? '#0066FF' : (isDarkMode ? '#334155' : '#E2E8F0'),
                           color: isSelected ? '#FFFFFF' : (isDarkMode ? '#CBD5E1' : '#475569'),
                           fontSize: '0.72rem',
-                          fontWeight: 800,
+                          fontWeight: 700,
                           display: 'flex',
                           alignItems: 'center',
                           gap: '5px',
                           cursor: 'pointer',
-                          boxShadow: isSelected ? '0 2px 8px rgba(0,102,255,0.3)' : 'none'
+                          boxShadow: isSelected ? '0 2px 8px rgba(0,102,255,0.25)' : 'none'
                         }}
                         title={isTestingRingtone && isSelected ? t('ringtone_test_stop') : t('ringtone_test_play')}
                       >
                         {isTestingRingtone && isSelected ? (
                           <>
-                            <Square size={12} fill="white" /> {t('ringtone_test_stop')}
+                            <Square size={11} fill="white" /> {t('ringtone_test_stop') || 'Arrêter'}
                           </>
                         ) : (
                           <>
-                            <Play size={12} fill={isSelected ? 'white' : 'currentColor'} /> {t('ringtone_test_play')}
+                            <Play size={11} fill={isSelected ? 'white' : 'currentColor'} /> {t('ringtone_test_play') || 'Écouter'}
                           </>
                         )}
                       </button>
@@ -264,14 +285,16 @@ export default function AppSettingsModal({
                   cursor: 'pointer'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Smartphone size={18} color="#0066FF" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: isDarkMode ? 'rgba(0,102,255,0.15)' : '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0066FF' }}>
+                    <Smartphone size={16} />
+                  </div>
                   <div>
-                    <span style={{ fontSize: '0.86rem', fontWeight: 700, display: 'block' }}>{t('vibration_setting')}</span>
-                    <span style={{ fontSize: '0.68rem', color: isDarkMode ? '#94A3B8' : '#64748B' }}>{t('vibration_desc')}</span>
+                    <span style={{ fontSize: '0.86rem', fontWeight: 700, display: 'block' }}>{t('vibration_setting') || 'Vibrations'}</span>
+                    <span style={{ fontSize: '0.70rem', color: isDarkMode ? '#94A3B8' : '#64748B' }}>{t('vibration_desc') || 'Retour haptique lors des appels entrants'}</span>
                   </div>
                 </div>
-                <div style={{ width: '44px', height: '24px', borderRadius: '12px', background: vibrationEnabled ? '#10B981' : '#CBD5E1', position: 'relative', transition: 'all 0.3s' }}>
+                <div style={{ width: '44px', height: '24px', borderRadius: '12px', background: vibrationEnabled ? '#10B981' : (isDarkMode ? '#334155' : '#CBD5E1'), position: 'relative', transition: 'all 0.3s' }}>
                   <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#FFF', position: 'absolute', top: 2, left: vibrationEnabled ? 22 : 2, transition: '0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
                 </div>
               </div>
@@ -289,11 +312,11 @@ export default function AppSettingsModal({
                     marginTop: '10px',
                     padding: '12px',
                     borderRadius: '14px',
-                    border: '1.5px dashed #0066FF',
+                    border: isDarkMode ? '1px solid rgba(0, 102, 255, 0.4)' : '1px solid #BFDBFE',
                     background: isDarkMode ? 'rgba(0, 102, 255, 0.12)' : '#EFF6FF',
                     color: '#0066FF',
                     fontSize: '0.82rem',
-                    fontWeight: 800,
+                    fontWeight: 700,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -302,21 +325,26 @@ export default function AppSettingsModal({
                     transition: 'all 0.2s ease'
                   }}
                 >
-                  <PhoneCall size={16} /> {t('simulate_call_btn')}
+                  <PhoneCall size={15} /> {t('simulate_call_btn') || 'Simuler un appel entrant pour test'}
                 </button>
               )}
             </div>
 
             {/* 3. Appearance / Theme */}
             <div style={{ marginBottom: '24px' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0066FF', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{t('appearance_theme') || 'Apparence'}</span>
+              <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#0066FF', textTransform: 'uppercase', letterSpacing: '0.6px' }}>{t('appearance_theme') || 'Apparence'}</span>
               <div
                 onClick={() => { soundEngine.playPopSound(); onToggleDarkMode(); }}
-                style={{ marginTop: '10px', padding: '14px', borderRadius: '16px', border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', cursor: 'pointer', background: isDarkMode ? '#1E293B' : '#F8FAFC' }}
+                style={{ marginTop: '10px', padding: '14px 16px', borderRadius: '16px', border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', background: isDarkMode ? '#1E293B' : '#F8FAFC' }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {isDarkMode ? <Moon size={18} color="#F59E0B" /> : <Sun size={18} color="#0066FF" />}
-                  <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>{isDarkMode ? (t('theme_dark') || 'Mode Sombre') : (t('theme_light') || 'Mode Clair')}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {isDarkMode ? <Moon size={16} color="#F59E0B" /> : <Sun size={16} color="#0066FF" />}
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 700, display: 'block' }}>{isDarkMode ? (t('theme_dark') || 'Mode Sombre') : (t('theme_light') || 'Mode Clair')}</span>
+                    <span style={{ fontSize: '0.70rem', color: isDarkMode ? '#94A3B8' : '#64748B' }}>{isDarkMode ? 'Thème sombre actif pour économie d\'énergie' : 'Thème clair actif'}</span>
+                  </div>
                 </div>
                 <div style={{ width: '44px', height: '24px', borderRadius: '12px', background: isDarkMode ? '#0066FF' : '#CBD5E1', position: 'relative', transition: 'all 0.3s' }}>
                   <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#FFF', position: 'absolute', top: 2, left: isDarkMode ? 22 : 2, transition: '0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
@@ -327,102 +355,141 @@ export default function AppSettingsModal({
             {/* 4. Language Selection */}
             <div style={{ marginBottom: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0066FF', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  <Globe size={13} style={{ display: 'inline', marginRight: '4px', verticalAlign: '-1px' }} />
+                <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#0066FF', textTransform: 'uppercase', letterSpacing: '0.6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Globe size={13} />
                   {t('desired_language') || 'Langue de l\'application'}
                 </span>
                 <span style={{ fontSize: '0.68rem', fontWeight: 700, color: isDarkMode ? '#94A3B8' : '#64748B', background: isDarkMode ? '#1E293B' : '#F1F5F9', padding: '2px 8px', borderRadius: '8px' }}>
-                  {deviceLanguage === 'en' ? 'Appareil: EN 🇬🇧' : 'Appareil: FR 🇫🇷'}
+                  {deviceLanguage === 'en' ? 'Système : EN' : 'Système : FR'}
                 </span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginTop: '6px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '8px' }}>
                 <button
                   onClick={() => { soundEngine.playPopSound(); changeLanguage('auto', true); }}
                   style={{
-                    padding: '10px 6px',
+                    padding: '12px 6px',
                     borderRadius: '14px',
-                    border: isAuto ? '2px solid #0066FF' : (isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E2E8F0'),
+                    border: isAuto ? '1.5px solid #0066FF' : (isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0'),
                     background: isAuto ? (isDarkMode ? 'rgba(0,102,255,0.15)' : '#EFF6FF') : (isDarkMode ? '#1E293B' : '#FFFFFF'),
                     color: isAuto ? '#0066FF' : 'inherit',
-                    fontWeight: 800,
-                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '2px'
+                    gap: '4px'
                   }}
                   title={t('language_auto_desc')}
                 >
-                  <span>⚡ Auto</span>
-                  <span style={{ fontSize: '0.64rem', opacity: 0.8 }}>({deviceLanguage.toUpperCase()})</span>
+                  <span style={{ fontWeight: 800 }}>Automatique</span>
+                  <span style={{ fontSize: '0.64rem', opacity: 0.7, fontWeight: 700 }}>AUTO ({deviceLanguage.toUpperCase()})</span>
                 </button>
 
                 <button
                   onClick={() => { soundEngine.playPopSound(); changeLanguage('fr'); }}
                   style={{
-                    padding: '10px 6px',
+                    padding: '12px 6px',
                     borderRadius: '14px',
-                    border: !isAuto && language === 'fr' ? '2px solid #0066FF' : (isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E2E8F0'),
+                    border: !isAuto && language === 'fr' ? '1.5px solid #0066FF' : (isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0'),
                     background: !isAuto && language === 'fr' ? (isDarkMode ? 'rgba(0,102,255,0.15)' : '#EFF6FF') : (isDarkMode ? '#1E293B' : '#FFFFFF'),
                     color: !isAuto && language === 'fr' ? '#0066FF' : 'inherit',
-                    fontWeight: 800,
-                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '2px'
+                    gap: '4px'
                   }}
                 >
-                  <span>Français</span>
-                  <span style={{ fontSize: '0.68rem' }}>🇫🇷</span>
+                  <span style={{ fontWeight: 800 }}>Français</span>
+                  <span style={{ fontSize: '0.64rem', opacity: 0.7, fontWeight: 700 }}>FR</span>
                 </button>
 
                 <button
                   onClick={() => { soundEngine.playPopSound(); changeLanguage('en'); }}
                   style={{
-                    padding: '10px 6px',
+                    padding: '12px 6px',
                     borderRadius: '14px',
-                    border: !isAuto && language === 'en' ? '2px solid #0066FF' : (isDarkMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E2E8F0'),
+                    border: !isAuto && language === 'en' ? '1.5px solid #0066FF' : (isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0'),
                     background: !isAuto && language === 'en' ? (isDarkMode ? 'rgba(0,102,255,0.15)' : '#EFF6FF') : (isDarkMode ? '#1E293B' : '#FFFFFF'),
                     color: !isAuto && language === 'en' ? '#0066FF' : 'inherit',
-                    fontWeight: 800,
-                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '2px'
+                    gap: '4px'
                   }}
                 >
-                  <span>English</span>
-                  <span style={{ fontSize: '0.68rem' }}>🇬🇧</span>
+                  <span style={{ fontWeight: 800 }}>English</span>
+                  <span style={{ fontSize: '0.64rem', opacity: 0.7, fontWeight: 700 }}>EN</span>
                 </button>
               </div>
 
-              <p style={{ fontSize: '0.68rem', color: isDarkMode ? '#94A3B8' : '#64748B', margin: '6px 0 0 2px' }}>
-                {isAuto ? `✨ ${t('language_auto_desc')}` : (language === 'en' ? '🔒 Fixed to English' : '🔒 Fixé en Français')}
+              <p style={{ fontSize: '0.70rem', color: isDarkMode ? '#94A3B8' : '#64748B', margin: '8px 0 0 2px', lineHeight: 1.4 }}>
+                {isAuto
+                  ? (language === 'en' ? 'Language synchronizes automatically with your system settings.' : 'La langue s\'adapte automatiquement aux réglages de votre système.')
+                  : (language === 'en' ? 'Application language locked to English.' : 'Langue de l\'application configurée en Français.')}
               </p>
             </div>
 
             {/* 5. Legal Information */}
             <div style={{ marginBottom: '24px' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#0066FF', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{t('legal_section') || 'Informations Légales'}</span>
+              <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#0066FF', textTransform: 'uppercase', letterSpacing: '0.6px' }}>{t('legal_section') || 'Informations Légales'}</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
-                <button onClick={() => setActiveModal('cgu')} style={{ padding: '14px', borderRadius: '16px', border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0', background: 'transparent', display: 'flex', justifyContent: 'space-between', color: 'inherit', fontSize: '0.88rem', fontWeight: 700, cursor: 'pointer' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><FileText size={18} color="#0066FF" /> {t('cgu') || 'Conditions Générales d\'Utilisation'}</span>
+                <button
+                  onClick={() => setActiveModal('cgu')}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: '16px',
+                    border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
+                    background: isDarkMode ? '#1E293B' : '#F8FAFC',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    color: 'inherit',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: isDarkMode ? 'rgba(0,102,255,0.15)' : '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0066FF' }}>
+                      <FileText size={16} />
+                    </div>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>{t('cgu') || 'Conditions Générales d\'Utilisation'}</span>
+                  </div>
                   <ChevronRight size={16} color="#94A3B8" />
                 </button>
-                <button onClick={() => setActiveModal('privacy')} style={{ padding: '14px', borderRadius: '16px', border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0', background: 'transparent', display: 'flex', justifyContent: 'space-between', color: 'inherit', fontSize: '0.88rem', fontWeight: 700, cursor: 'pointer' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><ShieldCheck size={18} color="#10B981" /> {t('privacy') || 'Politique de Confidentialité'}</span>
+
+                <button
+                  onClick={() => setActiveModal('privacy')}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: '16px',
+                    border: isDarkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
+                    background: isDarkMode ? '#1E293B' : '#F8FAFC',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    color: 'inherit',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10B981' }}>
+                      <ShieldCheck size={16} />
+                    </div>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>{t('privacy') || 'Politique de Confidentialité'}</span>
+                  </div>
                   <ChevronRight size={16} color="#94A3B8" />
                 </button>
               </div>
@@ -430,24 +497,52 @@ export default function AppSettingsModal({
 
             {/* 6. Logout & Danger Zone */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button onClick={logout} style={{ width: '100%', padding: '16px', borderRadius: '16px', border: 'none', background: '#FEF2F2', color: '#EF4444', fontWeight: 900, fontSize: '0.95rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <LogOut size={20} /> {t('logout') || 'Se déconnecter'}
+              <button
+                onClick={logout}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '16px',
+                  border: 'none',
+                  background: isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2',
+                  color: '#EF4444',
+                  fontWeight: 800,
+                  fontSize: '0.90rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <LogOut size={18} /> {t('logout') || 'Se déconnecter'}
               </button>
 
               <button
                 onClick={() => { soundEngine.playPopSound(); setShowDeleteModal(true); }}
                 style={{
-                  width: '100%', padding: '12px', borderRadius: '14px',
-                  border: '1px dashed #FCA5A5', background: 'transparent',
-                  color: '#EF4444', fontWeight: 700, fontSize: '0.8rem',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '14px',
+                  border: isDarkMode ? '1px dashed rgba(239, 68, 68, 0.4)' : '1px dashed #FCA5A5',
+                  background: 'transparent',
+                  color: '#EF4444',
+                  fontWeight: 600,
+                  fontSize: '0.78rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
                 }}
               >
-                <Trash2 size={16} /> {t('danger_zone') || 'Supprimer définitivement mon compte'}
+                <Trash2 size={15} /> {t('danger_zone') || 'Supprimer définitivement mon compte'}
               </button>
             </div>
 
-            <p style={{ fontSize: '0.75rem', color: '#94A3B8', textAlign: 'center', marginTop: '20px', fontWeight: 600 }}>{t('powered_by') || 'StageLink • Powered by JABE PRODUCTION'}</p>
+            <p style={{ fontSize: '0.72rem', color: isDarkMode ? '#64748B' : '#94A3B8', textAlign: 'center', marginTop: '22px', fontWeight: 600 }}>
+              {t('powered_by') || 'StageLink • Plateforme Professionnelle des Musiciens'}
+            </p>
           </div>
         </div>
       </div>

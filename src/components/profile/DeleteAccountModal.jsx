@@ -190,12 +190,18 @@ export default function DeleteAccountModal({ isOpen, onClose, isDarkMode }) {
                   flex: 2, padding: '14px', borderRadius: '16px', border: 'none',
                   background: isStep2Valid ? '#DC2626' : (isDarkMode ? '#1E293B' : '#E2E8F0'),
                   color: isStep2Valid ? '#FFFFFF' : '#94A3B8',
-                  fontWeight: 900, fontSize: '0.85rem',
+                  fontWeight: 800, fontSize: '0.85rem',
                   cursor: isStep2Valid && !isDeleting ? 'pointer' : 'not-allowed',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                 }}
               >
-                {isDeleting ? 'Suppression...' : '🔥 Supprimer définitivement'}
+                {isDeleting ? (
+                  'Suppression...'
+                ) : (
+                  <>
+                    <Trash2 size={16} /> Supprimer définitivement
+                  </>
+                )}
               </button>
             </div>
           </form>

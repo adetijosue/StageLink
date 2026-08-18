@@ -4,7 +4,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import {
   Camera, Settings, Edit3, Music, Disc, Play, Pause,
   Users, QrCode, FileText, LogOut, MapPin, Briefcase, Crown, Sparkles,
-  Save, X, Globe, Plus, ChevronDown, Check
+  Save, X, Globe, Plus, ChevronDown, Check, Mic, Sliders, Radio
 } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { INSTRUMENTS_LIST, GENRES_LIST } from '../../services/musicData';
@@ -107,7 +107,15 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
     return Math.min(100, s);
   })();
 
-  const instrumentIcons = { 'Piano / Clavier': '🎹', 'Chanteur / Vocal': '🎤', 'Guitare Acoustique': '🎸', 'Guitare Électrique': '🎸', 'Beatmaker / Producer': '💻', 'Ingénieur Son': '🎚️', 'Basse Électrique': '🎸', 'Batterie': '🥁' };
+  const renderInstrumentIcon = (inst) => {
+    const s = 13;
+    const lower = (inst || '').toLowerCase();
+    if (lower.includes('chant') || lower.includes('vocal')) return <Mic size={s} style={{ marginRight: 5 }} />;
+    if (lower.includes('beatmaker') || lower.includes('producer') || lower.includes('ingénieur') || lower.includes('mix')) return <Sliders size={s} style={{ marginRight: 5 }} />;
+    if (lower.includes('basse') || lower.includes('guitare')) return <Radio size={s} style={{ marginRight: 5 }} />;
+    if (lower.includes('batterie') || lower.includes('percussion')) return <Disc size={s} style={{ marginRight: 5 }} />;
+    return <Music size={s} style={{ marginRight: 5 }} />;
+  };
 
   return (
     <div style={{ width: '100%', minHeight: '100vh', background: isDarkMode ? '#0B0F19' : '#F8FAFC', color: isDarkMode ? '#F8FAFC' : '#0F172A', paddingBottom: '120px', overflowY: 'auto' }}>
@@ -164,7 +172,10 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
            <h3 style={{ fontSize: '0.8rem', fontWeight: 900, color: '#64748B', marginBottom: '12px' }}>{language === 'en' ? 'INSTRUMENTS & GENRES' : 'INSTRUMENTS & GENRES'}</h3>
            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
              {(currentUser.instruments?.length > 0 ? currentUser.instruments : [language === 'en' ? 'Artist' : 'Artiste']).map(inst => (
-               <span key={inst} style={{ background: '#EFF6FF', color: '#0066FF', padding: '6px 14px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 800, border: '1px solid #BFDBFE' }}>{instrumentIcons[inst] || '🎵'} {inst}</span>
+               <span key={inst} style={{ background: isDarkMode ? 'rgba(0, 102, 255, 0.15)' : '#EFF6FF', color: '#0066FF', padding: '6px 12px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700, border: isDarkMode ? '1px solid rgba(0, 102, 255, 0.3)' : '1px solid #BFDBFE', display: 'inline-flex', alignItems: 'center' }}>
+                 {renderInstrumentIcon(inst)}
+                 {inst}
+               </span>
              ))}
            </div>
            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>

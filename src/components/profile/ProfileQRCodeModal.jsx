@@ -238,7 +238,7 @@ export default function ProfileQRCodeModal({ isOpen, onClose, user, isDarkMode }
     ctx.font = '800 30px Inter, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(
-      language === 'en' ? '📷 Scan with any camera to follow & listen' : '📷 Scannez pour écouter & vous abonner',
+      language === 'en' ? 'Scan with any camera to follow & listen' : 'Scannez avec votre appareil pour écouter & vous abonner',
       width / 2,
       1055
     );
@@ -447,7 +447,7 @@ export default function ProfileQRCodeModal({ isOpen, onClose, user, isDarkMode }
               {userRole}
             </p>
             <span style={{ fontSize: '0.72rem', color: '#0066FF', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-              📍 {userLocation}
+              <MapPin size={12} /> {userLocation}
             </span>
           </div>
         </div>

@@ -30,7 +30,8 @@ import {
   Grid,
   Layers,
   Headphones,
-  CheckCircle2
+  CheckCircle2,
+  Mic
 } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 import { useAuth } from '../../context/AuthContext';
@@ -226,10 +227,14 @@ export default function PublicProfileModal({
     { id: 'ptr_2', title: 'Live Performance / Instrumental', genre: 'Live Production', duration: '02:45', plays: '1.8k' }
   ];
 
-  const instrumentIcons = {
-    'Piano': '🎹', 'Chanteur': '🎤', 'Chant': '🎤', 'Vocaliste': '🎤', 'Guitare': '🎸', 
-    'Beatmaker': '💻', 'Producteur': '🎧', 'Ingénieur': '🎚️', 'Mix': '🎚️', 'Basse': '🎸', 
-    'Batterie': '🥁', 'Saxophone': '🎷', 'Clavier': '🎹', 'Studio': '🎙️', 'DJ': '🎧'
+  const renderSkillIcon = (skillName) => {
+    const s = 13;
+    const lower = (skillName || '').toLowerCase();
+    if (lower.includes('chant') || lower.includes('vocal')) return <Mic size={s} />;
+    if (lower.includes('beatmaker') || lower.includes('producer') || lower.includes('ingénieur') || lower.includes('mix') || lower.includes('studio')) return <Sliders size={s} />;
+    if (lower.includes('basse') || lower.includes('guitare')) return <Radio size={s} />;
+    if (lower.includes('batterie') || lower.includes('percussion') || lower.includes('dj')) return <Disc size={s} />;
+    return <Music size={s} />;
   };
 
   const specialtiesList = Array.isArray(profile.skills) && profile.skills.length > 0
@@ -804,12 +809,13 @@ export default function PublicProfileModal({
                     fontSize: '0.78rem', 
                     fontWeight: 700,
                     border: '1px solid rgba(0, 102, 255, 0.2)',
-                    display: 'flex',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '4px'
+                    gap: '6px'
                   }}
                 >
-                  {instrumentIcons[skill] || '🎵'} {skill}
+                  {renderSkillIcon(skill)}
+                  {skill}
                 </span>
               ))}
             </div>
@@ -841,7 +847,7 @@ export default function PublicProfileModal({
                       fontWeight: 700
                     }}
                   >
-                    🎸 {genre}
+                    #{genre}
                   </span>
                 ))}
               </div>
