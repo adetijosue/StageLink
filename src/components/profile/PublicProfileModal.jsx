@@ -28,7 +28,9 @@ import {
   Radio,
   Sliders,
   Grid,
-  Layers
+  Layers,
+  Headphones,
+  CheckCircle2
 } from 'lucide-react';
 import UserAvatar from '../common/UserAvatar';
 import { useAuth } from '../../context/AuthContext';
@@ -57,7 +59,6 @@ export default function PublicProfileModal({
   const [isCvModalOpen, setIsCvModalOpen] = useState(false);
   const [showFullAvatar, setShowFullAvatar] = useState(false);
   const [userPosts, setUserPosts] = useState([]);
-  const [activeTab, setActiveTab] = useState('about'); // 'about' | 'works' | 'gear'
   const [isOnline, setIsOnline] = useState(false);
 
   // Subscribe to real-time online presence for this user
@@ -160,11 +161,11 @@ export default function PublicProfileModal({
   // Normalized user fields
   const userName = profile.name || profile.full_name || profile.userName || profile.title || 'Artiste StageLink';
   const userAvatarUrl = profile.avatar || profile.avatar_url || profile.userAvatar || profile.image || '';
-  const userRole = profile.role || profile.userRole || profile.category || 'Artiste';
-  const userBio = profile.bio || profile.description || 'Membre vérifié de la communauté musicale StageLink.';
+  const userRole = profile.role || profile.userRole || profile.category || 'Artiste Musicien';
+  const userBio = profile.bio || profile.description || 'Artiste passionné et créateur sur le réseau musical StageLink. Prêt pour de nouvelles collaborations et projets de scène ou de studio.';
   const userLocation = profile.location || 'Studio & En ligne';
   const userCompany = profile.company || profile.studio || 'Artiste Indépendant';
-  const userCover = profile.coverPhoto || profile.cover_url || profile.cover || profile.image || 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=800';
+  const userCover = profile.coverPhoto || profile.cover_url || profile.cover || profile.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800';
   const isVip = profile.badgeType === 'gold' || profile.badgeType === 'blue' || profile.verified === true;
 
   const handleFollowClick = async () => {
@@ -221,14 +222,14 @@ export default function PublicProfileModal({
   };
 
   const sampleTracks = [
-    { id: 'ptr_1', title: 'Studio Production Demo 2026', genre: userRole || 'Afrobeat', duration: '03:20', plays: '1.8k' },
-    { id: 'ptr_2', title: 'Acoustic Jam Session', genre: 'Live Production', duration: '02:45', plays: '1.2k' }
+    { id: 'ptr_1', title: 'Session Studio & Démo 2026', genre: userRole || 'Afrobeat', duration: '03:20', plays: '2.4k' },
+    { id: 'ptr_2', title: 'Live Performance / Instrumental', genre: 'Live Production', duration: '02:45', plays: '1.8k' }
   ];
 
   const instrumentIcons = {
     'Piano': '🎹', 'Chanteur': '🎤', 'Chant': '🎤', 'Vocaliste': '🎤', 'Guitare': '🎸', 
     'Beatmaker': '💻', 'Producteur': '🎧', 'Ingénieur': '🎚️', 'Mix': '🎚️', 'Basse': '🎸', 
-    'Batterie': '🥁', 'Saxophone': '🎷', 'Clavier': '🎹', 'Studio': '🎙️'
+    'Batterie': '🥁', 'Saxophone': '🎷', 'Clavier': '🎹', 'Studio': '🎙️', 'DJ': '🎧'
   };
 
   const specialtiesList = Array.isArray(profile.skills) && profile.skills.length > 0
@@ -257,9 +258,9 @@ export default function PublicProfileModal({
         onClick={(e) => e.stopPropagation()} 
         style={{
           width: '100%', 
-          maxWidth: '520px', 
+          maxWidth: '500px', 
           background: 'var(--card-bg, #FFFFFF)', 
-          borderRadius: '28px',
+          borderRadius: '32px',
           maxHeight: '94vh', 
           overflowY: 'auto', 
           boxShadow: '0 25px 60px rgba(0,0,0,0.5)', 
@@ -270,110 +271,107 @@ export default function PublicProfileModal({
           flexDirection: 'column'
         }}
       >
-        {/* Top Floating App Bar */}
-        <div style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 30,
-          background: 'rgba(15, 23, 42, 0.85)',
-          backdropFilter: 'blur(12px)',
-          padding: '12px 18px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          color: '#FFFFFF',
-          borderBottom: '1px solid rgba(255,255,255,0.1)'
-        }}>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'rgba(255, 255, 255, 0.15)',
-              border: 'none',
-              borderRadius: '50%',
-              width: '36px',
-              height: '36px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#FFF',
-              cursor: 'pointer'
-            }}
-            title={language === 'en' ? 'Back' : 'Retour'}
-          >
-            <ArrowLeft size={18} />
-          </button>
-
-          <span style={{ fontSize: '0.88rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
-            {language === 'en' ? 'Public Profile' : 'Profil Public'} • {userName}
-          </span>
-
-          <button
-            onClick={() => setIsQrModalOpen(true)}
-            style={{
-              background: 'rgba(255, 255, 255, 0.15)',
-              border: 'none',
-              borderRadius: '50%',
-              width: '36px',
-              height: '36px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#FFF',
-              cursor: 'pointer'
-            }}
-            title={language === 'en' ? 'QR Contact Card' : 'Carte contact QR'}
-          >
-            <QrCode size={18} />
-          </button>
-        </div>
-
-        {/* 1. Header Hero (Cover + Avatar) */}
-        <div style={{ position: 'relative', height: '190px', marginBottom: '52px' }}>
+        {/* 1. Header Cover Hero with Integrated Floating Controls */}
+        <div style={{ position: 'relative', height: '180px', background: '#0F172A', overflow: 'hidden', borderTopLeftRadius: '32px', borderTopRightRadius: '32px' }}>
           <img
             src={userCover}
             style={{ 
               width: '100%', 
               height: '100%', 
-              objectFit: 'cover' 
+              objectFit: 'cover',
+              filter: 'brightness(0.82)'
             }}
             alt={language === 'en' ? `${userName}'s Cover` : `Couverture de ${userName}`}
           />
           <div style={{ 
             position: 'absolute', 
             inset: 0, 
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, transparent 40%, rgba(15, 23, 42, 0.9) 100%)' 
+            background: 'linear-gradient(to bottom, rgba(15, 23, 42, 0.5) 0%, transparent 40%, rgba(15, 23, 42, 0.85) 100%)' 
           }} />
 
-          {/* Live Talent Indicator */}
+          {/* Floating Top Left: Back Button */}
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: '14px',
+              left: '16px',
+              background: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '50%',
+              width: '38px',
+              height: '38px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#FFF',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              zIndex: 10
+            }}
+            title={language === 'en' ? 'Back' : 'Retour'}
+          >
+            <ArrowLeft size={18} />
+          </button>
+
+          {/* Floating Top Center: Official Artist Pill */}
           <div style={{
             position: 'absolute',
-            top: 14,
-            left: 16,
-            background: 'rgba(16, 185, 129, 0.92)',
-            color: '#FFF',
-            padding: '4px 10px',
+            top: '16px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(15, 23, 42, 0.75)',
+            color: '#38BDF8',
+            border: '1px solid rgba(56, 189, 248, 0.35)',
+            padding: '4px 12px',
             borderRadius: '20px',
-            fontSize: '0.72rem',
+            fontSize: '0.70rem',
             fontWeight: 800,
             display: 'flex',
             alignItems: 'center',
             gap: '5px',
-            backdropFilter: 'blur(6px)',
-            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)'
+            backdropFilter: 'blur(8px)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            zIndex: 10
           }}>
-            <Radio size={12} /> {language === 'en' ? 'VERIFIED PROFILE' : 'PROFIL VÉRIFIÉ'}
+            <Sparkles size={12} color="#38BDF8" /> {language === 'en' ? 'OFFICIAL ARTIST' : 'ARTISTE OFFICIEL'}
           </div>
 
-          {/* Avatar & Hero Info */}
-          <div style={{ 
-            position: 'absolute', 
-            bottom: '-44px', 
-            left: '20px', 
-            right: '20px',
-            display: 'flex', 
-            alignItems: 'flex-end', 
-            gap: '14px' 
-          }}>
+          {/* Floating Top Right: Share / QR Code Button */}
+          <button
+            onClick={() => {
+              soundEngine?.playPopSound?.();
+              setIsQrModalOpen(true);
+            }}
+            style={{
+              position: 'absolute',
+              top: '14px',
+              right: '16px',
+              background: 'rgba(0, 102, 255, 0.75)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              borderRadius: '50%',
+              width: '38px',
+              height: '38px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#FFFFFF',
+              cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(0, 102, 255, 0.4)',
+              zIndex: 10
+            }}
+            title={language === 'en' ? 'Share Profile & QR' : 'Partager Profil & QR'}
+          >
+            <Share2 size={17} />
+          </button>
+        </div>
+
+        {/* 2. Identity Card Row (Avatar + Clear Typography) */}
+        <div style={{ padding: '0 20px', marginTop: '-52px', position: 'relative', zIndex: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap' }}>
+            {/* Avatar with Presence Indicator */}
             <div 
               onClick={(e) => {
                 e.stopPropagation();
@@ -394,7 +392,7 @@ export default function PublicProfileModal({
                     borderRadius: '50%',
                     objectFit: 'cover',
                     border: '4px solid #FFFFFF',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
                     background: '#1E293B'
                   }}
                 />
@@ -403,23 +401,23 @@ export default function PublicProfileModal({
                   user={{ avatar: userAvatarUrl, name: userName }} 
                   size={92} 
                   border="4px solid #FFFFFF" 
-                  style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }} 
+                  style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }} 
                 />
               )}
 
-              {/* Realtime Presence Status Dot (Green = Online, Grey = Offline) */}
+              {/* Realtime Online Dot */}
               <span
                 title={isOnline ? (language === 'en' ? 'Online' : 'En ligne') : (language === 'en' ? 'Offline' : 'Hors ligne')}
                 style={{
                   position: 'absolute',
                   bottom: '4px',
-                  left: '4px',
+                  right: '4px',
                   width: '18px',
                   height: '18px',
                   borderRadius: '50%',
                   background: isOnline ? '#10B981' : '#94A3B8',
                   border: '3px solid #FFFFFF',
-                  boxShadow: isOnline ? '0 0 12px rgba(16, 185, 129, 0.65)' : 'none',
+                  boxShadow: isOnline ? '0 0 10px rgba(16, 185, 129, 0.7)' : 'none',
                   transition: 'all 0.25s ease',
                   zIndex: 10
                 }}
@@ -428,96 +426,139 @@ export default function PublicProfileModal({
               {isVip && (
                 <div style={{
                   position: 'absolute',
-                  bottom: '2px',
-                  right: '2px',
-                  background: '#F59E0B',
+                  top: '0px',
+                  right: '-4px',
+                  background: 'linear-gradient(135deg, #F59E0B, #D97706)',
                   color: '#FFF',
                   borderRadius: '50%',
-                  width: '26px',
-                  height: '26px',
+                  width: '24px',
+                  height: '24px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   border: '2px solid #FFF',
                   boxShadow: '0 2px 8px rgba(245, 158, 11, 0.5)'
                 }}>
-                  <Award size={15} />
+                  <Crown size={13} />
                 </div>
               )}
             </div>
 
-            <div style={{ paddingBottom: '48px', flex: 1, minWidth: 0 }}>
-              <h3 style={{ 
-                fontSize: '1.3rem', 
-                fontWeight: 900, 
-                color: '#FFFFFF', 
-                textShadow: '0 2px 8px rgba(0,0,0,0.8)', 
-                margin: 0, 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '6px',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
+            {/* Quick Badges / Status on Right */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                background: isOnline ? 'rgba(16, 185, 129, 0.12)' : 'rgba(148, 163, 184, 0.15)',
+                color: isOnline ? '#059669' : '#64748B',
+                border: `1px solid ${isOnline ? 'rgba(16, 185, 129, 0.3)' : 'rgba(148, 163, 184, 0.25)'}`,
+                borderRadius: '12px',
+                padding: '3px 10px',
+                fontSize: '0.72rem',
+                fontWeight: 800
               }}>
-                {userName} {isVip && <Crown size={17} color="#F59E0B" fill="#F59E0B" />}
-              </h3>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', flexWrap: 'wrap' }}>
-                <p style={{ 
-                  color: 'rgba(255,255,255,0.95)', 
-                  fontSize: '0.84rem', 
-                  fontWeight: 700,
-                  margin: 0,
-                  textShadow: '0 1px 4px rgba(0,0,0,0.7)'
-                }}>
-                  {userRole}
-                </p>
                 <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  background: isOnline ? 'rgba(16, 185, 129, 0.3)' : 'rgba(148, 163, 184, 0.3)',
-                  color: isOnline ? '#34D399' : '#E2E8F0',
-                  border: `1px solid ${isOnline ? 'rgba(16, 185, 129, 0.5)' : 'rgba(148, 163, 184, 0.4)'}`,
-                  backdropFilter: 'blur(6px)',
-                  borderRadius: '12px',
-                  padding: '2px 8px',
-                  fontSize: '0.70rem',
-                  fontWeight: 800,
-                  textShadow: '0 1px 3px rgba(0,0,0,0.6)'
-                }}>
-                  <span style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '50%',
-                    background: isOnline ? '#10B981' : '#94A3B8',
-                    boxShadow: isOnline ? '0 0 6px #10B981' : 'none'
-                  }} />
-                  {isOnline ? (language === 'en' ? 'Online' : 'En ligne') : (language === 'en' ? 'Offline' : 'Hors ligne')}
-                </span>
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: isOnline ? '#10B981' : '#94A3B8'
+                }} />
+                {isOnline ? (language === 'en' ? 'Online' : 'En ligne') : (language === 'en' ? 'Offline' : 'Hors ligne')}
+              </span>
+            </div>
+          </div>
+
+          {/* Artist Name & Title */}
+          <div style={{ marginTop: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ 
+                fontSize: '1.38rem', 
+                fontWeight: 900, 
+                color: 'var(--text-dark, #0F172A)', 
+                margin: 0, 
+                letterSpacing: '-0.02em',
+                lineHeight: 1.2
+              }}>
+                {userName}
+              </h2>
+              {isVip && <CheckCircle2 size={19} color="#0066FF" fill="#0066FF" />}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '5px', flexWrap: 'wrap' }}>
+              <span style={{
+                background: 'rgba(0, 102, 255, 0.08)',
+                color: '#0066FF',
+                padding: '4px 10px',
+                borderRadius: '10px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                border: '1px solid rgba(0, 102, 255, 0.15)'
+              }}>
+                {userRole}
+              </span>
+
+              <span style={{ fontSize: '0.78rem', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                <MapPin size={13} color="#64748B" /> {userLocation}
+              </span>
+            </div>
+          </div>
+
+          {/* Micro Stats Counter Row */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '8px',
+            marginTop: '14px',
+            background: 'var(--bg-light, #F8FAFC)',
+            padding: '10px 12px',
+            borderRadius: '16px',
+            border: '1px solid var(--border-light, #E2E8F0)'
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '0.95rem', fontWeight: 900, color: 'var(--text-dark, #0F172A)' }}>
+                {isFollowing ? '143' : '142'}
+              </div>
+              <div style={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>
+                {language === 'en' ? 'Followers' : 'Abonnés'}
+              </div>
+            </div>
+
+            <div style={{ textAlign: 'center', borderLeft: '1px solid var(--border-light, #E2E8F0)', borderRight: '1px solid var(--border-light, #E2E8F0)' }}>
+              <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#0066FF' }}>
+                4.2k
+              </div>
+              <div style={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>
+                {language === 'en' ? 'Plays' : 'Écoutes'}
+              </div>
+            </div>
+
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#10B981' }}>
+                98%
+              </div>
+              <div style={{ fontSize: '0.68rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>
+                Match Pro
               </div>
             </div>
           </div>
         </div>
 
-        {/* 2. Main Profile Content Body */}
-        <div style={{ padding: '0 20px 24px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-          {/* Action Bar (Follow & Chat) */}
-          {!isSelf && (
-            <div style={{ display: 'flex', gap: '10px' }}>
+        {/* 3. Action Toolbar (Suivre, Message Direct, Partager/QR) */}
+        <div style={{ padding: '16px 20px 0 20px' }}>
+          {!isSelf ? (
+            <div style={{ display: 'flex', gap: '8px' }}>
               <button 
                 onClick={handleFollowClick} 
                 style={{ 
-                  flex: 1, 
-                  padding: '12px', 
+                  flex: 1.2, 
+                  padding: '12px 14px', 
                   borderRadius: '16px', 
-                  border: isFollowing ? '1px solid #10B981' : 'none', 
+                  border: isFollowing ? '1.5px solid #10B981' : 'none', 
                   background: isFollowing ? '#ECFDF5' : '#0066FF', 
                   color: isFollowing ? '#047857' : '#FFFFFF', 
                   fontWeight: 800, 
-                  fontSize: '0.88rem', 
+                  fontSize: '0.86rem', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
@@ -527,7 +568,7 @@ export default function PublicProfileModal({
                   transition: 'all 0.2s ease'
                 }}
               >
-                {isFollowing ? <><UserCheck size={18} /> {language === 'en' ? 'Following' : 'Suivi'}</> : <><UserPlus size={18} /> {language === 'en' ? 'Follow' : 'Suivre'}</>}
+                {isFollowing ? <><UserCheck size={17} /> {language === 'en' ? 'Following' : 'Suivi'}</> : <><UserPlus size={17} /> {language === 'en' ? 'Follow' : 'Suivre'}</>}
               </button>
 
               <button 
@@ -539,14 +580,14 @@ export default function PublicProfileModal({
                   }
                 }} 
                 style={{ 
-                  flex: 1, 
-                  padding: '12px', 
+                  flex: 1.2, 
+                  padding: '12px 14px', 
                   borderRadius: '16px', 
                   border: '1.5px solid #0066FF', 
                   background: 'rgba(0, 102, 255, 0.05)', 
                   color: '#0066FF',
                   fontWeight: 800, 
-                  fontSize: '0.88rem', 
+                  fontSize: '0.86rem', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
@@ -555,12 +596,66 @@ export default function PublicProfileModal({
                   transition: 'all 0.2s ease'
                 }}
               >
-                <MessageSquare size={18} /> {language === 'en' ? 'Direct Message' : 'Message Direct'}
+                <MessageSquare size={17} /> {language === 'en' ? 'Message' : 'Message'}
+              </button>
+
+              <button
+                onClick={() => {
+                  soundEngine?.playPopSound?.();
+                  setIsQrModalOpen(true);
+                }}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: '16px',
+                  border: '1px solid var(--border-light, #CBD5E1)',
+                  background: 'var(--bg-light, #F8FAFC)',
+                  color: 'var(--text-dark, #0F172A)',
+                  fontWeight: 800,
+                  fontSize: '0.86rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                title={language === 'en' ? 'Share Profile' : 'Partager le Profil'}
+              >
+                <QrCode size={17} color="#0066FF" />
               </button>
             </div>
+          ) : (
+            <button
+              onClick={() => {
+                soundEngine?.playPopSound?.();
+                setIsQrModalOpen(true);
+              }}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '16px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #0066FF, #0047FF)',
+                color: '#FFF',
+                fontWeight: 800,
+                fontSize: '0.88rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(0, 102, 255, 0.3)'
+              }}
+            >
+              <Share2 size={17} /> {language === 'en' ? 'Share My Profile & QR Code' : 'Partager Mon Profil & QR Code'}
+            </button>
           )}
+        </div>
 
-          {/* Location, Studio & Status Details */}
+        {/* 4. Main Profile Content Body */}
+        <div style={{ padding: '16px 20px 24px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+          {/* Location & Studio Details */}
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
@@ -585,7 +680,7 @@ export default function PublicProfileModal({
 
           {/* Social Links Row if present */}
           {(profile.spotifyUrl || profile.instagramUrl || profile.youtubeUrl || profile.tiktokUrl) && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               {profile.spotifyUrl && !profile.spotifyUrl.startsWith('javascript:') && (
                 <a 
                   href={profile.spotifyUrl.startsWith('http') ? profile.spotifyUrl : `https://${profile.spotifyUrl}`} 
@@ -792,7 +887,8 @@ export default function PublicProfileModal({
                       alignItems: 'center', 
                       justifyContent: 'center',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 10px rgba(0, 102, 255, 0.25)'
+                      boxShadow: '0 4px 10px rgba(0, 102, 255, 0.25)',
+                      transition: 'transform 0.15s ease'
                     }}
                   >
                     {playingTrackId === tr.id ? <Pause size={16} fill="white" /> : <Play size={16} fill="white" style={{ marginLeft: 2 }} />}
@@ -899,7 +995,7 @@ export default function PublicProfileModal({
             {userAvatarUrl ? (
               <img 
                 src={userAvatarUrl} 
-                alt={userName}
+                alt={userName} 
                 loading="lazy"
                 decoding="async"
                 style={{

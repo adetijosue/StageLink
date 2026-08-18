@@ -497,10 +497,12 @@ function MainApp() {
       try {
         const params = new URLSearchParams(window.location.search);
         const hash = window.location.hash || '';
-        let targetId = params.get('profile') || params.get('user') || params.get('artist');
+        let targetId = params.get('p') || params.get('profile') || params.get('user') || params.get('artist') || params.get('u');
         
         if (!targetId && hash.startsWith('#profile-')) {
           targetId = hash.replace('#profile-', '');
+        } else if (!targetId && hash.startsWith('#p-')) {
+          targetId = hash.replace('#p-', '');
         }
 
         if (!targetId) return;
