@@ -27,6 +27,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
   onApplyMatch, 
   onRefreshMatches, 
   onOpenProfile, 
+  onStartChat,
   currentUser 
 }) {
   const { t, language } = useLanguage();
@@ -75,16 +76,27 @@ const SwipeMatching = React.memo(function SwipeMatching({
   const filteredMatches = useMemo(() => {
     return (matches || []).filter(card => {
       // Exclude logged in user
-      if (currentUser && (card.userId === currentUser.id || card.id === `match_${currentUser.id}`)) {
+      if (currentUser && (card.userId === currentUser.id || card.id === `match_${currentUser.id}` || card.id === currentUser.id)) {
         return false;
       }
 
+      const isAlreadyMatched = 
+        matchedIds.includes(card.id) || 
+        (card.userId && matchedIds.includes(card.userId)) ||
+        (card.rawUser?.id && matchedIds.includes(card.rawUser.id)) ||
+        (typeof card.id === 'string' && card.id.startsWith('match_') && matchedIds.includes(card.id.replace('match_', '')));
+
       if (activeFilter === 'matched') {
-        return matchedIds.includes(card.id) || matchedIds.includes(card.userId);
+        return isAlreadyMatched;
+      }
+
+      // In discovery tabs ('all', 'producers', 'singers', 'engineers'), NEVER show already matched artists again!
+      if (activeFilter !== 'favorites' && isAlreadyMatched) {
+        return false;
       }
 
       if (activeFilter === 'favorites') {
-        return favoriteIds.includes(card.id) || favoriteIds.includes(card.userId);
+        return favoriteIds.includes(card.id) || (card.userId && favoriteIds.includes(card.userId));
       }
 
       const roleStr = `${card.role || ''} ${card.category || ''} ${(card.skills || []).join(' ')}`.toLowerCase();
@@ -103,8 +115,9 @@ const SwipeMatching = React.memo(function SwipeMatching({
     });
   }, [matches, activeFilter, matchedIds, favoriteIds, currentUser]);
 
-  const currentCard = filteredMatches[currentIndex] || filteredMatches[0];
-  const isCurrentFavorite = currentCard && (favoriteIds.includes(currentCard.id) || favoriteIds.includes(currentCard.userId));
+  const safeIndex = (filteredMatches.length > 0 && currentIndex >= filteredMatches.length) ? 0 : currentIndex;
+  const currentCard = filteredMatches[safeIndex] || filteredMatches[0];
+  const isCurrentFavorite = currentCard && (favoriteIds.includes(currentCard.id) || (currentCard.userId && favoriteIds.includes(currentCard.userId)));
 
   // Save matched IDs to localStorage
   useEffect(() => {
@@ -141,25 +154,34 @@ const SwipeMatching = React.memo(function SwipeMatching({
   const handleAction = (type) => {
     if (!currentCard) return;
 
-    const targetId = currentCard.id || currentCard.userId;
+    const targetId = currentCard.id;
+    const targetUserId = currentCard.userId || (typeof currentCard.id === 'string' && currentCard.id.startsWith('match_') ? currentCard.id.replace('match_', '') : null);
+    const rawId = currentCard.rawUser?.id;
 
     if (type === 'match') {
       soundEngine?.playPopSound?.();
       triggerConfetti();
       setShowMatchSuccess(currentCard);
 
-      if (targetId && !matchedIds.includes(targetId)) {
-        setMatchedIds(prev => [...prev, targetId]);
-      }
+      const idsToAdd = [targetId, targetUserId, rawId].filter(Boolean);
+      setMatchedIds(prev => {
+        const next = [...prev];
+        idsToAdd.forEach(id => {
+          if (!next.includes(id)) next.push(id);
+        });
+        return next;
+      });
+
       if (onApplyMatch) onApplyMatch(currentCard);
     } else if (type === 'favorite') {
       soundEngine?.playPopSound?.();
-      const isFav = favoriteIds.includes(targetId);
+      const favKey = targetUserId || targetId;
+      const isFav = favoriteIds.includes(favKey) || (targetId && favoriteIds.includes(targetId));
       if (isFav) {
-        setFavoriteIds(prev => prev.filter(id => id !== targetId));
+        setFavoriteIds(prev => prev.filter(id => id !== favKey && id !== targetId));
         setFavoriteToast(`Retiré des favoris`);
       } else {
-        setFavoriteIds(prev => [...prev, targetId]);
+        setFavoriteIds(prev => [...prev, favKey]);
         setFavoriteToast(`⭐ ${currentCard.title || currentCard.name} ajouté aux favoris !`);
       }
       setTimeout(() => setFavoriteToast(null), 2000);
@@ -766,6 +788,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
               </button>
 
               <button
+                id="btn-action-favorite"
                 onClick={() => handleAction('favorite')}
                 title={isCurrentFavorite ? (language === 'en' ? 'Remove from favorites' : 'Retirer des favoris') : (language === 'en' ? 'Add to favorites' : 'Sauvegarder dans les favoris')}
                 style={{
@@ -787,6 +810,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
               </button>
 
               <button
+                id="btn-action-match"
                 onClick={() => handleAction('match')}
                 title={t('btn_match')}
                 style={{
@@ -804,7 +828,7 @@ const SwipeMatching = React.memo(function SwipeMatching({
                   boxShadow: '0 6px 18px rgba(0, 102, 255, 0.35)'
                 }}
               >
-                <MessageCircle size={18} /> {t('btn_match')}
+                <Check size={20} strokeWidth={3} /> {t('btn_match')}
               </button>
             </div>
           </div>
@@ -936,34 +960,79 @@ const SwipeMatching = React.memo(function SwipeMatching({
             </div>
 
             <h2 style={{ fontSize: '1.35rem', fontWeight: 900, color: '#0F172A', marginBottom: '8px' }}>
-              {t('match_success_title')} 🎉
+              {t('match_success_title') || 'C\'est un Match !'} 🎉
             </h2>
 
-            <p style={{ fontSize: '0.86rem', color: '#475569', marginBottom: '20px', lineHeight: 1.4 }}>
+            <p style={{ fontSize: '0.88rem', color: '#475569', marginBottom: '22px', lineHeight: 1.45 }}>
               {language === 'en' ? (
-                <>Your connection with <strong>{showMatchSuccess.title || showMatchSuccess.name}</strong> was recorded and the conversation is open in your messages.</>
+                <>You matched with <strong>{showMatchSuccess.title || showMatchSuccess.name}</strong> and are now following each other! Continue exploring or send a message when you want.</>
               ) : (
-                <>Votre connexion avec <strong>{showMatchSuccess.title || showMatchSuccess.name}</strong> a été enregistrée et la discussion a été ouverte dans vos messages.</>
+                <>Vous avez matché avec <strong>{showMatchSuccess.title || showMatchSuccess.name}</strong> et vous vous suivez désormais ! Continuez à explorer ou écrivez-lui quand vous le souhaitez.</>
               )}
             </p>
 
-            <button
-              onClick={() => setShowMatchSuccess(null)}
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '20px',
-                background: '#0066FF',
-                color: '#FFF',
-                border: 'none',
-                fontWeight: 800,
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(0, 102, 255, 0.35)'
-              }}
-            >
-              {t('match_continue')}
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button
+                id="btn-match-continue-exploring"
+                onClick={() => setShowMatchSuccess(null)}
+                style={{
+                  width: '100%',
+                  padding: '13px',
+                  borderRadius: '20px',
+                  background: '#0066FF',
+                  color: '#FFF',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.92rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(0, 102, 255, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <span>✨</span>
+                <span>{language === 'en' ? 'Continue Exploring' : 'Continuer à explorer'}</span>
+              </button>
+
+              {onStartChat && (
+                <button
+                  id="btn-match-send-message"
+                  onClick={() => {
+                    const target = showMatchSuccess;
+                    setShowMatchSuccess(null);
+                    const raw = target.rawUser || {};
+                    onStartChat({
+                      id: target.userId || (typeof target.id === 'string' ? target.id.replace('match_', '') : target.id) || raw.id,
+                      name: target.name || target.title || target.creator || raw.full_name || 'Artiste',
+                      full_name: target.name || target.title || target.creator || raw.full_name || 'Artiste',
+                      avatar: target.avatar || target.creatorAvatar || target.image || raw.avatar_url || '',
+                      avatar_url: target.avatar || target.creatorAvatar || target.image || raw.avatar_url || '',
+                      role: target.role || target.category || raw.role || 'Artiste'
+                    });
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '11px',
+                    borderRadius: '20px',
+                    background: '#F1F5F9',
+                    color: '#334155',
+                    border: '1px solid #E2E8F0',
+                    fontWeight: 700,
+                    fontSize: '0.88rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <MessageCircle size={16} />
+                  <span>{language === 'en' ? 'Send a message' : 'Envoyer un message'}</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

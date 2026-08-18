@@ -2339,15 +2339,11 @@ function MainApp() {
   };
 
   const handleFollowUser = (post) => {
-    const currentConnections = currentUser.connectionsCount || 14;
-    updateUserProfile({ connectionsCount: currentConnections + 1 });
-
-    handleStartChatWithUser({
-      id: post.userId,
-      name: post.userName,
-      avatar: post.userAvatar,
-      role: post.userRole
-    });
+    if (!post) return;
+    const targetUserId = post.userId || post.id;
+    if (targetUserId) {
+      handleConnectUser(targetUserId);
+    }
   };
 
   const handleStoryReplyToInbox = async (storyUser, replyText, isFromViewersList = false) => {
@@ -3365,12 +3361,15 @@ function MainApp() {
   const handleApplyMatch = async (matchCard) => {
     if (!currentUser || !matchCard) return;
 
-    const targetUserId = matchCard.userId || matchCard.id?.replace('match_', '');
+    const targetUserId = matchCard.userId || (typeof matchCard.id === 'string' ? matchCard.id.replace('match_', '') : matchCard.id);
     const targetUserName = matchCard.name || matchCard.title || matchCard.creator || 'Artiste';
-    const targetAvatar = matchCard.avatar || matchCard.creatorAvatar || matchCard.image || '';
-    const targetRole = matchCard.role || matchCard.category || 'Artiste';
 
-    // 1. Insert match record into Supabase matches table
+    // 1. Auto-Follow the matched artist ("Le matching doit être allié à la fonctionnalité de Following")
+    if (targetUserId) {
+      handleConnectUser(targetUserId);
+    }
+
+    // 2. Insert match record into Supabase matches table
     if (isSupabaseConfigured() && targetUserId && currentUser?.id) {
       try {
         await supabase.from('matches').insert({
@@ -3392,16 +3391,7 @@ function MainApp() {
       }
     }
 
-    // 2. Start a direct chat session with the target artist
-    handleStartChatWithUser({
-      id: targetUserId,
-      name: targetUserName,
-      full_name: targetUserName,
-      avatar: targetAvatar,
-      avatar_url: targetAvatar,
-      role: targetRole,
-      userRole: targetRole
-    });
+    // 3. Keep the user on Match Pro exploration deck without auto-redirecting to private messaging
   };
 
   const handleRefreshMatches = async () => {
@@ -3624,6 +3614,7 @@ function MainApp() {
             onApplyMatch={handleApplyMatch}
             onRefreshMatches={handleRefreshMatches}
             onOpenProfile={handleOpenPublicProfile}
+            onStartChat={handleStartChatWithUser}
             currentUser={currentUser}
           />
         )}
