@@ -174,15 +174,68 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
            </div>
         </div>
 
+        {/* 🎧 Demo Studio Showcase */}
+        <div
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent('play_global_audio', {
+              detail: {
+                title: `${currentUser.name || 'Artiste'} - Démo Studio`,
+                artist: currentUser.name || 'StageLink Studio',
+                genre: currentUser.genres?.[0] || 'Afro-Gospel',
+                coverUrl: currentUser.avatar || currentUser.coverPhoto || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400',
+                bpm: 120
+              }
+            }));
+          }}
+          className="card"
+          style={{
+            padding: '16px 18px',
+            borderRadius: '22px',
+            background: 'linear-gradient(135deg, rgba(0, 102, 255, 0.12) 0%, rgba(0, 240, 255, 0.08) 100%)',
+            border: '1px solid rgba(0, 102, 255, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #0066FF, #0047FF)',
+                color: '#FFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(0, 102, 255, 0.4)'
+              }}
+            >
+              <Play size={18} fill="#FFF" style={{ marginLeft: '2px' }} />
+            </div>
+            <div>
+              <h4 style={{ margin: 0, fontSize: '0.86rem', fontWeight: 800 }}>
+                {language === 'en' ? 'Play Artist Studio Demo' : 'Écouter ma Démo Studio'}
+              </h4>
+              <span style={{ fontSize: '0.72rem', color: '#0066FF', fontWeight: 600 }}>
+                {currentUser.genres?.[0] || 'Afro-Gospel'} • 120 BPM
+              </span>
+            </div>
+          </div>
+          <Disc size={20} color="#0066FF" />
+        </div>
+
         <div style={{ display: 'flex', gap: '12px' }}>
-           <button onClick={() => setActiveModal('qr')} className="card" style={{ flex: 1, padding: '18px', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-             <QrCode size={28} color="#0066FF" />
-             <span style={{ fontSize: '0.72rem', fontWeight: 900 }}>{language === 'en' ? 'QR CARD' : 'CARTE QR'}</span>
-           </button>
-           <button onClick={() => setActiveModal('cv')} className="card" style={{ flex: 1, padding: '18px', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-             <FileText size={28} color="#10B981" />
-             <span style={{ fontSize: '0.72rem', fontWeight: 900 }}>{language === 'en' ? 'EPK / RESUME' : 'EPK / CV'}</span>
-           </button>
+          <button onClick={() => setActiveModal('qr')} className="card" style={{ flex: 1, padding: '18px', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <QrCode size={28} color="#0066FF" />
+            <span style={{ fontSize: '0.72rem', fontWeight: 900 }}>{language === 'en' ? 'QR CARD' : 'CARTE QR'}</span>
+          </button>
+          <button onClick={() => setActiveModal('cv')} className="card" style={{ flex: 1, padding: '18px', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <FileText size={28} color="#10B981" />
+            <span style={{ fontSize: '0.72rem', fontWeight: 900 }}>{language === 'en' ? 'EPK / RESUME' : 'EPK / CV'}</span>
+          </button>
         </div>
 
         <button onClick={onSimulateIncomingCall} style={{ width: '100%', padding: '16px', borderRadius: '18px', background: '#ECFDF5', border: '1px solid #10B981', color: '#047857', fontWeight: 900 }}>{language === 'en' ? 'SIMULATE INCOMING CALL' : 'SIMULER APPEL ENTRANT'}</button>

@@ -150,13 +150,7 @@ function MainApp() {
       themeColorMeta.setAttribute('content', activeBgColor);
     }
   }, [isDarkMode]);
-  const [activeGlobalTrack, setActiveGlobalTrack] = useState({
-    title: 'Jam Session Afro-Gospel (Demo)',
-    artist: 'StageLink Studio • Live Track',
-    genre: 'Afro-Gospel',
-    coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200&auto=format&fit=crop&q=80'
-  });
-  const [showGlobalPlayer, setShowGlobalPlayer] = useState(false);
+  const [activeGlobalTrack, setActiveGlobalTrack] = useState(null);
 
   // Navigation & View States
   const [activeTab, setActiveTab] = useState('feed');
@@ -2150,9 +2144,15 @@ function MainApp() {
           setSelectedConversation(e.detail);
         }
       };
+      const handlePlayGlobalAudio = (e) => {
+        if (e.detail) {
+          setActiveGlobalTrack(e.detail);
+        }
+      };
       window.addEventListener('refresh_conversations', handleRefreshConversations);
       window.addEventListener('show_toast', handleShowToast);
       window.addEventListener('open_direct_conversation', handleOpenDirectConversation);
+      window.addEventListener('play_global_audio', handlePlayGlobalAudio);
       window.addEventListener('visibilitychange', handleVisibilityChange);
       window.addEventListener('focus', handleVisibilityChange);
 
@@ -2161,6 +2161,7 @@ function MainApp() {
         window.removeEventListener('refresh_conversations', handleRefreshConversations);
         window.removeEventListener('show_toast', handleShowToast);
         window.removeEventListener('open_direct_conversation', handleOpenDirectConversation);
+        window.removeEventListener('play_global_audio', handlePlayGlobalAudio);
         window.removeEventListener('visibilitychange', handleVisibilityChange);
         window.removeEventListener('focus', handleVisibilityChange);
         if (profilesSub) supabase.removeChannel(profilesSub);
@@ -4020,6 +4021,15 @@ function MainApp() {
         onClose={() => setToastNotification(null)}
         isDarkMode={isDarkMode}
       />
+
+      {/* Global Interactive Audio Player (Persistent across tabs) */}
+      {activeGlobalTrack && (
+        <GlobalAudioPlayer
+          currentTrack={activeGlobalTrack}
+          onClose={() => setActiveGlobalTrack(null)}
+          isDarkMode={isDarkMode}
+        />
+      )}
     </div>
     </React.Suspense>
   );

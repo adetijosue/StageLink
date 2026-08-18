@@ -92,20 +92,17 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
   const [selectedEventForTicket, setSelectedEventForTicket] = useState(null);
 
   const toggleAudioPlay = (item) => {
-    if (playingId === item.id) {
-      soundEngine?.stop?.();
-      setPlayingId(null);
-    } else {
-      soundEngine?.playPopSound?.();
-      if (item.audioUrl) {
-        const audio = new Audio(item.audioUrl);
-        audio.play().catch(() => soundEngine?.generateAndPlay?.(120, 'Afro-Gospel'));
-        audio.onended = () => setPlayingId(null);
-      } else {
-        soundEngine?.generateAndPlay?.(120, 'Afro-Gospel');
+    window.dispatchEvent(new CustomEvent('play_global_audio', {
+      detail: {
+        title: item.title || 'Beat Demo Studio',
+        artist: item.author || currentUser?.name || 'Artiste StageLink',
+        genre: item.genre || item.type || 'Beat / Production',
+        coverUrl: item.cover || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400',
+        audioUrl: item.audioUrl || null,
+        bpm: item.bpm || 120
       }
-      setPlayingId(item.id);
-    }
+    }));
+    setPlayingId(item.id);
   };
 
   const handleWorkCreated = (newWork, shareFeed) => {

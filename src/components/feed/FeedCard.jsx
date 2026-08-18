@@ -42,28 +42,18 @@ function FeedCard({
   const audioInstanceRef = useRef(null);
 
   const toggleAudio = () => {
-    if (isPlayingAudio) {
-      if (audioInstanceRef.current) {
-        audioInstanceRef.current.pause();
+    haptics.selection();
+    window.dispatchEvent(new CustomEvent('play_global_audio', {
+      detail: {
+        title: post.audioTitle || (post.content ? post.content.substring(0, 32) : 'Publication Vocale'),
+        artist: post.userName || 'Artiste StageLink',
+        genre: post.category || 'Afro-Gospel',
+        coverUrl: post.userAvatar || post.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400',
+        audioUrl: post.audioUrl || null,
+        lyrics: post.content || null,
+        bpm: 120
       }
-      soundEngine.stop();
-      setIsPlayingAudio(false);
-    } else {
-      if (post.audioUrl) {
-        const audio = new Audio(post.audioUrl);
-        audioInstanceRef.current = audio;
-        audio.onended = () => setIsPlayingAudio(false);
-        audio.onerror = () => {
-          soundEngine.generateAndPlay(120, 'Afro-Gospel');
-        };
-        audio.play().catch(() => {
-          soundEngine.generateAndPlay(120, 'Afro-Gospel');
-        });
-      } else {
-        soundEngine.generateAndPlay(120, 'Afro-Gospel');
-      }
-      setIsPlayingAudio(true);
-    }
+    }));
   };
 
   // Double Click / Double Tap to Like Media & Card
