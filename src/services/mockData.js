@@ -24,17 +24,20 @@ const INITIAL_POSTS = [];
 const INITIAL_SWIPE_MATCHES = [];
 const INITIAL_CHATS = [];
 
-// Helper to detect test/dummy artifacts (strictly targeting purged test subagent accounts)
+// Helper to detect test/dummy artifacts (strictly targeting purged test accounts & test runs)
 export const isTestArtifact = (item) => {
   if (!item) return false;
   if (item.is_test === true || item.is_test_account === true) return true;
   const author = String(item.userName || item.authorName || item.user_name || item.name || '').toLowerCase().trim();
   const userId = String(item.userId || item.user_id || item.id || '').toLowerCase().trim();
+  const content = String(item.text || item.content || item.caption || '').toLowerCase();
   
   if (
     author === 'test subagent' ||
     author.includes('subagent') ||
-    userId === 'd0b0e7b9-648f-4d77-96a6-a527ae2b4939'
+    userId === 'd0b0e7b9-648f-4d77-96a6-a527ae2b4939' ||
+    content.includes('test subagent') ||
+    (content.includes('nouvelle prod en cours') && content.includes('1787'))
   ) {
     return true;
   }
