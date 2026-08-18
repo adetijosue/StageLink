@@ -332,7 +332,14 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
       )}
 
       {/* MODALS INTEGRATION */}
-      <AppSettingsModal isOpen={activeModal === 'settings'} onClose={() => setActiveModal(null)} onOpenEditProfile={() => setActiveModal('edit')} isDarkMode={isDarkMode} onToggleDarkMode={onToggleDarkMode} />
+      <AppSettingsModal 
+        isOpen={activeModal === 'settings'} 
+        onClose={() => setActiveModal(null)} 
+        onOpenEditProfile={() => setActiveModal('edit')} 
+        isDarkMode={isDarkMode} 
+        onToggleDarkMode={onToggleDarkMode}
+        onSimulateIncomingCall={onSimulateIncomingCall}
+      />
       <ProfileQRCodeModal isOpen={activeModal === 'qr'} onClose={() => setActiveModal(null)} user={currentUser} isDarkMode={isDarkMode} />
       <MusicalCVModal isOpen={activeModal === 'cv'} onClose={() => setActiveModal(null)} user={currentUser} isOwnProfile={true} isDarkMode={isDarkMode} />
       <AvatarCropModal isOpen={activeModal === 'crop'} onClose={() => { setActiveModal(null); setRawImageForCrop(null); }} rawImageSrc={rawImageForCrop} onCropComplete={(img) => { updateUserProfile({ avatar: img }); setActiveModal(null); }} />

@@ -783,7 +783,7 @@ export default function VideoCallScreen({
             color: '#FFFFFF',
             position: 'relative'
           }}>
-            {/* Pulsing Aura Rings during Speaking */}
+            {/* Pulsing Aura Rings during Speaking or Ringing */}
             <div style={{
               position: 'relative',
               display: 'flex',
@@ -791,15 +791,16 @@ export default function VideoCallScreen({
               justifyContent: 'center',
               marginBottom: '20px'
             }}>
-              {isConnected && (
+              {(isConnected || isIncoming) && (
                 <div style={{
                   position: 'absolute',
-                  width: `${140 + audioLevel * 1.2}px`,
-                  height: `${140 + audioLevel * 1.2}px`,
+                  width: `${140 + (isConnected ? audioLevel * 1.2 : 25)}px`,
+                  height: `${140 + (isConnected ? audioLevel * 1.2 : 25)}px`,
                   borderRadius: '50%',
-                  background: 'rgba(0, 102, 255, 0.25)',
+                  background: isIncoming && !isConnected ? 'rgba(16, 185, 129, 0.35)' : 'rgba(0, 102, 255, 0.25)',
                   filter: 'blur(20px)',
-                  transition: 'all 0.1s ease',
+                  transition: 'all 0.15s ease',
+                  animation: isIncoming && !isConnected ? 'ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite' : 'none',
                   zIndex: 0
                 }} />
               )}
@@ -808,8 +809,8 @@ export default function VideoCallScreen({
                 position: 'relative',
                 zIndex: 1,
                 borderRadius: '50%',
-                border: '4px solid #0066FF',
-                boxShadow: '0 8px 30px rgba(0, 102, 255, 0.5)'
+                border: isIncoming && !isConnected ? '4px solid #10B981' : '4px solid #0066FF',
+                boxShadow: isIncoming && !isConnected ? '0 8px 35px rgba(16, 185, 129, 0.6)' : '0 8px 30px rgba(0, 102, 255, 0.5)'
               }}>
                 <UserAvatar user={{ avatar: safeAvatar, name: partnerName }} size={isFullScreen ? 130 : 50} />
               </div>
@@ -818,7 +819,7 @@ export default function VideoCallScreen({
             {isFullScreen && (
               <>
                 <h2 style={{ fontSize: '1.65rem', fontWeight: 900, margin: 0, color: '#FFF' }}>{partnerName}</h2>
-                <span style={{ fontSize: '0.82rem', color: '#60A5FA', marginTop: '4px', fontWeight: 700 }}>
+                <span style={{ fontSize: '0.85rem', color: isIncoming && !isConnected ? '#34D399' : '#60A5FA', marginTop: '4px', fontWeight: 700 }}>
                   {callerRole}
                 </span>
 
@@ -840,8 +841,8 @@ export default function VideoCallScreen({
                   </div>
                 )}
 
-                <p style={{ color: '#94A3B8', fontSize: '0.85rem', marginTop: '14px' }}>
-                  {isConnected ? '🎙️ Connexion Audio HD Stéréo Active' : 'Établissement du signal...'}
+                <p style={{ color: isIncoming && !isConnected ? '#6EE7B7' : '#94A3B8', fontSize: '0.85rem', marginTop: '14px', fontWeight: isIncoming && !isConnected ? 700 : 500 }}>
+                  {isConnected ? '🎙️ Connexion Audio HD Stéréo Active' : isIncoming ? '📞 Appel Entrant... (Sonnerie & Vibration en cours)' : 'Établissement du signal...'}
                 </p>
               </>
             )}

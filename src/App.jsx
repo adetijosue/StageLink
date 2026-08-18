@@ -46,6 +46,7 @@ import { soundEngine } from './services/audioService';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { useGlobalPresence } from './hooks/useGlobalPresence';
 import { nativeNotificationService } from './services/nativeNotificationService';
+import { nativeCallKit } from './services/nativeCallKitBridge';
 import { offlineQueue } from './services/offlineQueueService';
 import { haptics } from './services/hapticsService';
 
@@ -1631,6 +1632,14 @@ function MainApp() {
               });
               setIsAudioCallOnly(isAudioOnly);
               setIsVideoCallActive(true);
+
+              // Trigger immediate native ringtone, vibration and system notification
+              nativeCallKit.displayIncomingCall({
+                callId: notif.id || `call_${callerId}_${Date.now()}`,
+                callerName,
+                callerAvatar,
+                hasVideo: !isAudioOnly
+              });
 
               // Asynchronously enrich with database profile in background if details are minimal
               if (callerId && (!notif.callerName || !notif.callerAvatar)) {
@@ -3647,9 +3656,33 @@ function MainApp() {
             isDarkMode={isDarkMode}
             onToggleDarkMode={toggleDarkMode}
             onSimulateIncomingCall={() => {
+              const simData = {
+                callerName: 'Sarah Directrice Musicale',
+                callerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+                callerRole: 'Directrice Musicale & Studio',
+                isAudioOnly: false,
+                callerId: 'usr_sarah_sim'
+              };
+              setActiveCallPartner({
+                id: simData.callerId,
+                name: simData.callerName,
+                full_name: simData.callerName,
+                avatar: simData.callerAvatar,
+                avatar_url: simData.callerAvatar,
+                role: simData.callerRole,
+                userRole: simData.callerRole,
+                verified: true
+              });
+              setIncomingCallData(simData);
               setIsIncomingCall(true);
               setIsVideoCallActive(true);
               setIsAudioCallOnly(false);
+              nativeCallKit.displayIncomingCall({
+                callId: `sim_${Date.now()}`,
+                callerName: simData.callerName,
+                callerAvatar: simData.callerAvatar,
+                hasVideo: true
+              });
             }}
           />
         )}

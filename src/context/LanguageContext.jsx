@@ -200,6 +200,20 @@ export const translations = {
     language_device_detected: 'Langue de votre appareil détectée',
     language_auto_desc: 'S\'adapte automatiquement à la langue de votre téléphone ou ordinateur',
 
+    // Ringtones & Incoming Calls
+    ringtone_section: 'Sonneries & Appels Entrants',
+    ringtone_style: 'Style de Sonnerie',
+    ringtone_marimba: '📱 Moderne (Marimba Studio HD)',
+    ringtone_bell: '🔔 Classique (Téléphone & Gong)',
+    ringtone_groove: '🎹 StageLink Groove (Afro-Gospel)',
+    ringtone_electronic: '⚡ Électronique (Chimes Synth)',
+    ringtone_test_play: 'Écouter',
+    ringtone_test_stop: 'Arrêter',
+    vibration_setting: 'Vibration de l\'appareil',
+    vibration_desc: 'Faire vibrer l\'appareil lors des appels entrants',
+    simulate_call_btn: 'Simuler un Appel Entrant',
+    simulate_call_desc: 'Tester la sonnerie, la vibration et l\'écran d\'appel',
+
     // Common Actions
     btn_back: 'Retour',
     btn_close: 'Fermer',
@@ -401,6 +415,20 @@ export const translations = {
     language_auto: 'Automatic (Device)',
     language_device_detected: 'Language detected on your device',
     language_auto_desc: 'Automatically adapts to the language of your phone or computer',
+
+    // Ringtones & Incoming Calls
+    ringtone_section: 'Ringtones & Incoming Calls',
+    ringtone_style: 'Ringtone Style',
+    ringtone_marimba: '📱 Modern (Marimba Studio HD)',
+    ringtone_bell: '🔔 Classic (Phone Bell & Gong)',
+    ringtone_groove: '🎹 StageLink Groove (Afro-Gospel)',
+    ringtone_electronic: '⚡ Electronic (Synth Chimes)',
+    ringtone_test_play: 'Preview',
+    ringtone_test_stop: 'Stop',
+    vibration_setting: 'Device Vibration',
+    vibration_desc: 'Vibrate device on incoming phone calls',
+    simulate_call_btn: 'Simulate Incoming Call',
+    simulate_call_desc: 'Test ringtone, vibration, and live calling screen',
 
     // Common Actions
     btn_back: 'Back',

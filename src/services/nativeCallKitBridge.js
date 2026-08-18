@@ -1,8 +1,10 @@
 /**
  * STAGELINK Native CallKit & Android ConnectionService Bridge
  * Provides system-level incoming call UI, lock screen controls, and OS call log integration.
- * Supports React Native CallKeep / Capacitor VoIP Plugin integration.
+ * Supports React Native CallKeep, Capacitor VoIP Plugin, and Web Notification API fallback.
  */
+
+import { soundEngine } from './audioService';
 
 class NativeCallKitBridge {
   constructor() {
@@ -10,6 +12,7 @@ class NativeCallKitBridge {
     this.hasCallKeep = false;
     this.currentCallUuid = null;
     this.activeCallListeners = new Map();
+    this.currentNotification = null;
 
     this.checkEnvironment();
   }
@@ -29,6 +32,13 @@ class NativeCallKitBridge {
    * Initializes CallKit / ConnectionService with StageLink branding
    */
   async setup() {
+    // Request Web Notification permission for incoming calls
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      try {
+        await Notification.requestPermission();
+      } catch (e) {}
+    }
+
     if (!this.isNativeEnvironment) return;
 
     try {
@@ -42,7 +52,7 @@ class NativeCallKitBridge {
         },
         android: {
           alertTitle: 'Permissions d\'appel requises',
-          alertDescription: 'StageLink a besoin des autorisations téléphoniques pour gérer les appels vocaux et vidéo.',
+          alertDescription: 'StageLink a besoin des autorisations téléphoniques pour gérer les appels vocaux et vidéo avec sonnerie native.',
           cancelButton: 'Annuler',
           okButton: 'Autoriser',
           imageName: 'ic_launcher',
@@ -84,10 +94,15 @@ class NativeCallKitBridge {
   }
 
   /**
-   * Report Incoming VoIP Call to OS (Triggers full screen incoming call UI even when locked)
+   * Report Incoming VoIP Call to OS & Web (Triggers system notification, vibration & ringtone)
    */
   displayIncomingCall({ callId, callerName, callerAvatar, hasVideo = false }) {
     this.currentCallUuid = callId;
+
+    // 1. Play incoming phone ringtone & continuous physical vibration immediately
+    soundEngine.playIncomingRingtone();
+
+    // 2. Report to Native CallKeep / ConnectionService if present
     if (this.hasCallKeep && window.RNCallKeep) {
       try {
         window.RNCallKeep.displayIncomingCall(
@@ -101,12 +116,40 @@ class NativeCallKitBridge {
         console.warn('CallKeep display error:', e);
       }
     }
+
+    // 3. Web Push Notification fallback with vibration & action buttons
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        const notifTitle = `📞 Appel entrant de ${callerName || 'un artiste'}`;
+        const notifOptions = {
+          body: hasVideo ? '📹 Appel vidéo en direct sur StageLink' : '🎙️ Appel audio HD en direct sur StageLink',
+          icon: callerAvatar || '/logo.png',
+          badge: '/logo.png',
+          tag: 'stagelink-incoming-call',
+          renotify: true,
+          requireInteraction: true,
+          vibrate: [1000, 600, 1000, 800]
+        };
+
+        this.currentNotification = new Notification(notifTitle, notifOptions);
+        this.currentNotification.onclick = () => {
+          window.focus();
+          this.currentNotification?.close();
+        };
+      } catch (e) {}
+    }
   }
 
   /**
    * Report Call Connected to OS
    */
   reportConnected(callId) {
+    soundEngine.stopRingtone();
+    if (this.currentNotification) {
+      try { this.currentNotification.close(); } catch (e) {}
+      this.currentNotification = null;
+    }
+
     if (this.hasCallKeep && window.RNCallKeep && callId) {
       try {
         window.RNCallKeep.setCurrentCallActive(callId);
@@ -115,10 +158,17 @@ class NativeCallKitBridge {
   }
 
   /**
-   * Report Call Ended to OS (Removes native call screen and updates phone logs)
+   * Report Call Ended to OS (Removes native call screen, silences ringtone & updates phone logs)
    */
   endNativeCall(callId) {
     const targetId = callId || this.currentCallUuid;
+    soundEngine.stopRingtone();
+
+    if (this.currentNotification) {
+      try { this.currentNotification.close(); } catch (e) {}
+      this.currentNotification = null;
+    }
+
     if (this.hasCallKeep && window.RNCallKeep && targetId) {
       try {
         window.RNCallKeep.endCall(targetId);
