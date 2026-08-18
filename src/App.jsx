@@ -3368,6 +3368,7 @@ function MainApp() {
   };
 
   const handleClearAllNotifications = async () => {
+    setIsNotificationsOpen(false);
     if (isSupabaseConfigured() && currentUser?.id) {
       try {
         const { error } = await supabase.from('notifications').delete().eq('user_id', currentUser.id);

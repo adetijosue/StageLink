@@ -376,6 +376,9 @@ function NotificationsDrawer({
     } else if (typeof onDeleteNotification === 'function') {
       displayNotifications.forEach(n => onDeleteNotification(n.id));
     }
+    if (typeof onClose === 'function') {
+      onClose();
+    }
   };
 
   return (
