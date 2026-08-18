@@ -397,7 +397,7 @@ export default function OnboardingWizard({ isOpen, onClose }) {
                 Styles & Genres Préférés 🎵
               </h3>
               <p style={{ fontSize: '0.85rem', color: '#64748B', marginTop: '4px' }}>
-                Calibrez vos suggestions de Match IA.
+                Calibrez vos suggestions de Match Pro.
               </p>
             </div>
 

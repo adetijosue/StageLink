@@ -1,10 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Phone, Video, Flame, X, Download, Radio, Music } from 'lucide-react';
+import { ArrowLeft, Phone, Video, Flame, X, Download, Music } from 'lucide-react';
 import UserAvatar from '../../common/UserAvatar';
 import MessageBubble from './MessageBubble';
 import InputBar from './InputBar';
 import ReactionOverlay from './ReactionOverlay';
-import LiveJamWorkspace from '../../music_studio/LiveJamWorkspace';
 import { useChatThread } from '../../../hooks/useChatThread';
 import { useDirectPresence } from '../../../hooks/useDirectPresence';
 import { supabase, isSupabaseConfigured } from '../../../services/supabaseClient';
@@ -25,7 +24,6 @@ export default function MessageThread({
   const [reactionOverlayData, setReactionOverlayData] = useState(null);
   const [partnerProfile, setPartnerProfile] = useState(partner || null);
   const [previewMedia, setPreviewMedia] = useState(null);
-  const [isLiveJamOpen, setIsLiveJamOpen] = useState(false);
 
   // Sync internal partner state if prop changes
   useEffect(() => {
@@ -247,30 +245,8 @@ export default function MessageThread({
           </div>
         </div>
 
-        {/* Action Call & Studio Icons */}
+        {/* Action Call Icons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-          <button
-            onClick={() => {
-              haptics.selection();
-              setIsLiveJamOpen(true);
-            }}
-            title="Session Studio Jam en Direct"
-            style={{
-              background: 'linear-gradient(135deg, #0066FF, #00F0FF)',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: '50%',
-              width: '36px',
-              height: '36px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(0, 102, 255, 0.35)'
-            }}
-          >
-            <Radio size={17} />
-          </button>
 
           <button
             onClick={() => {
@@ -497,68 +473,6 @@ export default function MessageThread({
         onTyping={sendTypingEvent}
       />
 
-      {/* Live Jam Studio Modal Overlay */}
-      {isLiveJamOpen && (
-        <div
-          onClick={() => setIsLiveJamOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px'
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: '100%',
-              maxWidth: '520px',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              borderRadius: '26px'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
-              <button
-                onClick={() => setIsLiveJamOpen(false)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.2)',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '36px',
-                  height: '36px',
-                  color: '#FFFFFF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer'
-                }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <LiveJamWorkspace
-              isDarkMode={true}
-              onShareToChat={(lyrics) => {
-                sendMessage({
-                  text: `🎵 [Notes & Accords Studio Jam]\n\n${lyrics}`,
-                  mediaType: 'text'
-                });
-                setIsLiveJamOpen(false);
-                haptics.success();
-              }}
-              onClose={() => setIsLiveJamOpen(false)}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

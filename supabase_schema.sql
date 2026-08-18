@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS public.stories (
 
 
 -- ════════════════════════════════════════════════════════════════
--- 7. TABLE — MATCHES (matching IA / candidatures)
+-- 7. TABLE — MATCHES (matching musical / candidatures)
 -- ════════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.matches (
     id            UUID DEFAULT uuid_generate_v4() PRIMARY KEY,

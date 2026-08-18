@@ -12,7 +12,7 @@ Le script SQL a été synchronisé à la racine du projet dans [`supabase_schema
 1. **`public.profiles`** : Identités des artistes, bio, badges (`gold`, `blue`, `none`), instruments, compétences et genres musicaux.
 2. **`public.posts`** : Publications du fil d'actualité, visuels, extraits audio et compteurs de j'aime.
 3. **`public.stories`** : Stories éphémères expirant automatiquement au bout de 24 heures (`expires_at = NOW() + INTERVAL '24 hours'`).
-4. **`public.matches`** : Correspondances et candidatures de co-création IA avec score d'affinité.
+4. **`public.matches`** : Correspondances et candidatures de co-création avec score d'affinité.
 5. **`public.messages`** : Messagerie privée et messages éphémères avec TTL en secondes.
 
 ### Publications Temps Réel :
