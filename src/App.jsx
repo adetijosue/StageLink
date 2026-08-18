@@ -732,14 +732,24 @@ function MainApp() {
 
             if (Array.isArray(supaPosts)) {
               const userLookup = new Map((loadedUsers || []).map(u => [u.id, u]));
-              loadedPosts = supaPosts.map(p => {
+              const mappedSupaPosts = supaPosts.map(p => {
                 const authorProfile = userLookup.get(p.user_id) || p.profiles || {};
                 const isCurrentUser = p.user_id === currentUser?.id;
-                const authorName = isCurrentUser ? currentUser.name : (authorProfile.name || authorProfile.full_name || p.profiles?.full_name || 'Artiste StageLink');
-                const authorAvatar = isCurrentUser ? currentUser.avatar : (authorProfile.avatar || authorProfile.avatar_url || p.profiles?.avatar_url || '');
+                const authorName = isCurrentUser ? (currentUser.name || currentUser.full_name || authorProfile.full_name || 'Artiste StageLink') : (authorProfile.name || authorProfile.full_name || p.profiles?.full_name || 'Artiste StageLink');
+                const authorAvatar = isCurrentUser ? (currentUser.avatar || currentUser.avatar_url || authorProfile.avatar_url || '') : (authorProfile.avatar || authorProfile.avatar_url || p.profiles?.avatar_url || '');
                 const authorRole = isCurrentUser ? (currentUser.role || 'Artiste') : (authorProfile.role || p.profiles?.role || 'Membre StageLink');
-                const isVerified = isCurrentUser ? currentUser.verified : (authorProfile.verified || authorProfile.verified_badge === 'gold' || authorProfile.verified_badge === 'blue' || p.profiles?.verified_badge === 'gold');
-                const badgeType = isCurrentUser ? currentUser.badgeType : (authorProfile.badgeType || authorProfile.verified_badge || p.profiles?.verified_badge || 'none');
+                const isVerified = isCurrentUser ? (currentUser.verified || currentUser.badgeType === 'gold' || currentUser.badgeType === 'blue') : (authorProfile.verified || authorProfile.verified_badge === 'gold' || authorProfile.verified_badge === 'blue' || p.profiles?.verified_badge === 'gold');
+                const badgeType = isCurrentUser ? (currentUser.badgeType || 'none') : (authorProfile.badgeType || authorProfile.verified_badge || p.profiles?.verified_badge || 'none');
+
+                let textContent = p.content || '';
+                let proServiceData = p.metadata?.proServiceData || null;
+                if (textContent.includes('___PRO_SERVICE___:')) {
+                  const parts = textContent.split('___PRO_SERVICE___:');
+                  textContent = parts[0].trim();
+                  try {
+                    proServiceData = JSON.parse(parts[1]);
+                  } catch(e) {}
+                }
 
                 const isVideo = isVideoMediaUrl(p.media_url);
                 const postMediaList = Array.isArray(p.metadata?.mediaList) && p.metadata.mediaList.length > 0
@@ -754,12 +764,12 @@ function MainApp() {
                   userAvatar: authorAvatar,
                   isVerified: isVerified,
                   badgeType: badgeType,
-                  text: p.content || '',
+                  text: textContent,
                   image: !isVideo ? p.media_url : null,
                   video: isVideo ? p.media_url : null,
                   media_url: p.media_url || null,
                   mediaList: postMediaList,
-                  proServiceData: p.metadata?.proServiceData || null,
+                  proServiceData: proServiceData,
                   hasAudio: Boolean(p.audio_url),
                   audioTitle: p.audio_title || 'Extrait Audio',
                   audioUrl: p.audio_url || null,
@@ -776,6 +786,12 @@ function MainApp() {
                   timeAgo: 'Récemment'
                 };
               });
+
+              // CRITICAL: Preserve any pending local optimistic posts created recently by current user
+              const supaPostIds = new Set(mappedSupaPosts.map(sp => sp.id));
+              const currentLocalPosts = getStoredItem(STORAGE_KEYS.POSTS, []) || [];
+              const pendingLocalPosts = currentLocalPosts.filter(lp => lp && lp.id && !supaPostIds.has(lp.id) && !lp.isDeleted && !isTestArtifact(lp));
+              loadedPosts = [...pendingLocalPosts, ...mappedSupaPosts];
               setPosts(loadedPosts);
               setStoredItem(STORAGE_KEYS.POSTS, loadedPosts);
             }
@@ -993,7 +1009,13 @@ function MainApp() {
         }
 
         setAllUsers(loadedUsers);
-        setPosts(loadedPosts);
+        setPosts(prevPosts => {
+          const freshPostIds = new Set((loadedPosts || []).map(p => p.id));
+          const currentPending = (prevPosts || []).filter(p => p && p.id && !freshPostIds.has(p.id) && !p.isDeleted && !isTestArtifact(p));
+          const combined = [...currentPending, ...(loadedPosts || [])];
+          setStoredItem(STORAGE_KEYS.POSTS, combined);
+          return combined;
+        });
         setStories(loadedStories);
         setMatches(loadedMatches);
         setChats(prevChats => {
@@ -1205,7 +1227,7 @@ function MainApp() {
             // Preserve any pending local optimistic posts created recently by current user
             const currentLocalPosts = getStoredItem(STORAGE_KEYS.POSTS, []) || [];
             const supaPostIds = new Set(sanitizedPosts.map(sp => sp.id));
-            const pendingLocalPosts = currentLocalPosts.filter(lp => lp && lp.userId === currentUser?.id && !supaPostIds.has(lp.id));
+            const pendingLocalPosts = currentLocalPosts.filter(lp => lp && lp.id && !supaPostIds.has(lp.id) && !lp.isDeleted && !isTestArtifact(lp));
             const mergedPosts = [...pendingLocalPosts, ...sanitizedPosts];
 
             setPosts(mergedPosts);
@@ -2739,6 +2761,7 @@ function MainApp() {
   };
 
   const handleCreatePost = async (newPostData) => {
+    if (!currentUser) return;
     setIsUploadingPost(true);
     const postUuid = generateUUID();
 
@@ -2768,15 +2791,19 @@ function MainApp() {
       }];
     }
 
+    const authorName = currentUser.name || currentUser.full_name || 'Artiste StageLink';
+    const authorAvatar = currentUser.avatar || currentUser.avatar_url || '';
+    const authorRole = currentUser.role || 'Artiste';
+
     // 2. Build instant optimistic post object
     const optimisticPost = {
       id: postUuid,
       userId: currentUser.id,
-      userName: currentUser.name,
-      userRole: `${currentUser.role || 'Artiste'}, ${currentUser.company || 'StageLink'}`,
-      userAvatar: currentUser.avatar,
-      isVerified: currentUser.verified,
-      badgeType: currentUser.badgeType,
+      userName: authorName,
+      userRole: `${authorRole}, ${currentUser.company || 'StageLink'}`,
+      userAvatar: authorAvatar,
+      isVerified: currentUser.verified || currentUser.badgeType === 'gold' || currentUser.badgeType === 'blue',
+      badgeType: currentUser.badgeType || 'none',
       text: newPostData.text || '',
       mediaList: preliminaryMediaList,
       image: !isVideoMedia ? preliminaryMediaUrl : null,
@@ -2794,9 +2821,12 @@ function MainApp() {
     };
 
     // 3. INSTANT OPTIMISTIC STATE & LOCAL STORAGE UPDATE (0ms)
-    setPosts(prev => [optimisticPost, ...(prev || [])]);
-    const currentLocal = getStoredItem(STORAGE_KEYS.POSTS, []) || [];
-    setStoredItem(STORAGE_KEYS.POSTS, [optimisticPost, ...currentLocal]);
+    setPosts(prev => {
+      const filtered = (prev || []).filter(p => p.id !== postUuid);
+      const updated = [optimisticPost, ...filtered];
+      setStoredItem(STORAGE_KEYS.POSTS, updated);
+      return updated;
+    });
 
     // 4. Play subtle success sound chime & show sleek minimalist toast
     soundEngine.playSuccessSound();
@@ -2811,7 +2841,7 @@ function MainApp() {
     if (optimisticPost.hasAudio) {
       handleStartGlobalAudio({
         title: optimisticPost.audioTitle || 'Composition Audio',
-        artist: currentUser.name,
+        artist: authorName,
         genre: 'Afro-Gospel'
       });
     }
@@ -2850,44 +2880,65 @@ function MainApp() {
           }];
         }
 
-        // If storage uploaded new URLs, silently update the post in state & storage
-        if (finalMediaUrl !== preliminaryMediaUrl || finalAudioUrl !== preliminaryAudioUrl) {
-          setPosts(prev => (prev || []).map(p => p.id === postUuid ? {
-            ...p,
-            image: !isVideoMedia ? finalMediaUrl : null,
-            video: isVideoMedia ? finalMediaUrl : null,
-            media_url: finalMediaUrl,
-            audioUrl: finalAudioUrl,
-            mediaList: finalMediaList
-          } : p));
-        }
+        // Silently update the post in state & storage with final storage URLs
+        const finalizedPost = {
+          ...optimisticPost,
+          image: !isVideoMedia ? finalMediaUrl : null,
+          video: isVideoMedia ? finalMediaUrl : null,
+          media_url: finalMediaUrl,
+          audioUrl: finalAudioUrl,
+          mediaList: finalMediaList
+        };
+
+        setPosts(prev => {
+          const mapped = (prev || []).map(p => p.id === postUuid ? finalizedPost : p);
+          setStoredItem(STORAGE_KEYS.POSTS, mapped);
+          return mapped;
+        });
 
         let textContent = newPostData.text || '';
         if (newPostData.proServiceData) {
           textContent += `\n\n___PRO_SERVICE___:${JSON.stringify(newPostData.proServiceData)}`;
         }
 
-        if (isSupabaseConfigured()) {
-          const { error } = await supabase.from('posts').insert({
+        if (isSupabaseConfigured() && currentUser?.id) {
+          // Pre-flight: Ensure author profile exists in Supabase `profiles` table so foreign key constraint passes
+          try {
+            await supabase.from('profiles').upsert({
+              id: currentUser.id,
+              full_name: authorName,
+              email: currentUser.email || `${currentUser.id}@stagelink.app`,
+              role: authorRole,
+              avatar_url: authorAvatar,
+              bio: currentUser.bio || '',
+              verified_badge: currentUser.verified ? (currentUser.badgeType || 'blue') : 'none'
+            }, { onConflict: 'id' });
+          } catch (pe) {
+            console.warn('Pre-flight profile sync note:', pe?.message || pe);
+          }
+
+          const insertPayload = {
             id: postUuid,
             user_id: currentUser.id,
             content: textContent,
-            media_url: finalMediaUrl,
-            audio_url: finalAudioUrl,
-            audio_title: newPostData.audioTitle || null
-          });
-          if (error) console.error("Post insert error:", error);
+            media_url: finalMediaUrl || null,
+            audio_url: finalAudioUrl || null,
+            audio_title: newPostData.audioTitle || (newPostData.hasAudio ? 'Extrait Audio' : null)
+          };
+
+          const { error: insertError } = await supabase.from('posts').insert(insertPayload);
+          if (insertError) {
+            console.error("Post insert error:", insertError);
+            // Automatic retry after 800ms
+            await new Promise(r => setTimeout(r, 800));
+            await supabase.from('posts').insert(insertPayload);
+          }
 
           try {
             supabase.channel('realtime:posts_interactions').send({
               type: 'broadcast',
               event: 'new_post',
-              payload: {
-                ...optimisticPost,
-                media_url: finalMediaUrl,
-                audio_url: finalAudioUrl,
-                mediaList: finalMediaList
-              }
+              payload: finalizedPost
             });
           } catch (be) {}
         }
