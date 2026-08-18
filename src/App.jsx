@@ -36,15 +36,18 @@ const ProfileView = React.lazy(() => import('./components/premium/ProfileView'))
 const PaywallModal = React.lazy(() => import('./components/premium/PaywallModal'));
 const NotificationsDrawer = React.lazy(() => import('./components/notifications/NotificationsDrawer'));
 const TopNotificationBanner = React.lazy(() => import('./components/notifications/TopNotificationBanner'));
-import AppSplashScreen from './components/common/AppSplashScreen';
 const GlobalAudioPlayer = React.lazy(() => import('./components/audio/GlobalAudioPlayer'));
+import AppSplashScreen from './components/common/AppSplashScreen';
 import PWAInstallPrompt from './components/common/PWAInstallPrompt';
 import PullToRefresh from './components/common/PullToRefresh';
+import OfflineStatusBanner from './components/common/OfflineStatusBanner';
 import { getStoredItem, setStoredItem, STORAGE_KEYS, isTestArtifact } from './services/mockData';
 import { soundEngine } from './services/audioService';
 import { supabase, isSupabaseConfigured } from './services/supabaseClient';
 import { useGlobalPresence } from './hooks/useGlobalPresence';
 import { nativeNotificationService } from './services/nativeNotificationService';
+import { offlineQueue } from './services/offlineQueueService';
+import { haptics } from './services/hapticsService';
 
 const INITIAL_COMMUNITY_USERS = [];
 import { generateUUID } from './utils/uuid';
@@ -2488,6 +2491,21 @@ function MainApp() {
     setActiveStory(reconstructedStory);
   };
 
+  // Automatic sync for offline queue upon network restoration
+  useEffect(() => {
+    const handleOnlineSync = () => {
+      if (isSupabaseConfigured()) {
+        offlineQueue.processQueue(supabase);
+      }
+    };
+    window.addEventListener('online', handleOnlineSync);
+    // Also trigger immediately on mount if online and has pending items
+    if (typeof navigator !== 'undefined' && navigator.onLine && isSupabaseConfigured()) {
+      offlineQueue.processQueue(supabase);
+    }
+    return () => window.removeEventListener('online', handleOnlineSync);
+  }, []);
+
   const handleDeletePost = async (postId) => {
     const updated = posts.filter((p) => p.id !== postId);
     setPosts(updated);
@@ -2526,22 +2544,37 @@ function MainApp() {
     setStoredItem(STORAGE_KEYS.POSTS, updated);
 
     if (isSupabaseConfigured() && targetPost && currentUser) {
-      try {
-        if (targetPost.isLiked) {
-          await supabase.from('post_likes').insert({ post_id: postId, user_id: currentUser.id });
-          if (targetPost.userId && targetPost.userId !== currentUser.id) {
-            await supabase.from('notifications').insert({
-              user_id: targetPost.userId,
-              actor_id: currentUser.id,
-              type: 'like_post',
-              reference_id: postId
-            });
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        offlineQueue.enqueue({
+          type: 'LIKE_POST',
+          postId,
+          userId: currentUser.id,
+          isLiked: targetPost.isLiked
+        });
+      } else {
+        try {
+          if (targetPost.isLiked) {
+            await supabase.from('post_likes').insert({ post_id: postId, user_id: currentUser.id });
+            if (targetPost.userId && targetPost.userId !== currentUser.id) {
+              await supabase.from('notifications').insert({
+                user_id: targetPost.userId,
+                actor_id: currentUser.id,
+                type: 'like_post',
+                reference_id: postId
+              });
+            }
+          } else {
+            await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', currentUser.id);
           }
-        } else {
-          await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', currentUser.id);
+        } catch (e) {
+          console.warn('Supabase post like update note:', e.message);
+          offlineQueue.enqueue({
+            type: 'LIKE_POST',
+            postId,
+            userId: currentUser.id,
+            isLiked: targetPost.isLiked
+          });
         }
-      } catch (e) {
-        console.warn('Supabase post like update note:', e.message);
       }
     }
   };
@@ -2570,23 +2603,38 @@ function MainApp() {
     setStoredItem(STORAGE_KEYS.POSTS, updated);
 
     if (isSupabaseConfigured() && targetPost && currentUser) {
-      try {
-        await supabase.from('post_comments').insert({
-          post_id: postId,
-          user_id: currentUser.id,
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        offlineQueue.enqueue({
+          type: 'ADD_COMMENT',
+          postId,
+          userId: currentUser.id,
           content: commentText
         });
-        
-        if (targetPost.userId && targetPost.userId !== currentUser.id) {
-          await supabase.from('notifications').insert({
-            user_id: targetPost.userId,
-            actor_id: currentUser.id,
-            type: 'comment_post',
-            reference_id: postId
+      } else {
+        try {
+          await supabase.from('post_comments').insert({
+            post_id: postId,
+            user_id: currentUser.id,
+            content: commentText
+          });
+          
+          if (targetPost.userId && targetPost.userId !== currentUser.id) {
+            await supabase.from('notifications').insert({
+              user_id: targetPost.userId,
+              actor_id: currentUser.id,
+              type: 'comment_post',
+              reference_id: postId
+            });
+          }
+        } catch (e) {
+          console.warn('Supabase post comment note:', e.message);
+          offlineQueue.enqueue({
+            type: 'ADD_COMMENT',
+            postId,
+            userId: currentUser.id,
+            content: commentText
           });
         }
-      } catch (e) {
-        console.warn('Supabase post comment note:', e.message);
       }
     }
   };
@@ -3264,20 +3312,34 @@ function MainApp() {
 
   const handleConnectUser = async (targetUserId) => {
     if (!targetUserId || !currentUser?.id || String(targetUserId) === String(currentUser.id)) return;
+    haptics.success();
     if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('followers').insert({
-          follower_id: currentUser.id,
-          following_id: targetUserId
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        offlineQueue.enqueue({
+          type: 'FOLLOW_USER',
+          targetUserId,
+          currentUserId: currentUser.id
         });
-        await supabase.from('notifications').insert({
-          user_id: targetUserId,
-          actor_id: currentUser.id,
-          type: 'follow',
-          reference_id: currentUser.id
-        });
-      } catch (e) {
-        console.warn("Connection error note:", e?.message || e);
+      } else {
+        try {
+          await supabase.from('followers').insert({
+            follower_id: currentUser.id,
+            following_id: targetUserId
+          });
+          await supabase.from('notifications').insert({
+            user_id: targetUserId,
+            actor_id: currentUser.id,
+            type: 'follow',
+            reference_id: currentUser.id
+          });
+        } catch (e) {
+          console.warn("Connection error note:", e?.message || e);
+          offlineQueue.enqueue({
+            type: 'FOLLOW_USER',
+            targetUserId,
+            currentUserId: currentUser.id
+          });
+        }
       }
     }
 
@@ -3436,6 +3498,9 @@ function MainApp() {
         transition: 'background-color 0.3s ease, color 0.3s ease'
       }}
     >
+      {/* Offline Status Banner */}
+      <OfflineStatusBanner isDarkMode={isDarkMode} />
+
       {/* Top Header Navigation */}
       <TopBar
         activeTab={activeTab}

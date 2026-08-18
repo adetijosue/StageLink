@@ -7,6 +7,7 @@ import {
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { haptics } from '../../services/hapticsService';
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
 import confetti from 'canvas-confetti';
 import UserAvatar from '../common/UserAvatar';
@@ -78,6 +79,7 @@ function FeedCard({
 
     setShowDoubleTapHeart(true);
     soundEngine.playPopSound();
+    haptics.like();
 
     onLike(post.id);
 
@@ -97,7 +99,7 @@ function FeedCard({
 
   const handleCardTouchOrClick = (e) => {
     const now = Date.now();
-    const DOUBLE_TAP_DELAY = 300;
+    const DOUBLE_TAP_DELAY = 320;
     if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
       triggerLikeBurst(e);
     }
@@ -105,6 +107,7 @@ function FeedCard({
   };
 
   const handleFollowClick = () => {
+    haptics.success();
     if (!isFollowing) {
       confetti({
         particleCount: 50,
@@ -121,6 +124,7 @@ function FeedCard({
   const handleCommentSubmit = (e) => {
     e.preventDefault();
     if (!commentText.trim()) return;
+    haptics.medium();
     onAddComment(post.id, commentText);
     setCommentText('');
   };
@@ -611,6 +615,7 @@ function FeedCard({
           onClick={(e) => {
             e.stopPropagation();
             soundEngine.playLikePopSound();
+            haptics.like();
             if (!post.isLiked) {
               triggerLikeBurst();
             } else {
@@ -626,16 +631,21 @@ function FeedCard({
             color: post.isLiked ? '#EF4444' : '#64748B',
             fontSize: '0.85rem',
             fontWeight: 600,
-            cursor: 'pointer'
+            cursor: 'pointer',
+            padding: '8px 12px',
+            borderRadius: '12px',
+            transition: 'transform 0.12s ease'
           }}
+          className="feed-action-btn"
         >
-          <Heart size={18} fill={post.isLiked ? '#EF4444' : 'none'} />
+          <Heart size={19} fill={post.isLiked ? '#EF4444' : 'none'} />
           <span>{post.likesCount} {language === 'en' ? 'Likes' : 'J\'aime'}</span>
         </button>
 
         <button
           onClick={(e) => {
             e.stopPropagation();
+            haptics.light();
             setShowComments(!showComments);
           }}
           style={{
@@ -647,16 +657,21 @@ function FeedCard({
             color: '#64748B',
             fontSize: '0.85rem',
             fontWeight: 600,
-            cursor: 'pointer'
+            cursor: 'pointer',
+            padding: '8px 12px',
+            borderRadius: '12px',
+            transition: 'transform 0.12s ease'
           }}
+          className="feed-action-btn"
         >
-          <MessageSquare size={18} />
+          <MessageSquare size={19} />
           <span>{post.commentsCount} {language === 'en' ? 'Comments' : 'Commentaires'}</span>
         </button>
 
         <button
           onClick={(e) => {
             e.stopPropagation();
+            haptics.medium();
             onOpenShare(post);
           }}
           style={{
@@ -668,10 +683,14 @@ function FeedCard({
             color: '#64748B',
             fontSize: '0.85rem',
             fontWeight: 600,
-            cursor: 'pointer'
+            cursor: 'pointer',
+            padding: '8px 12px',
+            borderRadius: '12px',
+            transition: 'transform 0.12s ease'
           }}
+          className="feed-action-btn"
         >
-          <Share2 size={18} />
+          <Share2 size={19} />
           <span>{language === 'en' ? 'Share' : 'Partager'}</span>
         </button>
       </div>

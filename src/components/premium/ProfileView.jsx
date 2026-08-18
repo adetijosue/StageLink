@@ -13,6 +13,7 @@ import AppSettingsModal from '../profile/AppSettingsModal';
 import ProfileQRCodeModal from '../profile/ProfileQRCodeModal';
 import MusicalCVModal from '../profile/MusicalCVModal';
 import AvatarCropModal from '../profile/AvatarCropModal';
+import GamificationBadgeBanner from '../profile/GamificationBadgeBanner';
 import UserAvatar from '../common/UserAvatar';
 import { getBrandLogoSVG } from '../common/SocialBrandLogo';
 import { compressImage } from '../../utils/imageCompressor';
@@ -137,6 +138,9 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
 
       {/* 2. MAIN CONTENT */}
       <div style={{ padding: '0 18px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+        {/* Gamification & Achievements Tier Card */}
+        <GamificationBadgeBanner isDarkMode={isDarkMode} />
 
         <div className="card" style={{ padding: '14px 16px', borderRadius: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>

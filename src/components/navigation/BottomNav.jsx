@@ -2,6 +2,7 @@ import React from 'react';
 import { Home, Users, MessageCircle, ShoppingBag, User } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
+import { haptics } from '../../services/hapticsService';
 import UserAvatar from '../common/UserAvatar';
 
 export default function BottomNav({ activeTab, setActiveTab, unreadMessagesCount = 0, isDarkMode }) {
@@ -50,7 +51,10 @@ export default function BottomNav({ activeTab, setActiveTab, unreadMessagesCount
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  haptics.light();
+                  setActiveTab(tab.id);
+                }}
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -96,7 +100,10 @@ export default function BottomNav({ activeTab, setActiveTab, unreadMessagesCount
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                haptics.light();
+                setActiveTab(tab.id);
+              }}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -109,7 +116,7 @@ export default function BottomNav({ activeTab, setActiveTab, unreadMessagesCount
                 cursor: 'pointer',
                 flex: 1,
                 position: 'relative',
-                padding: '4px 0',
+                padding: '6px 0',
                 transition: 'color 0.2s ease'
               }}
             >
