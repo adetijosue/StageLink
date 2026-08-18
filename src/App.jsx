@@ -3,7 +3,7 @@ const InboxView = React.lazy(() => import('./components/messaging/instagram/Inbo
 const MessageThread = React.lazy(() => import('./components/messaging/instagram/MessageThread'));
 import { directChatService } from './services/directChatService';
 
-import { Plus, Volume2, User } from 'lucide-react';
+import { Plus, Volume2, User, Music } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import AuthScreen from './components/auth/AuthScreen';
