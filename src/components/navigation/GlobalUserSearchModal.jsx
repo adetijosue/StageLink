@@ -46,7 +46,14 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
           .limit(50);
 
         if (data && !error && isMounted) {
-          const mapped = data.map(p => ({
+          const mapped = data
+            .filter(p => {
+              const name = (p.full_name || p.username || '').toLowerCase();
+              const email = (p.email || '').toLowerCase();
+              const id = String(p.id || '').toLowerCase();
+              return !name.includes('test subagent') && !name.includes('subagent') && !email.includes('subagent') && !id.includes('subagent');
+            })
+            .map(p => ({
             id: p.id,
             name: p.full_name || p.username || 'Artiste',
             userName: p.username || p.full_name || 'Artiste',
@@ -93,7 +100,14 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
           .limit(30);
 
         if (data && !error) {
-          const mapped = data.map(p => ({
+          const mapped = data
+            .filter(p => {
+              const name = (p.full_name || p.username || '').toLowerCase();
+              const email = (p.email || '').toLowerCase();
+              const id = String(p.id || '').toLowerCase();
+              return !name.includes('test subagent') && !name.includes('subagent') && !email.includes('subagent') && !id.includes('subagent');
+            })
+            .map(p => ({
             id: p.id,
             name: p.full_name || p.username || 'Artiste',
             userName: p.username || p.full_name || 'Artiste',

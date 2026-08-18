@@ -648,26 +648,33 @@ function MainApp() {
             } else {
               let mappedSupaUsers = [];
               if (supaProfiles && supaProfiles.length > 0) {
-                mappedSupaUsers = supaProfiles.map(p => ({
-                  id: p.id,
-                  name: p.full_name || p.username || 'Artiste',
-                  userName: p.username || p.full_name || 'Artiste',
-                  full_name: p.full_name || p.username || 'Artiste',
-                  username: p.username || '',
-                  email: p.email || '',
-                  role: p.role || 'Artiste',
-                  userRole: p.role || 'Artiste',
-                  company: p.company || '',
-                  avatar: p.avatar_url || '',
-                  avatar_url: p.avatar_url || '',
-                  verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
-                  badgeType: p.verified_badge || 'none',
-                  bio: p.bio || '',
-                  location: p.location || '',
-                  instruments: p.instruments || [],
-                  genres: p.genres || [],
-                  gear: p.gear || []
-                }));
+                mappedSupaUsers = supaProfiles
+                  .filter(p => {
+                    const name = (p.full_name || p.username || '').toLowerCase();
+                    const email = (p.email || '').toLowerCase();
+                    const id = String(p.id || '').toLowerCase();
+                    return !name.includes('test subagent') && !name.includes('subagent') && !email.includes('subagent') && !id.includes('subagent');
+                  })
+                  .map(p => ({
+                    id: p.id,
+                    name: p.full_name || p.username || 'Artiste',
+                    userName: p.username || p.full_name || 'Artiste',
+                    full_name: p.full_name || p.username || 'Artiste',
+                    username: p.username || '',
+                    email: p.email || '',
+                    role: p.role || 'Artiste',
+                    userRole: p.role || 'Artiste',
+                    company: p.company || '',
+                    avatar: p.avatar_url || '',
+                    avatar_url: p.avatar_url || '',
+                    verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+                    badgeType: p.verified_badge || 'none',
+                    bio: p.bio || '',
+                    location: p.location || '',
+                    instruments: p.instruments || [],
+                    genres: p.genres || [],
+                    gear: p.gear || []
+                  }));
               }
               loadedUsers = mappedSupaUsers;
               setStoredItem(STORAGE_KEYS.USERS, loadedUsers);
@@ -3403,7 +3410,14 @@ function MainApp() {
           .limit(100);
 
         if (!error && supaProfiles) {
-          const mappedUsers = supaProfiles.map(p => ({
+          const mappedUsers = supaProfiles
+            .filter(p => {
+              const name = (p.full_name || p.username || '').toLowerCase();
+              const email = (p.email || '').toLowerCase();
+              const id = String(p.id || '').toLowerCase();
+              return !name.includes('test subagent') && !name.includes('subagent') && !email.includes('subagent') && !id.includes('subagent');
+            })
+            .map(p => ({
             id: p.id,
             name: p.full_name || p.username || 'Artiste',
             userName: p.username || p.full_name || 'Artiste',
