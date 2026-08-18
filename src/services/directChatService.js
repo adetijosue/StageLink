@@ -212,6 +212,18 @@ export const directChatService = {
           } catch (pe) {}
         }
 
+        // Update chat_states to un-delete conversation if previously deleted
+        if (targetRecipientId && targetRecipientId !== senderId) {
+          try {
+            await supabase
+              .from('chat_states')
+              .upsert([
+                { user_id: senderId, partner_id: targetRecipientId, is_deleted: false, updated_at: now },
+                { user_id: targetRecipientId, partner_id: senderId, is_deleted: false, updated_at: now }
+              ], { onConflict: 'user_id,partner_id' });
+          } catch (_) {}
+        }
+
         // Insert notification in notifications table for recipient (instant push & sync across devices)
         const notifContent = content || (messageType === 'audio' ? '🎤 Note vocale' : (messageType === 'image' ? '📷 Photo' : 'Nouveau message'));
         if (targetRecipientId && targetRecipientId !== senderId) {
@@ -426,10 +438,20 @@ export const directChatService = {
   },
 
   /**
-   * Delete / leave conversation for a user
+   * Delete / leave conversation for a user (persisted directly in Supabase DB and local caches)
    */
-  async deleteConversation(conversationId, userId) {
+  async deleteConversation(conversationId, userId, partnerId = null) {
     if (!conversationId || !userId) return { success: false };
+
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(conversationId));
+    let effectivePartnerId = partnerId;
+    if (!effectivePartnerId) {
+      if (String(conversationId).startsWith('conv_')) {
+        effectivePartnerId = String(conversationId).replace('conv_', '');
+      } else if (String(conversationId).startsWith('chat_')) {
+        effectivePartnerId = String(conversationId).replace('chat_', '');
+      }
+    }
 
     // 0. Update LocalStorage conversation cache immediately (0ms instant UI removal)
     try {
@@ -437,55 +459,181 @@ export const directChatService = {
       const cachedStr = localStorage.getItem(cacheKey);
       if (cachedStr) {
         const cached = JSON.parse(cachedStr);
-        const updated = cached.filter(c => String(c.id) !== String(conversationId));
+        const updated = cached.filter(c => {
+          if (String(c.id) === String(conversationId)) return false;
+          const cPartnerId = c.partner?.id || c.participant?.id || c.partnerId;
+          if (effectivePartnerId && cPartnerId && String(cPartnerId) === String(effectivePartnerId)) return false;
+          return true;
+        });
         localStorage.setItem(cacheKey, JSON.stringify(updated));
+      }
+
+      // Also clean up chats cache
+      const chatsCacheKey = `stagelink_chats_${userId}`;
+      const cachedChatsStr = localStorage.getItem(chatsCacheKey);
+      if (cachedChatsStr) {
+        const cachedChats = JSON.parse(cachedChatsStr);
+        const updatedChats = cachedChats.filter(c => {
+          if (String(c.id) === String(conversationId)) return false;
+          const cPartnerId = c.participant?.id || c.partner?.id || c.partnerId;
+          if (effectivePartnerId && cPartnerId && String(cPartnerId) === String(effectivePartnerId)) return false;
+          return true;
+        });
+        localStorage.setItem(chatsCacheKey, JSON.stringify(updatedChats));
+      }
+
+      // Clean up cached message threads
+      localStorage.removeItem(`stagelink_cached_msgs_${conversationId}`);
+      if (effectivePartnerId) {
+        localStorage.removeItem(`stagelink_cached_msgs_conv_${effectivePartnerId}`);
+        localStorage.removeItem(`stagelink_cached_msgs_chat_${effectivePartnerId}`);
+        localStorage.removeItem(`chat_messages_${userId}_${effectivePartnerId}`);
+        localStorage.removeItem(`chat_messages_${effectivePartnerId}_${userId}`);
       }
     } catch (_) {}
 
-    // Dispatch UI refresh event immediately
-    window.dispatchEvent(new CustomEvent('conversation_deleted', { detail: { conversationId } }));
+    // Dispatch UI refresh events immediately
+    window.dispatchEvent(new CustomEvent('conversation_deleted', { detail: { conversationId, partnerId: effectivePartnerId } }));
+    window.dispatchEvent(new CustomEvent('delete_chat_local', { detail: { conversationId, partnerId: effectivePartnerId } }));
     window.dispatchEvent(new CustomEvent('refresh_conversations'));
 
     if (!isSupabaseConfigured()) return { success: true };
 
     try {
-      // 1. Remove or mark left_at in conversation_participants
-      const { error: partErr } = await supabase
-        .from('conversation_participants')
-        .delete()
-        .eq('conversation_id', conversationId)
-        .eq('user_id', userId);
-
-      if (partErr) {
-        // Fallback to update left_at if delete policy restricts hard delete
-        await supabase
-          .from('conversation_participants')
-          .update({ left_at: new Date().toISOString() })
-          .eq('conversation_id', conversationId)
-          .eq('user_id', userId);
+      // 1. If effectivePartnerId is not known and conversationId is UUID, look up partner from DB
+      if (!effectivePartnerId && isUUID) {
+        try {
+          const { data: parts } = await supabase
+            .from('conversation_participants')
+            .select('user_id')
+            .eq('conversation_id', conversationId)
+            .neq('user_id', userId)
+            .limit(1);
+          if (parts && parts.length > 0) {
+            effectivePartnerId = parts[0].user_id;
+          }
+        } catch (_) {}
       }
 
-      // 2. Clean up notifications for this conversation
+      // 2. Try RPC delete_user_conversation if available
+      if (isUUID) {
+        try {
+          const { data: rpcRes, error: rpcErr } = await supabase.rpc('delete_user_conversation', {
+            p_conversation_id: conversationId,
+            p_user_id: userId
+          });
+          if (!rpcErr && rpcRes?.success) {
+            return { success: true };
+          }
+        } catch (_) {}
+      }
+
+      // 3. Persist deletion in `chat_states` table in Supabase
+      if (effectivePartnerId) {
+        try {
+          await supabase
+            .from('chat_states')
+            .upsert({
+              user_id: userId,
+              partner_id: effectivePartnerId,
+              is_deleted: true,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id,partner_id' });
+        } catch (csErr) {
+          console.warn('Persist chat_states deletion note:', csErr?.message || csErr);
+        }
+      }
+
+      // 4. Update/Delete in conversation_participants & direct_messages & conversations
+      if (isUUID) {
+        try {
+          await supabase
+            .from('conversation_participants')
+            .update({ left_at: new Date().toISOString() })
+            .eq('conversation_id', conversationId)
+            .eq('user_id', userId);
+        } catch (_) {}
+
+        try {
+          await supabase
+            .from('conversation_participants')
+            .delete()
+            .eq('conversation_id', conversationId)
+            .eq('user_id', userId);
+        } catch (_) {}
+
+        try {
+          await supabase
+            .from('direct_messages')
+            .delete()
+            .eq('conversation_id', conversationId);
+        } catch (_) {}
+
+        try {
+          const { data: remainingParts } = await supabase
+            .from('conversation_participants')
+            .select('id')
+            .eq('conversation_id', conversationId)
+            .is('left_at', null);
+
+          if (!remainingParts || remainingParts.length === 0) {
+            await supabase.from('conversation_participants').delete().eq('conversation_id', conversationId);
+            await supabase.from('conversations').delete().eq('id', conversationId);
+          }
+        } catch (_) {}
+      }
+
+      // 5. Delete in messages table (legacy/hybrid tables)
+      if (effectivePartnerId) {
+        try {
+          await supabase
+            .from('messages')
+            .delete()
+            .or(`and(sender_id.eq.${userId},receiver_id.eq.${effectivePartnerId}),and(sender_id.eq.${effectivePartnerId},receiver_id.eq.${userId})`);
+        } catch (_) {}
+
+        try {
+          await supabase
+            .from('direct_messages')
+            .delete()
+            .or(`and(sender_id.eq.${userId},recipient_id.eq.${effectivePartnerId}),and(sender_id.eq.${effectivePartnerId},recipient_id.eq.${userId})`);
+        } catch (_) {}
+      }
+
+      // 6. Clean up notifications for this conversation & partner
       try {
-        await supabase
-          .from('notifications')
-          .delete()
-          .eq('user_id', userId)
-          .eq('reference_id', conversationId);
+        if (isUUID) {
+          await supabase
+            .from('notifications')
+            .delete()
+            .eq('user_id', userId)
+            .eq('reference_id', conversationId);
+        }
+        if (effectivePartnerId) {
+          await supabase
+            .from('notifications')
+            .delete()
+            .eq('user_id', userId)
+            .eq('actor_id', effectivePartnerId)
+            .eq('type', 'message');
+        }
       } catch (_) {}
 
-      // 3. If no active participants remain, purge conversation and messages
+      // 7. Broadcast deletion in realtime
       try {
-        const { data: remainingParts } = await supabase
-          .from('conversation_participants')
-          .select('id')
-          .eq('conversation_id', conversationId)
-          .is('left_at', null);
-
-        if (!remainingParts || remainingParts.length === 0) {
-          await supabase.from('direct_messages').delete().eq('conversation_id', conversationId);
-          await supabase.from('conversation_participants').delete().eq('conversation_id', conversationId);
-          await supabase.from('conversations').delete().eq('id', conversationId);
+        if (isUUID) {
+          supabase.channel(`dm:${conversationId}`).send({
+            type: 'broadcast',
+            event: 'conversation_deleted',
+            payload: { conversationId, userId }
+          }).catch(() => {});
+        }
+        if (effectivePartnerId) {
+          supabase.channel(`user:${effectivePartnerId}`).send({
+            type: 'broadcast',
+            event: 'conversation_deleted',
+            payload: { conversationId, userId, partnerId: effectivePartnerId }
+          }).catch(() => {});
         }
       } catch (_) {}
 

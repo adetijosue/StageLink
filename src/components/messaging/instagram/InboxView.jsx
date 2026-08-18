@@ -368,7 +368,7 @@ const InboxView = React.memo(function InboxView({
     setIsDeleting(true);
     try {
       soundEngine.playPopSound();
-      await deleteConversation(confirmDeleteConv.id);
+      await deleteConversation(confirmDeleteConv.id, confirmDeleteConv);
       setOpenSwipeId(null);
       showToast(language === 'en' ? 'Conversation deleted' : 'Discussion supprimée');
     } catch (err) {

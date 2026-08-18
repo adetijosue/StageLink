@@ -101,7 +101,19 @@ export function useConversationList(currentUser) {
         .is('left_at', null)
         .limit(50);
 
-      const [notes, { data: participants, error: partErr }] = await Promise.all([notesPromise, convPromise]);
+      // 3. Fetch deleted chat states in Supabase
+      const statesPromise = supabase
+        .from('chat_states')
+        .select('partner_id, is_deleted')
+        .eq('user_id', currentUser.id)
+        .eq('is_deleted', true)
+        .catch(() => ({ data: [] }));
+
+      const [notes, { data: participants, error: partErr }, { data: statesData }] = await Promise.all([
+        notesPromise,
+        convPromise,
+        statesPromise
+      ]);
 
       if (notes && isMountedRef.current) {
         setDirectNotes(notes);
@@ -114,6 +126,8 @@ export function useConversationList(currentUser) {
 
       if (partErr) throw partErr;
 
+      const deletedPartnerIds = new Set((statesData || []).map(s => String(s.partner_id)));
+
       const formatted = (participants || []).map((item) => {
         const conv = item.conversation;
         if (!conv) return null;
@@ -121,6 +135,12 @@ export function useConversationList(currentUser) {
         // Find partner profile for 1:1 direct chat
         const otherPartObj = conv.participants?.find((p) => p.user_id !== currentUser.id);
         const otherParticipant = Array.isArray(otherPartObj?.profile) ? otherPartObj.profile[0] : otherPartObj?.profile;
+        const partnerId = otherParticipant?.id || otherPartObj?.user_id;
+
+        // Filter out if user previously marked this discussion as deleted
+        if (partnerId && deletedPartnerIds.has(String(partnerId))) {
+          return null;
+        }
         
         const sortedMsgs = Array.isArray(conv.last_message)
           ? [...conv.last_message].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
@@ -223,9 +243,16 @@ export function useConversationList(currentUser) {
     window.addEventListener('update_conversation_local', handleLocalUpdate);
 
     const handleDeleted = (e) => {
-      if (e.detail?.conversationId) {
+      const convId = e.detail?.conversationId;
+      const partId = e.detail?.partnerId;
+      if (convId || partId) {
         setConversations(prev => {
-          const nextList = prev.filter(c => String(c.id) !== String(e.detail.conversationId));
+          const nextList = prev.filter(c => {
+            if (convId && String(c.id) === String(convId)) return false;
+            const cPartnerId = c.partner?.id || c.participant?.id || c.partnerId;
+            if (partId && cPartnerId && String(cPartnerId) === String(partId)) return false;
+            return true;
+          });
           try { localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(nextList)); } catch(err) {}
           return nextList;
         });
@@ -319,12 +346,23 @@ export function useConversationList(currentUser) {
   /**
    * Delete / leave a conversation
    */
-  const deleteConversation = useCallback(async (conversationId) => {
+  const deleteConversation = useCallback(async (conversationId, convObj = null) => {
     if (!conversationId || !currentUser?.id) return { success: false };
     
+    const partnerId = convObj?.partner?.id || convObj?.participant?.id || convObj?.partnerId || (
+      String(conversationId).startsWith('conv_') ? String(conversationId).replace('conv_', '') : (
+        String(conversationId).startsWith('chat_') ? String(conversationId).replace('chat_', '') : null
+      )
+    );
+
     // 1. Instant optimistic local state update (0ms latency)
     setConversations(prev => {
-      const nextList = prev.filter(c => String(c.id) !== String(conversationId));
+      const nextList = prev.filter(c => {
+        if (String(c.id) === String(conversationId)) return false;
+        const cPartnerId = c.partner?.id || c.participant?.id || c.partnerId;
+        if (partnerId && cPartnerId && String(cPartnerId) === String(partnerId)) return false;
+        return true;
+      });
       try {
         localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(nextList));
       } catch (e) {}
@@ -332,7 +370,7 @@ export function useConversationList(currentUser) {
     });
 
     // 2. Persist removal to database & storage
-    return await directChatService.deleteConversation(conversationId, currentUser.id);
+    return await directChatService.deleteConversation(conversationId, currentUser.id, partnerId);
   }, [currentUser?.id]);
 
   /**

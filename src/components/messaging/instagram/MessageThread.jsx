@@ -596,7 +596,7 @@ export default function MessageThread({
                   setIsDeletingConv(true);
                   try {
                     soundEngine.playPopSound();
-                    await directChatService.deleteConversation(conversationId, currentUser?.id);
+                    await directChatService.deleteConversation(conversationId, currentUser?.id, partner?.id);
                     onBack();
                   } catch (err) {
                     console.warn('Error deleting conversation from thread:', err);
