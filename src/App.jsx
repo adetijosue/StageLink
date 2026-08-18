@@ -4054,13 +4054,23 @@ export default function App() {
     };
   }, []);
 
-  const handleFinishSplash = () => {
+  const handleFinishSplash = useCallback(() => {
     try {
       sessionStorage.setItem('hasSeenSplashSession', 'true');
       localStorage.setItem('stagelink_last_active', Date.now().toString());
     } catch (e) { console.error("Suppressed error:", e); }
     setShowSplash(false);
-  };
+  }, []);
+
+  // Unconditional fail-safe timer: guarantee splash dismissal within 1.6s max
+  useEffect(() => {
+    if (showSplash) {
+      const safetyTimer = setTimeout(() => {
+        handleFinishSplash();
+      }, 1600);
+      return () => clearTimeout(safetyTimer);
+    }
+  }, [showSplash, handleFinishSplash]);
 
   return (
     <ErrorBoundary>

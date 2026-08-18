@@ -1,24 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export default function AppSplashScreen({ onFinish }) {
   const [stage, setStage] = useState('active'); // active -> exiting
+  const onFinishRef = useRef(onFinish);
+  
+  useEffect(() => {
+    onFinishRef.current = onFinish;
+  }, [onFinish]);
 
   useEffect(() => {
-    // Ultra-Snappy transition to main app at ~1.2s
+    // Guaranteed single-shot timer for snappy ~1.0s transition
     const exitTimer = setTimeout(() => {
       setStage('exiting');
-    }, 1200);
+    }, 1000);
 
-    // Complete unmount callback at ~1.5s
     const finishTimer = setTimeout(() => {
-      if (onFinish) onFinish();
-    }, 1500);
+      if (onFinishRef.current) {
+        onFinishRef.current();
+      }
+    }, 1250);
 
     return () => {
       clearTimeout(exitTimer);
       clearTimeout(finishTimer);
     };
-  }, [onFinish]);
+  }, []); // Run once on mount!
 
   const isExiting = stage === 'exiting';
 
