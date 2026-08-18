@@ -3,7 +3,7 @@ import {
   ShoppingBag, GraduationCap, Calendar, Play, Pause, 
   DollarSign, Plus, TrendingUp, Sliders, Search, 
   Share2, MessageSquare, ChevronRight, Music, User,
-  CheckCircle, Shield, Clock, Award, Layers, Volume2
+  CheckCircle, Shield, Clock, Award, Layers, Volume2, Radio
 } from 'lucide-react';
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
@@ -16,6 +16,7 @@ import BuyWorkModal from './BuyWorkModal';
 import OrderServiceModal from './OrderServiceModal';
 import CourseDetailsModal from './CourseDetailsModal';
 import EventTicketModal from './EventTicketModal';
+import LiveJamWorkspace from '../music_studio/LiveJamWorkspace';
 
 export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProfile, isDarkMode }) {
   const { currentUser } = useAuth();
@@ -360,6 +361,7 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
         {[
           { id: 'marketplace', label: language === 'en' ? 'Works' : "Œuvres", fullLabel: language === 'en' ? 'Works & Beats' : "Œuvres & Beats", icon: <ShoppingBag size={15} />, count: worksList.length },
           { id: 'services', label: language === 'en' ? 'Services' : 'Prestations', fullLabel: language === 'en' ? 'Studio Services' : "Prestations Studio", icon: <Sliders size={15} />, count: servicesList.length },
+          { id: 'live_jam', label: 'Live Jam', fullLabel: 'Live Jam Studio', icon: <Radio size={15} />, count: 0 },
           { id: 'courses', label: language === 'en' ? 'Courses' : 'Formations', fullLabel: language === 'en' ? 'Courses' : "Formations", icon: <GraduationCap size={15} />, count: coursesList.length },
           { id: 'events', label: language === 'en' ? 'Events' : 'Événements', fullLabel: language === 'en' ? 'Events' : "Événements", icon: <Calendar size={15} />, count: eventsList.length }
         ].map((tab) => {
@@ -1372,6 +1374,22 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
               ))
             )}
           </div>
+        </div>
+      )}
+
+      {/* ---------------------------------------------------- */}
+      {/* SUBTAB 5: LIVE JAM STUDIO COLLABORATIF EN DIRECT     */}
+      {/* ---------------------------------------------------- */}
+      {activeSubTab === 'live_jam' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <LiveJamWorkspace
+            isDarkMode={isDarkMode}
+            onShareToChat={(lyrics) => {
+              if (onStartChat) {
+                onStartChat({ text: `🎵 [Notes & Accords Studio Jam]\n\n${lyrics}` });
+              }
+            }}
+          />
         </div>
       )}
 

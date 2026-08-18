@@ -1,5 +1,5 @@
 /**
- * StageLink Web Audio Synthesizer Engine & Haptic Pop Feedback System
+ * StageLink Web Audio Synthesizer Engine & Haptic Feedback System
  * Powered by JABE PRODUCTION
  */
 
@@ -11,6 +11,7 @@ class SoundSynthesizer {
     this.bpm = 120;
     this.genre = 'Afro-Gospel';
     this.ringtoneTimer = null;
+    this.metronomeTimer = null;
   }
 
   initContext() {
@@ -73,7 +74,6 @@ class SoundSynthesizer {
       if (!this.ctx) return;
       const now = this.ctx.currentTime;
       
-      // First tone
       const osc1 = this.ctx.createOscillator();
       const gain1 = this.ctx.createGain();
       osc1.type = 'sine';
@@ -87,7 +87,6 @@ class SoundSynthesizer {
       osc1.start(now);
       osc1.stop(now + 0.1);
 
-      // Second tone (higher pitch, slightly delayed)
       const osc2 = this.ctx.createOscillator();
       const gain2 = this.ctx.createGain();
       osc2.type = 'sine';
@@ -102,6 +101,25 @@ class SoundSynthesizer {
       osc2.stop(now + 0.25);
 
       if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+    } catch (e) {}
+  }
+
+  playMetronomeClick(isAccent = false) {
+    try {
+      this.initContext();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(isAccent ? 1200 : 800, now);
+      osc.frequency.exponentialRampToValueAtTime(200, now + 0.04);
+      gain.gain.setValueAtTime(isAccent ? 0.35 : 0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.04);
     } catch (e) {}
   }
 
@@ -136,7 +154,6 @@ class SoundSynthesizer {
       const ringOnce = () => {
         if (!this.isPlaying || !this.ctx) return;
         const now = this.ctx.currentTime;
-        // Urgent dual-tone beep
         [660, 880].forEach((freq, i) => {
            const osc = this.ctx.createOscillator();
            const gain = this.ctx.createGain();
@@ -198,17 +215,55 @@ class SoundSynthesizer {
     } catch (e) {}
   }
 
-  generateAndPlay() {
+  generateAndPlay(bpm = 120, genre = 'Afro-Gospel') {
     this.initContext();
+    this.stop();
     this.isPlaying = true;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.frequency.setValueAtTime(220, this.ctx.currentTime);
-    gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-    osc.start();
-    this.activeNodes.push(osc);
+    this.bpm = bpm;
+    this.genre = genre;
+
+    // Harmonic chord progession synthesis (F - C - Dm - Bb in Afro-Gospel style)
+    const baseFreqs = genre === 'Afro-Gospel' ? [174.61, 261.63, 293.66, 233.08] : [220, 261.63, 329.63, 392];
+    let noteIdx = 0;
+    const intervalMs = (60 / bpm) * 1000 * 2;
+
+    const playNextBar = () => {
+      if (!this.isPlaying || !this.ctx) return;
+      const now = this.ctx.currentTime;
+      const root = baseFreqs[noteIdx % baseFreqs.length];
+      noteIdx++;
+
+      // Synth Chord Pad
+      [root, root * 1.25, root * 1.5].forEach((freq) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, now);
+        gain.gain.setValueAtTime(0.02, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + (intervalMs / 1000) * 0.9);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + (intervalMs / 1000) * 0.9);
+        this.activeNodes.push(osc);
+      });
+
+      // Bass 808 note
+      const bassOsc = this.ctx.createOscillator();
+      const bassGain = this.ctx.createGain();
+      bassOsc.type = 'sine';
+      bassOsc.frequency.setValueAtTime(root / 2, now);
+      bassGain.gain.setValueAtTime(0.12, now);
+      bassGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+      bassOsc.connect(bassGain);
+      bassGain.connect(this.ctx.destination);
+      bassOsc.start(now);
+      bassOsc.stop(now + 0.6);
+      this.activeNodes.push(bassOsc);
+    };
+
+    playNextBar();
+    this.ringtoneTimer = setInterval(playNextBar, intervalMs);
   }
 
   stop() {
