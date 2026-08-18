@@ -275,3 +275,89 @@ export function subscribeToRealtimeMessages(callback) {
     )
     .subscribe();
 }
+
+/**
+ * Convert base64 DataURL to File object
+ */
+export function dataURLtoFile(dataurl, filename = 'media_upload') {
+  if (!dataurl || typeof dataurl !== 'string' || !dataurl.startsWith('data:')) {
+    return null;
+  }
+  try {
+    const arr = dataurl.split(',');
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    const ext = mime.includes('video/mp4') ? 'mp4' : mime.includes('video/webm') ? 'webm' : mime.includes('video/quicktime') ? 'mov' : mime.includes('video/3gpp') ? '3gp' : mime.includes('video/x-m4v') ? 'm4v' : mime.includes('audio') ? 'webm' : (mime.split('/')[1] || 'jpg');
+    return new File([u8arr], `${filename}.${ext}`, { type: mime });
+  } catch (e) {
+    console.warn('dataURLtoFile conversion note:', e);
+    return null;
+  }
+}
+
+/**
+ * Safe wrapper for Supabase storage upload that falls back to compressed Base64 Data URL if bucket/RLS fails
+ */
+export const safeUploadToStorage = async (bucketName, filePath, dataUrl) => {
+  if (!dataUrl) return '';
+  if (typeof dataUrl === 'string' && (dataUrl.startsWith('http://') || dataUrl.startsWith('https://'))) {
+    return dataUrl;
+  }
+
+  const isVideo = typeof dataUrl === 'string' && (dataUrl.startsWith('data:video') || dataUrl.includes('.mp4') || dataUrl.includes('.webm'));
+  const isAudio = typeof dataUrl === 'string' && (dataUrl.startsWith('data:audio') || dataUrl.includes('.mp3') || dataUrl.includes('.wav') || dataUrl.includes('.ogg') || dataUrl.includes('.m4a'));
+
+  let optimizedDataUrl = dataUrl;
+  
+  if (!isSupabaseConfigured()) {
+    return optimizedDataUrl;
+  }
+
+  try {
+    const file = dataURLtoFile(optimizedDataUrl);
+    if (!file) return optimizedDataUrl;
+
+    let uploadedSuccessfully = false;
+    let targetBucket = isVideo ? 'posts' : (bucketName || 'chat_media');
+    const { error: uploadError } = await supabase.storage.from(targetBucket).upload(filePath, file, {
+      upsert: true,
+      contentType: file.type
+    });
+
+    if (!uploadError) {
+      uploadedSuccessfully = true;
+    } else {
+      console.warn(`Storage upload attempt failed (${targetBucket}):`, uploadError.message);
+      if (!uploadError.message?.includes('Bucket not found')) {
+        const fallbackBucket = targetBucket === 'chat_media' ? 'posts' : 'chat_media';
+        const { error: retryError } = await supabase.storage.from(fallbackBucket).upload(filePath, file, {
+          upsert: true,
+          contentType: file.type
+        });
+        if (!retryError) {
+          uploadedSuccessfully = true;
+          targetBucket = fallbackBucket;
+        }
+      }
+    }
+
+    if (uploadedSuccessfully) {
+      const { data: publicUrlData } = supabase.storage.from(targetBucket).getPublicUrl(filePath);
+      if (publicUrlData && publicUrlData.publicUrl) {
+        return publicUrlData.publicUrl;
+      }
+    }
+
+    return optimizedDataUrl;
+  } catch (e) {
+    console.warn('Storage upload fallback note:', e?.message || e);
+    return dataUrl;
+  }
+};
+

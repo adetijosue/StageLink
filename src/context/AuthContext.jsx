@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getStoredItem, setStoredItem, STORAGE_KEYS, initializeStorage } from '../services/mockData';
-import { signUpUser, signInUser, signOutUser, isSupabaseConfigured, supabase } from '../services/supabaseClient';
+import { signUpUser, signInUser, signOutUser, isSupabaseConfigured, supabase, safeUploadToStorage } from '../services/supabaseClient';
 
 const AuthContext = createContext();
 
@@ -9,20 +9,44 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [supabaseActive, setSupabaseActive] = useState(false);
 
+  // Helper to normalize user object from Supabase profile row
+  const buildUserFromProfile = (profile, fallbackUser = {}) => {
+    const ensureArray = (val) => Array.isArray(val) ? val : [];
+    return {
+      id: profile?.id || fallbackUser.id,
+      email: profile?.email || fallbackUser.email || '',
+      name: profile?.full_name || fallbackUser.name || 'Artiste StageLink',
+      role: profile?.role || fallbackUser.role || 'Beatmaker / Compositeur',
+      gender: profile?.gender || fallbackUser.gender || 'male',
+      avatar: profile?.avatar_url || fallbackUser.avatar || '',
+      coverPhoto: profile?.cover_url || fallbackUser.coverPhoto || '',
+      bio: profile?.bio || fallbackUser.bio || `Membre ${profile?.role || fallbackUser.role || 'Artiste'} sur StageLink`,
+      location: profile?.location || fallbackUser.location || '',
+      verified: profile?.verified_badge === 'gold' || profile?.verified_badge === 'blue' || fallbackUser.verified,
+      badgeType: profile?.verified_badge || fallbackUser.badgeType || 'none',
+      company: profile?.company || fallbackUser.company || '',
+      instruments: ensureArray(profile?.instruments || fallbackUser.instruments),
+      genres: ensureArray(profile?.genres || fallbackUser.genres),
+      gear: ensureArray(profile?.gear || fallbackUser.gear),
+      isNewRegistration: fallbackUser.isNewRegistration || false
+    };
+  };
+
   useEffect(() => {
     initializeStorage();
     setSupabaseActive(isSupabaseConfigured());
     
-    // Restore persistent session from local storage on app startup
+    // 1. Initial restore from local storage
     const savedUser = getStoredItem(STORAGE_KEYS.CURRENT_USER, null);
+    let activeUser = savedUser;
+
     if (savedUser) {
       const users = getStoredItem(STORAGE_KEYS.USERS, []);
       const latestUser = users.find(u => 
         (u.id && savedUser.id && u.id === savedUser.id) ||
         (u.email && savedUser.email && u.email.toLowerCase() === savedUser.email.toLowerCase())
       );
-      const activeUser = { ...(latestUser || savedUser) };
-
+      activeUser = { ...(latestUser || savedUser) };
       const ensureArray = (val) => Array.isArray(val) ? val : [];
       activeUser.instruments = ensureArray(activeUser.instruments);
       activeUser.genres = ensureArray(activeUser.genres);
@@ -32,7 +56,23 @@ export function AuthProvider({ children }) {
       setStoredItem(STORAGE_KEYS.CURRENT_USER, activeUser);
     }
 
-    // Subscribe to Supabase Auth State Changes & Token Refreshes
+    // 2. Fetch authoritative profile from Supabase Database on startup
+    if (isSupabaseConfigured()) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        const targetId = session?.user?.id || activeUser?.id;
+        if (targetId) {
+          supabase.from('profiles').select('*').eq('id', targetId).maybeSingle().then(({ data: profile, error }) => {
+            if (profile && !error) {
+              const freshUser = buildUserFromProfile(profile, activeUser || {});
+              setCurrentUser(freshUser);
+              setStoredItem(STORAGE_KEYS.CURRENT_USER, freshUser);
+            }
+          });
+        }
+      });
+    }
+
+    // 3. Subscribe to Supabase Auth State Changes & Token Refreshes
     let authListener;
     if (isSupabaseConfigured()) {
       const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
@@ -41,25 +81,14 @@ export function AuthProvider({ children }) {
           localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
           return;
         }
-        if (session?.user && (!currentUser || currentUser.id !== session.user.id)) {
+        if (session?.user) {
           supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle().then(({ data: profile }) => {
-            const u = {
+            const u = buildUserFromProfile(profile, {
               id: session.user.id,
-              email: profile?.email || session.user.email,
-              name: profile?.full_name || session.user.user_metadata?.full_name || 'Artiste StageLink',
-              role: profile?.role || session.user.user_metadata?.role || 'Beatmaker / Compositeur',
-              gender: profile?.gender || session.user.user_metadata?.gender || 'male',
-              avatar: profile?.avatar_url || '',
-              coverPhoto: profile?.cover_url || '',
-              bio: profile?.bio || `Membre ${profile?.role || 'Artiste'} sur StageLink`,
-              location: profile?.location || '',
-              verified: profile?.verified_badge === 'gold' || profile?.verified_badge === 'blue',
-              badgeType: profile?.verified_badge || 'none',
-              company: profile?.company || '',
-              instruments: Array.isArray(profile?.instruments) ? profile.instruments : [],
-              genres: Array.isArray(profile?.genres) ? profile.genres : [],
-              gear: Array.isArray(profile?.gear) ? profile.gear : []
-            };
+              email: session.user.email,
+              name: session.user.user_metadata?.full_name,
+              role: session.user.user_metadata?.role
+            });
             setCurrentUser(u);
             setStoredItem(STORAGE_KEYS.CURRENT_USER, u);
           });
@@ -184,7 +213,6 @@ export function AuthProvider({ children }) {
         const { error } = await supabase.rpc('delete_user_account');
         if (error) {
            console.warn('Erreur RPC delete_user_account, utilisation de la suppression directe...', error);
-           // Fallback in case RPC is not yet created by admin
            const { error: deleteErr } = await supabase.from('profiles').delete().eq('id', userId);
            if (deleteErr) {
              console.error('Erreur de suppression du profil:', deleteErr);
@@ -225,20 +253,46 @@ export function AuthProvider({ children }) {
     if (sanitizedFields.genres !== undefined) sanitizedFields.genres = toArray(sanitizedFields.genres);
     if (sanitizedFields.gear !== undefined) sanitizedFields.gear = toArray(sanitizedFields.gear);
 
+    // If avatar or cover is a base64 DataURL, upload it to storage so it's a permanent HTTPS URL
+    if (sanitizedFields.avatar && typeof sanitizedFields.avatar === 'string' && sanitizedFields.avatar.startsWith('data:image')) {
+      try {
+        const publicAvatar = await safeUploadToStorage('chat_media', `avatar_${currentUser.id}_${Date.now()}`, sanitizedFields.avatar);
+        if (publicAvatar) sanitizedFields.avatar = publicAvatar;
+      } catch (e) {
+        console.warn('Avatar upload to storage note:', e);
+      }
+    }
+
+    if (sanitizedFields.coverPhoto && typeof sanitizedFields.coverPhoto === 'string' && sanitizedFields.coverPhoto.startsWith('data:image')) {
+      try {
+        const publicCover = await safeUploadToStorage('chat_media', `cover_${currentUser.id}_${Date.now()}`, sanitizedFields.coverPhoto);
+        if (publicCover) sanitizedFields.coverPhoto = publicCover;
+      } catch (e) {
+        console.warn('Cover upload to storage note:', e);
+      }
+    }
+
     const updatedUser = { ...currentUser, ...sanitizedFields };
     setCurrentUser(updatedUser);
     setStoredItem(STORAGE_KEYS.CURRENT_USER, updatedUser);
 
     const users = getStoredItem(STORAGE_KEYS.USERS, []);
     const updatedUsers = users.map((u) => (u.id === currentUser.id ? updatedUser : u));
+    if (!updatedUsers.some(u => u.id === currentUser.id)) {
+      updatedUsers.unshift(updatedUser);
+    }
     setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
 
-    // Save profile modifications directly to Supabase Database
+    // Save profile modifications directly to Supabase Database with resilient update/upsert
     if (isSupabaseConfigured() && currentUser.id) {
       try {
-        const payload = {};
-        if (sanitizedFields.name !== undefined) payload.full_name = sanitizedFields.name;
-        if (sanitizedFields.role !== undefined) payload.role = sanitizedFields.role;
+        const payload = {
+          id: currentUser.id,
+          email: currentUser.email || `${currentUser.id}@stagelink.app`,
+          full_name: sanitizedFields.name !== undefined ? sanitizedFields.name : (currentUser.name || 'Artiste StageLink'),
+          role: sanitizedFields.role !== undefined ? sanitizedFields.role : (currentUser.role || 'Beatmaker / Compositeur'),
+          updated_at: new Date().toISOString()
+        };
         if (sanitizedFields.gender !== undefined) payload.gender = sanitizedFields.gender;
         if (sanitizedFields.avatar !== undefined) payload.avatar_url = sanitizedFields.avatar;
         if (sanitizedFields.coverPhoto !== undefined) payload.cover_url = sanitizedFields.coverPhoto;
@@ -246,14 +300,16 @@ export function AuthProvider({ children }) {
         if (sanitizedFields.location !== undefined) payload.location = sanitizedFields.location;
         if (sanitizedFields.company !== undefined) payload.company = sanitizedFields.company;
         if (sanitizedFields.verified !== undefined) payload.verified_badge = sanitizedFields.verified ? (sanitizedFields.badgeType || 'gold') : 'none';
+        if (sanitizedFields.badgeType !== undefined) payload.verified_badge = sanitizedFields.badgeType;
         if (sanitizedFields.instruments !== undefined) payload.instruments = sanitizedFields.instruments;
         if (sanitizedFields.genres !== undefined) payload.genres = sanitizedFields.genres;
         if (sanitizedFields.gear !== undefined) payload.gear = sanitizedFields.gear;
 
-        if (Object.keys(payload).length > 0) {
-          const { error: updateErr } = await supabase.from('profiles').update(payload).eq('id', currentUser.id);
-          if (updateErr) {
-            console.error('Failed to save profile to Supabase (check RLS policies or payload size):', updateErr);
+        const { error: updateErr } = await supabase.from('profiles').update(payload).eq('id', currentUser.id);
+        if (updateErr) {
+          const { error: upsertErr } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' });
+          if (upsertErr) {
+            console.error('Failed to upsert profile to Supabase:', upsertErr);
           }
         }
       } catch (pe) {
@@ -272,3 +328,4 @@ export function AuthProvider({ children }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
+

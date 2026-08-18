@@ -55,9 +55,9 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
 
   if (!currentUser) return <div style={{ padding: '60px', textAlign: 'center' }}>{t('loading')}</div>;
 
-  const handleSaveAll = (e) => {
+  const handleSaveAll = async (e) => {
     if (e) e.preventDefault();
-    updateUserProfile(formData);
+    await updateUserProfile(formData);
     setActiveModal(null);
     soundEngine.playPopSound();
   };
