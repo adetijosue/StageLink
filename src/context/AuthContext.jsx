@@ -59,109 +59,152 @@ export function AuthProvider({ children }) {
     initializeStorage();
     setSupabaseActive(isSupabaseConfigured());
     
-    // 1. Initial restore from local storage
-    const savedUser = getStoredItem(STORAGE_KEYS.CURRENT_USER, null);
-    let activeUser = savedUser;
-
-    if (savedUser) {
-      const users = getStoredItem(STORAGE_KEYS.USERS, []);
-      const latestUser = users.find(u => 
-        (u.id && savedUser.id && u.id === savedUser.id) ||
-        (u.email && savedUser.email && u.email.toLowerCase() === savedUser.email.toLowerCase())
-      );
-      activeUser = { ...(latestUser || savedUser) };
-      const ensureArray = (val) => Array.isArray(val) ? val : [];
-      activeUser.instruments = ensureArray(activeUser.instruments);
-      activeUser.genres = ensureArray(activeUser.genres);
-      activeUser.gear = ensureArray(activeUser.gear);
-
-      setCurrentUser(activeUser);
-      setStoredItem(STORAGE_KEYS.CURRENT_USER, activeUser);
-    }
-
-    // 2. Fetch authoritative profile from Supabase Database on startup
+    // If Supabase is configured, enforce strict session validation against Supabase Auth
     if (isSupabaseConfigured()) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        const targetId = session?.user?.id || activeUser?.id;
-        if (targetId) {
-          supabase.from('profiles').select('*').eq('id', targetId).maybeSingle().then(({ data: profile, error }) => {
-            if (profile && !error) {
-              const freshUser = buildUserFromProfile(profile, activeUser || {});
-              setCurrentUser(freshUser);
-              setStoredItem(STORAGE_KEYS.CURRENT_USER, freshUser);
-            } else if (session?.user) {
-              // Create initial profile row in Supabase so user is discoverable
-              const defaultName = activeUser?.name || session.user.user_metadata?.full_name || (session.user.email ? session.user.email.split('@')[0] : 'Artiste');
-              const defaultUsername = session.user.email?.split('@')[0]?.replace(/[^a-zA-Z0-9]/g, '_') || 'user_' + session.user.id.slice(0, 6);
-              supabase.from('profiles').upsert({
-                id: session.user.id,
-                full_name: defaultName,
-                username: defaultUsername,
-                email: session.user.email,
-                role: activeUser?.role || session.user.user_metadata?.role || 'Artiste',
-                avatar_url: activeUser?.avatar || '',
-                bio: activeUser?.bio || '',
-                location: activeUser?.location || '',
-                company: activeUser?.company || '',
-                verified_badge: activeUser?.badgeType || 'none'
-              }, { onConflict: 'id' }).then(() => {}).catch(() => {});
-            }
-          });
-        }
-      });
-    }
-
-    // 3. Subscribe to Supabase Auth State Changes & Token Refreshes
-    let authListener;
-    if (isSupabaseConfigured()) {
-      const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_OUT') {
+      supabase.auth.getSession().then(async ({ data: { session }, error: sessionErr }) => {
+        // 1. If Supabase session is invalid or user is not logged in, purge stale local user
+        if (sessionErr || !session?.user) {
           setCurrentUser(null);
           localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+          setLoading(false);
           return;
         }
-        if (session?.user) {
-          const currentLocal = getStoredItem(STORAGE_KEYS.CURRENT_USER, null) || {};
-          supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle().then(({ data: profile }) => {
-            const u = buildUserFromProfile(profile, {
-              ...currentLocal,
-              id: session.user.id,
-              email: session.user.email,
-              name: currentLocal.name || session.user.user_metadata?.full_name,
-              role: currentLocal.role || session.user.user_metadata?.role
-            });
-            setCurrentUser(u);
-            setStoredItem(STORAGE_KEYS.CURRENT_USER, u);
 
-            if (!profile) {
-              const defaultName = u.name || (session.user.email ? session.user.email.split('@')[0] : 'Artiste');
-              const defaultUsername = session.user.email?.split('@')[0]?.replace(/[^a-zA-Z0-9]/g, '_') || 'user_' + session.user.id.slice(0, 6);
-              supabase.from('profiles').upsert({
-                id: session.user.id,
-                full_name: defaultName,
-                username: defaultUsername,
-                email: session.user.email,
-                role: u.role || 'Artiste',
-                avatar_url: u.avatar || '',
-                bio: u.bio || '',
-                location: u.location || '',
-                company: u.company || '',
-                verified_badge: u.badgeType || 'none'
-              }, { onConflict: 'id' }).then(() => {}).catch(() => {});
-            }
-          });
+        const authUser = session.user;
+        const savedUser = getStoredItem(STORAGE_KEYS.CURRENT_USER, null);
+
+        // 2. If saved local user belongs to an old/deleted ID, purge all old caches
+        if (savedUser && savedUser.id && savedUser.id !== authUser.id) {
+          try {
+            Object.keys(localStorage).forEach(key => {
+              if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`)) {
+                localStorage.removeItem(key);
+              }
+            });
+          } catch (_) {}
+          localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+        }
+
+        // 3. Fetch authoritative profile from Supabase Database for the active session user
+        try {
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', authUser.id)
+            .maybeSingle();
+
+          if (profile && !error) {
+            const freshUser = buildUserFromProfile(profile, { id: authUser.id, email: authUser.email });
+            setCurrentUser(freshUser);
+            setStoredItem(STORAGE_KEYS.CURRENT_USER, freshUser);
+          } else {
+            // Create initial profile in public.profiles for the newly created user
+            const defaultName = authUser.user_metadata?.full_name || (authUser.email ? authUser.email.split('@')[0] : 'Artiste');
+            const defaultUsername = authUser.email?.split('@')[0]?.replace(/[^a-zA-Z0-9]/g, '_') || 'user_' + authUser.id.slice(0, 6);
+            const defaultRole = authUser.user_metadata?.role || 'Artiste / Compositeur';
+
+            const { data: createdProf } = await supabase.from('profiles').upsert({
+              id: authUser.id,
+              full_name: defaultName,
+              username: defaultUsername,
+              email: authUser.email,
+              role: defaultRole,
+              avatar_url: '',
+              bio: `Membre ${defaultRole} sur StageLink`,
+              verified_badge: 'none',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'id' }).select().maybeSingle();
+
+            const freshUser = buildUserFromProfile(createdProf || {}, { id: authUser.id, email: authUser.email, name: defaultName, role: defaultRole });
+            setCurrentUser(freshUser);
+            setStoredItem(STORAGE_KEYS.CURRENT_USER, freshUser);
+          }
+        } catch (err) {
+          console.warn('Profile sync on startup note:', err);
+        } finally {
+          setLoading(false);
         }
       });
-      authListener = listener;
+
+      // 4. Subscribe to Supabase Auth State Changes (Login, Logout, Token Refresh)
+      const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_OUT' || !session?.user) {
+          setCurrentUser(null);
+          localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+          try {
+            Object.keys(localStorage).forEach(key => {
+              if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`)) {
+                localStorage.removeItem(key);
+              }
+            });
+          } catch (_) {}
+          return;
+        }
+
+        if (session?.user) {
+          const authUser = session.user;
+          const oldSavedUser = getStoredItem(STORAGE_KEYS.CURRENT_USER, null);
+          if (oldSavedUser && oldSavedUser.id && oldSavedUser.id !== authUser.id) {
+            try {
+              Object.keys(localStorage).forEach(key => {
+                if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`)) {
+                  localStorage.removeItem(key);
+                }
+              });
+            } catch (_) {}
+          }
+
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', authUser.id)
+              .maybeSingle();
+
+            if (profile) {
+              const freshUser = buildUserFromProfile(profile, { id: authUser.id, email: authUser.email });
+              setCurrentUser(freshUser);
+              setStoredItem(STORAGE_KEYS.CURRENT_USER, freshUser);
+            } else {
+              const defaultName = authUser.user_metadata?.full_name || (authUser.email ? authUser.email.split('@')[0] : 'Artiste');
+              const defaultUsername = authUser.email?.split('@')[0]?.replace(/[^a-zA-Z0-9]/g, '_') || 'user_' + authUser.id.slice(0, 6);
+              const defaultRole = authUser.user_metadata?.role || 'Artiste / Compositeur';
+
+              const { data: createdProf } = await supabase.from('profiles').upsert({
+                id: authUser.id,
+                full_name: defaultName,
+                username: defaultUsername,
+                email: authUser.email,
+                role: defaultRole,
+                avatar_url: '',
+                bio: `Membre ${defaultRole} sur StageLink`,
+                verified_badge: 'none',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }, { onConflict: 'id' }).select().maybeSingle();
+
+              const freshUser = buildUserFromProfile(createdProf || {}, { id: authUser.id, email: authUser.email, name: defaultName, role: defaultRole });
+              setCurrentUser(freshUser);
+              setStoredItem(STORAGE_KEYS.CURRENT_USER, freshUser);
+            }
+          } catch (err) {
+            console.warn('Auth state change profile fetch note:', err);
+          }
+        }
+      });
+
+      return () => {
+        if (listener?.subscription) {
+          listener.subscription.unsubscribe();
+        }
+      };
+    } else {
+      // Local fallback only if Supabase is not configured
+      const savedUser = getStoredItem(STORAGE_KEYS.CURRENT_USER, null);
+      setCurrentUser(savedUser);
+      setLoading(false);
     }
-
-    setLoading(false);
-
-    return () => {
-      if (authListener?.subscription) {
-        authListener.subscription.unsubscribe();
-      }
-    };
   }, []);
 
   const login = async (email, password) => {
@@ -173,8 +216,21 @@ export function AuthProvider({ children }) {
       const supaRes = await signInUser({ email: cleanEmail, password: cleanPassword });
       if (supaRes.success && supaRes.user) {
         const safeUser = { ...supaRes.user };
+
+        // Clean out any stale cached data belonging to older user IDs for this email
+        try {
+          const oldSavedUser = getStoredItem(STORAGE_KEYS.CURRENT_USER, null);
+          if (oldSavedUser && oldSavedUser.id !== safeUser.id) {
+            Object.keys(localStorage).forEach(key => {
+              if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`)) {
+                localStorage.removeItem(key);
+              }
+            });
+          }
+        } catch (_) {}
+
         const users = getStoredItem(STORAGE_KEYS.USERS, []);
-        const updatedUsers = [safeUser, ...users.filter(u => !u.email || u.email.toLowerCase() !== cleanEmail)];
+        const updatedUsers = [safeUser, ...users.filter(u => (!u.email || u.email.toLowerCase() !== cleanEmail) && u.id !== safeUser.id)];
         
         setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
         setStoredItem(STORAGE_KEYS.CURRENT_USER, safeUser);
@@ -213,7 +269,7 @@ export function AuthProvider({ children }) {
       if (supaRes.success && supaRes.user) {
         const newUser = { ...supaRes.user, isNewRegistration: true };
         const users = getStoredItem(STORAGE_KEYS.USERS, []);
-        const updatedUsers = [newUser, ...users.filter(u => !u.email || u.email.toLowerCase() !== cleanEmail)];
+        const updatedUsers = [newUser, ...users.filter(u => (!u.email || u.email.toLowerCase() !== cleanEmail) && u.id !== newUser.id)];
         setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
         setStoredItem(STORAGE_KEYS.CURRENT_USER, newUser);
         setCurrentUser(newUser);
@@ -254,6 +310,14 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`)) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (_) {}
+
     await signOutUser();
     setCurrentUser(null);
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
