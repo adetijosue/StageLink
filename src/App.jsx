@@ -165,7 +165,7 @@ const uploadChatMediaToSupabase = async (dataUrl, fileName) => {
 
 
 function MainApp() {
-  const { isAuthenticated, currentUser, updateUserProfile } = useAuth();
+  const { isAuthenticated, currentUser, updateUserProfile, loading } = useAuth();
   const { t, language } = useLanguage();
   useGlobalPresence(currentUser);
 
@@ -231,8 +231,8 @@ function MainApp() {
   const [isCallHistoryModalOpen, setIsCallHistoryModalOpen] = useState(false);
   const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
 
-  // Persistent Data States
-  const [posts, setPosts] = useState([]);
+  // Persistent Data States (Instant 0ms render from persistent cache on page refresh)
+  const [posts, setPosts] = useState(() => getStoredItem(STORAGE_KEYS.POSTS, []));
   const [appDataError, setAppDataError] = useState(null);
 
   // Feed Pro Services Action Modals
@@ -425,9 +425,9 @@ function MainApp() {
     }
   }, [currentUser]);
 
-  const [stories, setStories] = useState([]);
-  const [matches, setMatches] = useState([]);
-  const [chats, setChats] = useState([]);
+  const [stories, setStories] = useState(() => getStoredItem(STORAGE_KEYS.STORIES, []));
+  const [matches, setMatches] = useState(() => getStoredItem(STORAGE_KEYS.MATCHES, []));
+  const [chats, setChats] = useState(() => getStoredItem(STORAGE_KEYS.CHATS, []));
   const [allUsers, setAllUsers] = useState([]);
   const [isUploadingStory, setIsUploadingStory] = useState(false);
   const [isUploadingPost, setIsUploadingPost] = useState(false);
@@ -2393,7 +2393,11 @@ function MainApp() {
     }
   }, [isAuthenticated, currentUser?.id]);
 
-  if (!isAuthenticated) {
+  if (loading && !currentUser) {
+    return <AppSplashScreen />;
+  }
+
+  if (!isAuthenticated && !currentUser) {
     return <AuthScreen />;
   }
 

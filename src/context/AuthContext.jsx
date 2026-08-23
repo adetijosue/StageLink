@@ -7,8 +7,16 @@ import { compressImage } from '../utils/imageCompressor';
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // 1. Synchronously initialize from persistent local storage (0ms instant restore on refresh)
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = getStoredItem(STORAGE_KEYS.CURRENT_USER, null);
+      return (saved && saved.id) ? saved : null;
+    } catch (_) {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(false);
   const [supabaseActive, setSupabaseActive] = useState(false);
   const [authKey, setAuthKey] = useState(0);
 
@@ -57,95 +65,22 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     initializeStorage();
-    setSupabaseActive(isSupabaseConfigured());
+    const isConfigured = isSupabaseConfigured();
+    setSupabaseActive(isConfigured);
     
-    // If Supabase is configured, enforce strict session validation against Supabase Auth
-    if (isSupabaseConfigured()) {
+    if (isConfigured) {
+      // 1. Asynchronously validate and sync the Supabase session with the server profile
       supabase.auth.getSession().then(async ({ data: { session }, error: sessionErr }) => {
-        // 1. If Supabase session is invalid or user is not logged in, purge stale local user
-        if (sessionErr || !session?.user) {
-          setCurrentUser(null);
-          localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-          setLoading(false);
-          return;
-        }
-
-        const authUser = session.user;
-        const savedUser = getStoredItem(STORAGE_KEYS.CURRENT_USER, null);
-
-        // 2. If saved local user belongs to an old/deleted ID, purge all old caches
-        if (savedUser && savedUser.id && savedUser.id !== authUser.id) {
-          try {
-            Object.keys(localStorage).forEach(key => {
-              if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`)) {
-                localStorage.removeItem(key);
-              }
-            });
-          } catch (_) {}
-          localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-        }
-
-        // 3. Fetch authoritative profile from Supabase Database for the active session user
-        try {
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', authUser.id)
-            .maybeSingle();
-
-          if (profile && !error) {
-            const freshUser = buildUserFromProfile(profile, { id: authUser.id, email: authUser.email });
-            setCurrentUser(freshUser);
-            setStoredItem(STORAGE_KEYS.CURRENT_USER, freshUser);
-          } else {
-            // Create initial profile in public.profiles for the newly created user
-            const defaultName = authUser.user_metadata?.full_name || (authUser.email ? authUser.email.split('@')[0] : 'Artiste');
-            const defaultUsername = authUser.email?.split('@')[0]?.replace(/[^a-zA-Z0-9]/g, '_') || 'user_' + authUser.id.slice(0, 6);
-            const defaultRole = authUser.user_metadata?.role || 'Artiste / Compositeur';
-
-            const { data: createdProf } = await supabase.from('profiles').upsert({
-              id: authUser.id,
-              full_name: defaultName,
-              username: defaultUsername,
-              email: authUser.email,
-              role: defaultRole,
-              avatar_url: '',
-              bio: `Membre ${defaultRole} sur StageLink`,
-              verified_badge: 'none',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'id' }).select().maybeSingle();
-
-            const freshUser = buildUserFromProfile(createdProf || {}, { id: authUser.id, email: authUser.email, name: defaultName, role: defaultRole });
-            setCurrentUser(freshUser);
-            setStoredItem(STORAGE_KEYS.CURRENT_USER, freshUser);
-          }
-        } catch (err) {
-          console.warn('Profile sync on startup note:', err);
-        } finally {
-          setLoading(false);
-        }
-      });
-
-      // 4. Subscribe to Supabase Auth State Changes (Login, Logout, Token Refresh)
-      const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_OUT' || !session?.user) {
-          setCurrentUser(null);
-          localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-          try {
-            Object.keys(localStorage).forEach(key => {
-              if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`)) {
-                localStorage.removeItem(key);
-              }
-            });
-          } catch (_) {}
-          return;
+        if (sessionErr) {
+          console.warn('Session verification notice:', sessionErr.message);
         }
 
         if (session?.user) {
           const authUser = session.user;
-          const oldSavedUser = getStoredItem(STORAGE_KEYS.CURRENT_USER, null);
-          if (oldSavedUser && oldSavedUser.id && oldSavedUser.id !== authUser.id) {
+          const savedUser = getStoredItem(STORAGE_KEYS.CURRENT_USER, null);
+
+          // If the authenticated user is different from previously cached user, clear old message cache
+          if (savedUser && savedUser.id && savedUser.id !== authUser.id) {
             try {
               Object.keys(localStorage).forEach(key => {
                 if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`)) {
@@ -155,15 +90,16 @@ export function AuthProvider({ children }) {
             } catch (_) {}
           }
 
+          // Fetch fresh authoritative profile from Supabase Database
           try {
-            const { data: profile } = await supabase
+            const { data: profile, error } = await supabase
               .from('profiles')
               .select('*')
               .eq('id', authUser.id)
               .maybeSingle();
 
-            if (profile) {
-              const freshUser = buildUserFromProfile(profile, { id: authUser.id, email: authUser.email });
+            if (profile && !error) {
+              const freshUser = buildUserFromProfile(profile, { ...savedUser, id: authUser.id, email: authUser.email });
               setCurrentUser(freshUser);
               setStoredItem(STORAGE_KEYS.CURRENT_USER, freshUser);
             } else {
@@ -184,7 +120,78 @@ export function AuthProvider({ children }) {
                 updated_at: new Date().toISOString()
               }, { onConflict: 'id' }).select().maybeSingle();
 
-              const freshUser = buildUserFromProfile(createdProf || {}, { id: authUser.id, email: authUser.email, name: defaultName, role: defaultRole });
+              const freshUser = buildUserFromProfile(createdProf || {}, { ...savedUser, id: authUser.id, email: authUser.email, name: defaultName, role: defaultRole });
+              setCurrentUser(freshUser);
+              setStoredItem(STORAGE_KEYS.CURRENT_USER, freshUser);
+            }
+          } catch (err) {
+            console.warn('Profile sync on startup note:', err);
+          }
+        }
+      }).catch((e) => {
+        console.warn('getSession catch:', e);
+      });
+
+      // 2. Subscribe to Supabase Auth State Changes (Login, Logout, Token Refresh)
+      const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+        // ONLY clear user data if user explicitly signed out
+        if (event === 'SIGNED_OUT') {
+          setCurrentUser(null);
+          localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+          try {
+            Object.keys(localStorage).forEach(key => {
+              if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`)) {
+                localStorage.removeItem(key);
+              }
+            });
+          } catch (_) {}
+          return;
+        }
+
+        if (session?.user) {
+          const authUser = session.user;
+          const savedUser = getStoredItem(STORAGE_KEYS.CURRENT_USER, null);
+
+          if (savedUser && savedUser.id && savedUser.id !== authUser.id) {
+            try {
+              Object.keys(localStorage).forEach(key => {
+                if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`)) {
+                  localStorage.removeItem(key);
+                }
+              });
+            } catch (_) {}
+          }
+
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', authUser.id)
+              .maybeSingle();
+
+            if (profile) {
+              const freshUser = buildUserFromProfile(profile, { ...savedUser, id: authUser.id, email: authUser.email });
+              setCurrentUser(freshUser);
+              setStoredItem(STORAGE_KEYS.CURRENT_USER, freshUser);
+            } else {
+              const defaultName = authUser.user_metadata?.full_name || (authUser.email ? authUser.email.split('@')[0] : 'Artiste');
+              const defaultUsername = authUser.email?.split('@')[0]?.replace(/[^a-zA-Z0-9]/g, '_') || 'user_' + authUser.id.slice(0, 6);
+              const defaultRole = authUser.user_metadata?.role || 'Artiste / Compositeur';
+
+              const { data: createdProf } = await supabase.from('profiles').upsert({
+                id: authUser.id,
+                full_name: defaultName,
+                username: defaultUsername,
+                email: authUser.email,
+                role: defaultRole,
+                avatar_url: '',
+                bio: `Membre ${defaultRole} sur StageLink`,
+                verified_badge: 'none',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }, { onConflict: 'id' }).select().maybeSingle();
+
+              const freshUser = buildUserFromProfile(createdProf || {}, { ...savedUser, id: authUser.id, email: authUser.email, name: defaultName, role: defaultRole });
               setCurrentUser(freshUser);
               setStoredItem(STORAGE_KEYS.CURRENT_USER, freshUser);
             }
@@ -202,8 +209,7 @@ export function AuthProvider({ children }) {
     } else {
       // Local fallback only if Supabase is not configured
       const savedUser = getStoredItem(STORAGE_KEYS.CURRENT_USER, null);
-      setCurrentUser(savedUser);
-      setLoading(false);
+      if (savedUser) setCurrentUser(savedUser);
     }
   }, []);
 
