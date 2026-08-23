@@ -95,9 +95,10 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
 
       const username = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_') + '_' + Math.floor(Date.now() % 10000);
       
-      // Update profile with full user metadata
+      // Upsert profile with full user metadata in public.profiles
       try {
-        const { error: updateErr } = await supabase.from('profiles').update({
+        const { error: upsertErr } = await supabase.from('profiles').upsert({
+          id: authData.user.id,
           username: username,
           full_name: name,
           email: email,
@@ -108,24 +109,13 @@ export async function signUpUser({ email, password, name, role, gender = 'male' 
           verified_badge: 'none',
           instruments: [],
           genres: [],
-          gear: []
-        }).eq('id', authData.user.id);
+          gear: [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' });
 
-        if (updateErr) {
-          await supabase.from('profiles').upsert({
-            id: authData.user.id,
-            username: username,
-            full_name: name,
-            email: email,
-            role: role,
-            gender: gender,
-            avatar_url: '',
-            bio: `Membre ${role} sur StageLink`,
-            verified_badge: 'none',
-            instruments: [],
-            genres: [],
-            gear: []
-          }, { onConflict: 'id' });
+        if (upsertErr) {
+          console.warn('Profile upsert note during signup:', upsertErr.message);
         }
       } catch (pe) {
         console.warn('Profile setup exception:', pe?.message || pe);
@@ -214,6 +204,33 @@ export async function signInUser({ email, password }) {
         .eq('id', authData.user.id)
         .maybeSingle();
       profile = data;
+
+      // If profile is missing in public.profiles table, create it immediately
+      if (!profile && authData.user) {
+        const userMeta = authData.user.user_metadata || {};
+        const fallbackName = userMeta.full_name || userMeta.name || email.split('@')[0];
+        const fallbackUsername = userMeta.username || email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_') + '_' + Math.floor(Date.now() % 10000);
+        const fallbackRole = userMeta.role || 'Artiste / Compositeur';
+
+        const { data: createdProfile } = await supabase.from('profiles').upsert({
+          id: authData.user.id,
+          username: fallbackUsername,
+          full_name: fallbackName,
+          email: email,
+          role: fallbackRole,
+          gender: userMeta.gender || 'male',
+          avatar_url: '',
+          bio: `Membre ${fallbackRole} sur StageLink`,
+          verified_badge: 'none',
+          instruments: [],
+          genres: [],
+          gear: [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' }).select().maybeSingle();
+
+        profile = createdProfile;
+      }
     } catch (pe) {
       console.warn('Profile fetch notice:', pe?.message || pe);
     }
