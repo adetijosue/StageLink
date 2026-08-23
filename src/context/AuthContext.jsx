@@ -10,6 +10,7 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [supabaseActive, setSupabaseActive] = useState(false);
+  const [authKey, setAuthKey] = useState(0);
 
   // Helper to normalize user object from Supabase profile row and retain custom user fields
   // Helper to normalize user object from Supabase profile row and retain custom user fields
@@ -312,15 +313,30 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     try {
       Object.keys(localStorage).forEach(key => {
-        if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`)) {
+        if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`) || key.startsWith('sb-') || key.includes('auth-token')) {
           localStorage.removeItem(key);
         }
       });
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
     } catch (_) {}
 
-    await signOutUser();
+    await signOutUser({ scope: 'global' });
     setCurrentUser(null);
-    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    setAuthKey(prev => prev + 1);
+  };
+
+  const resetAuthState = async () => {
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('stagelink_cached_') || key.startsWith('sb-') || key.includes('auth-token')) {
+          localStorage.removeItem(key);
+        }
+      });
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    } catch (_) {}
+    await signOutUser({ scope: 'global' });
+    setCurrentUser(null);
+    setAuthKey(prev => prev + 1);
   };
 
   const deleteUserAccount = async () => {
@@ -352,10 +368,18 @@ export function AuthProvider({ children }) {
     const updatedUsers = users.filter(u => u.id !== userId && (!u.email || !userEmail || u.email.toLowerCase() !== userEmail.toLowerCase()));
     setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
 
-    // 3. Clear current user session & logout
+    // 3. Clear current user session, purge storage & logout globally
     setCurrentUser(null);
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-    await signOutUser();
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`) || key.startsWith('sb-') || key.includes('auth-token')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (_) {}
+    await signOutUser({ scope: 'global' });
+    setAuthKey(prev => prev + 1);
 
     return { success: true };
   };
@@ -371,66 +395,49 @@ export function AuthProvider({ children }) {
     };
 
     const sanitizedFields = { ...updatedFields };
+
     if (sanitizedFields.instruments !== undefined) sanitizedFields.instruments = toArray(sanitizedFields.instruments);
     if (sanitizedFields.genres !== undefined) sanitizedFields.genres = toArray(sanitizedFields.genres);
     if (sanitizedFields.gear !== undefined) sanitizedFields.gear = toArray(sanitizedFields.gear);
 
-    // If avatar or cover is a base64 DataURL, compress it and upload to storage
-    if (sanitizedFields.avatar && typeof sanitizedFields.avatar === 'string' && sanitizedFields.avatar.startsWith('data:image')) {
-      try {
-        const compressedAvatar = await compressImage(sanitizedFields.avatar, 600, 600, 0.85);
-        if (compressedAvatar) sanitizedFields.avatar = compressedAvatar;
-        const publicAvatar = await safeUploadToStorage('chat_media', `avatar_${currentUser.id}_${Date.now()}`, sanitizedFields.avatar);
-        if (publicAvatar) sanitizedFields.avatar = publicAvatar;
-      } catch (e) {
-        console.warn('Avatar upload to storage note:', e);
-      }
-    }
+    const updatedUser = {
+      ...currentUser,
+      ...sanitizedFields
+    };
 
-    if (sanitizedFields.coverPhoto && typeof sanitizedFields.coverPhoto === 'string' && sanitizedFields.coverPhoto.startsWith('data:image')) {
-      try {
-        const compressedCover = await compressImage(sanitizedFields.coverPhoto, 1920, 1080, 0.8);
-        if (compressedCover) sanitizedFields.coverPhoto = compressedCover;
-        const publicCover = await safeUploadToStorage('chat_media', `cover_${currentUser.id}_${Date.now()}`, sanitizedFields.coverPhoto);
-        if (publicCover) sanitizedFields.coverPhoto = publicCover;
-      } catch (e) {
-        console.warn('Cover upload to storage note:', e);
-      }
-    }
-
-    const updatedUser = { ...currentUser, ...sanitizedFields };
+    // 1. Update In-Memory Context
     setCurrentUser(updatedUser);
+
+    // 2. Persist to Local Storage
     setStoredItem(STORAGE_KEYS.CURRENT_USER, updatedUser);
 
     const users = getStoredItem(STORAGE_KEYS.USERS, []);
-    const updatedUsers = users.map((u) => (u.id === currentUser.id ? updatedUser : u));
-    if (!updatedUsers.some(u => u.id === currentUser.id)) {
-      updatedUsers.unshift(updatedUser);
+    const userIndex = users.findIndex(u => u.id === currentUser.id);
+    if (userIndex >= 0) {
+      users[userIndex] = updatedUser;
+      setStoredItem(STORAGE_KEYS.USERS, users);
     }
-    setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
 
-    // Save profile modifications directly to Supabase Database with resilient update/upsert
-    if (isSupabaseConfigured() && currentUser.id) {
+    // 3. Sync to Supabase Database
+    if (isSupabaseConfigured()) {
       try {
-        const authorFullName = sanitizedFields.name !== undefined ? sanitizedFields.name : (currentUser.name || 'Artiste');
-        const authorRole = sanitizedFields.role !== undefined ? sanitizedFields.role : (currentUser.role || 'Beatmaker / Compositeur');
-        const authorUsername = sanitizedFields.userName || sanitizedFields.username || currentUser.userName || currentUser.username || (currentUser.email ? currentUser.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_') : 'user_' + String(currentUser.id).slice(0, 6));
+        const authorFullName = sanitizedFields.name || currentUser.name;
+        const authorRole = sanitizedFields.role || currentUser.role;
 
         const payload = {
           id: currentUser.id,
-          email: currentUser.email || `${currentUser.id}@stagelink.app`,
           full_name: authorFullName,
-          username: authorUsername,
           role: authorRole,
           updated_at: new Date().toISOString()
         };
+
+        if (sanitizedFields.username !== undefined) payload.username = sanitizedFields.username;
         if (sanitizedFields.gender !== undefined) payload.gender = sanitizedFields.gender;
         if (sanitizedFields.avatar !== undefined) payload.avatar_url = sanitizedFields.avatar;
         if (sanitizedFields.coverPhoto !== undefined) payload.cover_url = sanitizedFields.coverPhoto;
         if (sanitizedFields.bio !== undefined) payload.bio = sanitizedFields.bio;
         if (sanitizedFields.location !== undefined) payload.location = sanitizedFields.location;
         if (sanitizedFields.company !== undefined) payload.company = sanitizedFields.company;
-        if (sanitizedFields.verified !== undefined) payload.verified_badge = sanitizedFields.verified ? (sanitizedFields.badgeType || 'gold') : 'none';
         if (sanitizedFields.badgeType !== undefined) payload.verified_badge = sanitizedFields.badgeType;
         if (sanitizedFields.instruments !== undefined) payload.instruments = sanitizedFields.instruments;
         if (sanitizedFields.genres !== undefined) payload.genres = sanitizedFields.genres;
@@ -465,12 +472,24 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, isAuthenticated: !!currentUser, loading, supabaseActive, login, signup, logout, deleteUserAccount, updateUserProfile }}>
-      {children}
+    <AuthContext.Provider value={{
+      authKey,
+      currentUser,
+      isAuthenticated: !!currentUser,
+      loading,
+      supabaseActive,
+      login,
+      signup,
+      logout,
+      resetAuthState,
+      deleteUserAccount,
+      updateUserProfile
+    }}>
+      <React.Fragment key={authKey}>
+        {children}
+      </React.Fragment>
     </AuthContext.Provider>
   );
 }
 
 export const useAuth = () => useContext(AuthContext);
-
-
