@@ -4,7 +4,7 @@ import UserAvatar from '../common/UserAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 
-import { getStoredItem, STORAGE_KEYS, INITIAL_USERS } from '../../services/mockData';
+import { getStoredItem, STORAGE_KEYS, INITIAL_USERS, isTestArtifact } from '../../services/mockData';
 
 const normalizeStr = (str) => {
   return String(str || '')
@@ -148,7 +148,7 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
 
     const map = new Map();
     [...INITIAL_USERS, ...(Array.isArray(storedUsers) ? storedUsers : []), ...safeUsers, ...remoteUsers].forEach(u => {
-      if (u && u.id) {
+      if (u && u.id && !isTestArtifact(u)) {
         if (!map.has(u.id)) {
           map.set(u.id, u);
         } else {
@@ -170,7 +170,7 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
     const normQuery = normalizeStr(searchQuery);
 
     return combinedUsers.filter((user) => {
-      if (!user) return false;
+      if (!user || isTestArtifact(user)) return false;
 
       // Exclude current user from contact list
       if (currentUser) {

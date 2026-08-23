@@ -791,19 +791,19 @@ function MainApp() {
                   }));
               }
 
-              // Merge live Supabase profiles with local/community users seamlessly
+              // Merge live Supabase profiles with local users seamlessly
               if (mappedSupaUsers.length > 0) {
                 const mergedMap = new Map();
-                (loadedUsers || []).forEach(u => {
-                  if (u && u.id) mergedMap.set(String(u.id), u);
+                (loadedUsers || []).filter(u => u && u.id && !isTestArtifact(u)).forEach(u => {
+                  mergedMap.set(String(u.id), u);
                 });
-                mappedSupaUsers.forEach(u => {
-                  if (u && u.id) {
-                    const existing = mergedMap.get(String(u.id)) || {};
-                    mergedMap.set(String(u.id), { ...existing, ...u });
-                  }
+                mappedSupaUsers.filter(u => u && u.id && !isTestArtifact(u)).forEach(u => {
+                  const existing = mergedMap.get(String(u.id)) || {};
+                  mergedMap.set(String(u.id), { ...existing, ...u });
                 });
-                loadedUsers = Array.from(mergedMap.values());
+                loadedUsers = Array.from(mergedMap.values()).filter(u => !isTestArtifact(u));
+              } else {
+                loadedUsers = (loadedUsers || []).filter(u => u && u.id && !isTestArtifact(u));
               }
 
               // ALWAYS ensure the current authenticated user is present in the list
@@ -3774,12 +3774,7 @@ function MainApp() {
 
         if (!error && supaProfiles) {
           const mappedUsers = supaProfiles
-            .filter(p => {
-              const name = (p.full_name || p.username || '').toLowerCase();
-              const email = (p.email || '').toLowerCase();
-              const id = String(p.id || '').toLowerCase();
-              return !name.includes('test subagent') && !name.includes('subagent') && !email.includes('subagent') && !id.includes('subagent');
-            })
+            .filter(p => !isTestArtifact(p))
             .map(p => ({
             id: p.id,
             name: p.full_name || p.username || 'Artiste',

@@ -7,7 +7,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { presenceService } from '../../services/presenceService';
 
-import { getStoredItem, STORAGE_KEYS, INITIAL_USERS } from '../../services/mockData';
+import { getStoredItem, STORAGE_KEYS, INITIAL_USERS, isTestArtifact } from '../../services/mockData';
 
 const normalizeStr = (str) => {
   return String(str || '')
@@ -189,7 +189,7 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
 
     const map = new Map();
     [...INITIAL_USERS, ...(Array.isArray(storedUsers) ? storedUsers : []), ...safeLocalUsers, ...remoteUsers].forEach(u => {
-      if (u && u.id) {
+      if (u && u.id && !isTestArtifact(u)) {
         if (!map.has(u.id)) {
           map.set(u.id, u);
         } else {
@@ -205,7 +205,7 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
     const normQuery = rawQuery.replace(/^@/, '');
 
     return combinedUsers.filter((u) => {
-      if (!u) return false;
+      if (!u || isTestArtifact(u)) return false;
 
       // Exclude current logged-in user from search results
       if (currentUser) {
