@@ -62,6 +62,8 @@ function FeedCard({
   // Double Click / Touch Tap Heart Burst Animation State
   const [showDoubleTapHeart, setShowDoubleTapHeart] = useState(false);
   const lastTapRef = useRef(0);
+  const lastTapPosRef = useRef({ x: 0, y: 0 });
+  const likeBurstTimeoutRef = useRef(null);
 
   const isAuthor = currentUser && (currentUser.id === post.userId || currentUser.name === post.userName);
 
@@ -83,41 +85,60 @@ function FeedCard({
   };
 
   // Double Click / Double Tap to Like Media & Card
-  const isLikingRef = useRef(false);
-
   const triggerLikeBurst = (e) => {
     if (e && e.stopPropagation) {
       e.stopPropagation();
     }
 
-    if (isLikingRef.current) return;
-    isLikingRef.current = true;
-
     setShowDoubleTapHeart(true);
-    soundEngine.playPopSound();
+    soundEngine?.playPopSound?.();
     haptics.like();
 
-    onLike(post.id);
+    // Like post if not already liked
+    if (onLike && !post.isLiked) {
+      onLike(post.id);
+    }
 
     try {
       confetti({
-        particleCount: 25,
-        spread: 60,
-        origin: { y: 0.65 }
+        particleCount: 35,
+        spread: 70,
+        origin: { y: 0.6 }
       });
-    } catch (err) { console.error("Suppressed error", err); }
+    } catch (_) {}
 
-    setTimeout(() => {
+    if (likeBurstTimeoutRef.current) {
+      clearTimeout(likeBurstTimeoutRef.current);
+    }
+    likeBurstTimeoutRef.current = setTimeout(() => {
       setShowDoubleTapHeart(false);
-      isLikingRef.current = false;
-    }, 600);
+    }, 800);
   };
 
-  const handleCardTouchOrClick = (e) => {
+  const handleCardTouchEnd = (e) => {
     const now = Date.now();
-    const DOUBLE_TAP_DELAY = 320;
-    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+    const touch = e.changedTouches?.[0];
+    if (touch) {
+      const dx = Math.abs(touch.clientX - (lastTapPosRef.current.x || touch.clientX));
+      const dy = Math.abs(touch.clientY - (lastTapPosRef.current.y || touch.clientY));
+      
+      // Double tap detected (within 320ms and within 35px radius)
+      if (now - lastTapRef.current < 320 && dx < 35 && dy < 35) {
+        triggerLikeBurst(e);
+        lastTapRef.current = 0;
+        return;
+      }
+      lastTapPosRef.current = { x: touch.clientX, y: touch.clientY };
+    }
+    lastTapRef.current = now;
+  };
+
+  const handleCardClick = (e) => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 320) {
       triggerLikeBurst(e);
+      lastTapRef.current = 0;
+      return;
     }
     lastTapRef.current = now;
   };
@@ -161,40 +182,79 @@ function FeedCard({
   return (
     <div
       className="card"
-      onClick={handleCardTouchOrClick}
+      onClick={handleCardClick}
+      onTouchEnd={handleCardTouchEnd}
       onDoubleClick={triggerLikeBurst}
       style={{ marginBottom: '16px', borderRadius: '18px', position: 'relative', overflow: 'hidden', userSelect: 'none' }}
     >
-      {/* Double Tap Floating Heart Overlay */}
+      {/* Instagram-style Double Tap Floating Heart Overlay */}
       {showDoubleTapHeart && (
         <div style={{
           position: 'absolute',
           inset: 0,
-          zIndex: 50,
+          zIndex: 60,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           pointerEvents: 'none',
-          background: 'rgba(0, 0, 0, 0.3)',
-          backdropFilter: 'blur(3px)',
+          background: 'rgba(0, 0, 0, 0.28)',
+          backdropFilter: 'blur(2px)',
+          borderRadius: '18px',
           animation: 'fadeIn 0.15s ease'
         }}>
+          {/* Expanding Pulsing Ring */}
+          <div style={{
+            position: 'absolute',
+            width: '140px',
+            height: '140px',
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(239, 68, 68, 0.45) 0%, rgba(239, 68, 68, 0) 70%)',
+            animation: 'heartPulseRing 0.7s ease-out forwards'
+          }} />
+
+          {/* Main Glowing Instagram Heart */}
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            transform: 'scale(1.25)',
-            animation: 'likeHeartPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+            justifyContent: 'center',
+            position: 'relative',
+            animation: 'likeHeartPop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards'
           }}>
             <Heart
-              size={96}
+              size={110}
               fill="#EF4444"
-              color="#EF4444"
+              color="#FFFFFF"
+              strokeWidth={1.5}
               style={{
-                filter: 'drop-shadow(0 12px 35px rgba(239, 68, 68, 0.9))'
+                filter: 'drop-shadow(0 15px 35px rgba(239, 68, 68, 0.95)) drop-shadow(0 0 25px rgba(255, 0, 90, 0.8))'
               }}
             />
           </div>
+
+          {/* Radiating Sparkles */}
+          {[
+            { tx: '-45px', ty: '-45px', delay: '0.05s', size: 14 },
+            { tx: '45px', ty: '-40px', delay: '0.08s', size: 16 },
+            { tx: '-50px', ty: '35px', delay: '0.12s', size: 12 },
+            { tx: '50px', ty: '30px', delay: '0.15s', size: 15 },
+            { tx: '0px', ty: '-60px', delay: '0.02s', size: 18 },
+            { tx: '0px', ty: '55px', delay: '0.18s', size: 14 }
+          ].map((spark, idx) => (
+            <div
+              key={idx}
+              style={{
+                position: 'absolute',
+                color: '#FFD700',
+                fontSize: `${spark.size}px`,
+                animation: `heartSparkle 0.6s ease-out ${spark.delay} forwards`,
+                '--tx': spark.tx,
+                '--ty': spark.ty
+              }}
+            >
+              ✨
+            </div>
+          ))}
         </div>
       )}
 
