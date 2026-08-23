@@ -391,23 +391,72 @@ export function useConversationList(currentUser) {
       }
 
 
-      // Merge remote, messages, and local discussions seamlessly with deduplication by partner ID
+      // 5b. Process discussions from message notifications (supaNotifs fallback)
+      const notifsFormatted = [];
+      if (Array.isArray(supaNotifs) && supaNotifs.length > 0) {
+        supaNotifs.forEach(notif => {
+          const actor = notif.actor;
+          const actorId = notif.actor_id || actor?.id;
+          if (!actorId || actorId === currentUser.id || deletedPartnerIds.has(String(actorId))) return;
+
+          const actorName = actor?.full_name || actor?.username || 'Artiste';
+          const actorAvatar = actor?.avatar_url || '';
+          const actorRole = actor?.role || 'Artiste';
+
+          const normalizedPartner = {
+            id: actorId,
+            full_name: actorName,
+            name: actorName,
+            username: actor?.username || '',
+            avatar: actorAvatar,
+            avatar_url: actorAvatar,
+            role: actorRole,
+            userRole: actorRole
+          };
+
+          notifsFormatted.push({
+            id: `conv_${actorId}`,
+            type: 'direct',
+            title: actorName,
+            avatar: actorAvatar,
+            partner: normalizedPartner,
+            participant: normalizedPartner,
+            lastMessage: {
+              id: notif.id,
+              sender_id: actorId,
+              content: notif.content || 'Nouveau message',
+              created_at: notif.created_at
+            },
+            updatedAt: notif.created_at,
+            unreadCount: notif.is_read ? 0 : 1
+          });
+        });
+      }
+
+      // Merge remote, messages, notifications, and local discussions seamlessly with deduplication by partner ID
       const convMap = new Map();
       remoteFormatted.forEach(c => {
         if (!c || isTestArtifact(c)) return;
-        const key = c.partner?.id || c.id;
+        const key = c.partner?.id || c.participant?.id || c.id;
         if (key) convMap.set(key, c);
       });
       messagesFormatted.forEach(c => {
         if (!c || isTestArtifact(c)) return;
-        const key = c.partner?.id || c.id;
+        const key = c.partner?.id || c.participant?.id || c.id;
+        if (key && !convMap.has(key)) {
+          convMap.set(key, c);
+        }
+      });
+      notifsFormatted.forEach(c => {
+        if (!c || isTestArtifact(c)) return;
+        const key = c.partner?.id || c.participant?.id || c.id;
         if (key && !convMap.has(key)) {
           convMap.set(key, c);
         }
       });
       localCachedConvs.forEach(c => {
         if (!c || isTestArtifact(c)) return;
-        const key = c.partner?.id || c.id;
+        const key = c.partner?.id || c.participant?.id || c.id;
         if (key && !convMap.has(key)) {
           convMap.set(key, c);
         }
@@ -419,7 +468,7 @@ export function useConversationList(currentUser) {
           const partnerId = c.partner?.id || c.participant?.id;
           if (!partnerId || partnerId === currentUser.id) return false;
           const title = String(c.title || c.partner?.name || c.partner?.full_name || '').toLowerCase().trim();
-          if (title === 'utilisateur' || title.includes('stagelink support') || title.includes('subagent')) return false;
+          if (title.includes('stagelink support') || title.includes('subagent')) return false;
           if (!c.lastMessage) return false;
           return true;
         })

@@ -81,22 +81,52 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     }
 
     try {
-      const partnerId = partner?.id || partner?.userId || partner?.user_id || (conversationId && conversationId.startsWith('chat_') ? conversationId.replace('chat_', '') : null);
+      const isValidUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(str || ''));
+      const partnerId = partner?.id || partner?.userId || partner?.user_id || (conversationId ? (conversationId.startsWith('conv_') ? conversationId.replace('conv_', '') : (conversationId.startsWith('chat_') ? conversationId.replace('chat_', '') : null)) : null);
+
+      // Resolve UUID conversation if needed
+      let resolvedConvId = isValidUUID(conversationId) ? conversationId : null;
+      if (!resolvedConvId && partnerId && currentUser?.id && isValidUUID(partnerId) && isValidUUID(currentUser.id)) {
+        try {
+          const { data: myParts } = await supabase
+            .from('conversation_participants')
+            .select('conversation_id')
+            .eq('user_id', currentUser.id);
+
+          if (myParts && myParts.length > 0) {
+            const convIds = myParts.map(p => p.conversation_id);
+            const { data: partnerParts } = await supabase
+              .from('conversation_participants')
+              .select('conversation_id')
+              .eq('user_id', partnerId)
+              .in('conversation_id', convIds)
+              .limit(1);
+
+            if (partnerParts && partnerParts.length > 0 && partnerParts[0].conversation_id) {
+              resolvedConvId = partnerParts[0].conversation_id;
+            }
+          }
+        } catch (_) {}
+      }
 
       // 1. Fetch conversation details (e.g. Vanish mode state)
-      const convPromise = supabase
-        .from('conversations')
-        .select('vanish_mode_enabled')
-        .eq('id', conversationId)
-        .maybeSingle();
+      const convPromise = resolvedConvId
+        ? supabase
+            .from('conversations')
+            .select('vanish_mode_enabled')
+            .eq('id', resolvedConvId)
+            .maybeSingle()
+        : Promise.resolve({ data: null });
 
-      // 2. Fetch last 50 messages from direct_messages
-      const msgsPromise = supabase
-        .from('direct_messages')
-        .select('*, reactions:message_reactions(*)')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      // 2. Fetch messages from direct_messages table
+      const msgsPromise = resolvedConvId
+        ? supabase
+            .from('direct_messages')
+            .select('*, reactions:message_reactions(*)')
+            .eq('conversation_id', resolvedConvId)
+            .order('created_at', { ascending: false })
+            .limit(50)
+        : Promise.resolve({ data: [] });
 
       // 3. Also fetch from messages table for complete backward and forward compatibility
       const messagesTablePromise = partnerId && currentUser?.id
@@ -110,9 +140,9 @@ export function useChatThread({ conversationId, currentUser, partner }) {
         : Promise.resolve({ data: [] });
 
       const [{ data: conv }, { data: msgs }, { data: legacyMsgs }] = await Promise.all([
-        convPromise,
-        msgsPromise,
-        messagesTablePromise
+        convPromise.catch(() => ({ data: null })),
+        msgsPromise.catch(() => ({ data: [] })),
+        messagesTablePromise.catch(() => ({ data: [] }))
       ]);
 
       if (conv && isMountedRef.current) {
@@ -124,7 +154,7 @@ export function useChatThread({ conversationId, currentUser, partner }) {
         if (!m || !m.id) return;
         allMsgsMap.set(m.id, {
           id: m.id,
-          conversation_id: conversationId,
+          conversation_id: resolvedConvId || conversationId,
           sender_id: m.sender_id,
           message_type: m.metadata?.mediaType || (m.audio_url ? 'audio' : (m.media_url ? 'image' : 'text')),
           content: m.content || m.text || '',
@@ -138,19 +168,34 @@ export function useChatThread({ conversationId, currentUser, partner }) {
 
       (msgs || []).forEach(m => {
         if (!m || !m.id) return;
-        allMsgsMap.set(m.id, m);
+        allMsgsMap.set(m.id, {
+          id: m.id,
+          conversation_id: resolvedConvId || conversationId,
+          sender_id: m.sender_id,
+          message_type: m.message_type || (m.audio_url ? 'audio' : (m.media_url ? 'image' : 'text')),
+          content: m.content || m.text || '',
+          media_url: m.media_url || m.audio_url || null,
+          metadata: m.metadata || {},
+          status: m.status || 'sent',
+          is_vanished: Boolean(m.is_vanished),
+          reactions: m.reactions || [],
+          created_at: m.created_at || new Date().toISOString()
+        });
       });
 
       const mergedList = Array.from(allMsgsMap.values()).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
-      if (isMountedRef.current && mergedList.length > 0) {
+      if (isMountedRef.current) {
         setMessages(mergedList);
-        persistMessagesCache(mergedList);
+        if (mergedList.length > 0) {
+          persistMessagesCache(mergedList);
+        }
       }
 
       // Mark conversation as read across all systems
       if (currentUser?.id) {
-        directChatService.markAsRead(conversationId, currentUser.id);
+        if (resolvedConvId) directChatService.markAsRead(resolvedConvId, currentUser.id);
+        if (conversationId) directChatService.markAsRead(conversationId, currentUser.id);
 
         if (partnerId) {
           try {
@@ -158,23 +203,12 @@ export function useChatThread({ conversationId, currentUser, partner }) {
               .from('messages')
               .update({ is_read: true })
               .eq('receiver_id', currentUser.id)
-              .eq('sender_id', partnerId)
-              .then(() => {})
-              .catch(() => {});
-
-            supabase
-              .from('notifications')
-              .update({ is_read: true })
-              .eq('user_id', currentUser.id)
-              .eq('actor_id', partnerId)
-              .eq('type', 'message')
-              .then(() => {})
-              .catch(() => {});
+              .eq('sender_id', partnerId);
           } catch (_) {}
         }
       }
     } catch (e) {
-      console.warn('Load messages note:', e);
+      console.warn('Load messages error:', e);
     } finally {
       if (isMountedRef.current) {
         setIsLoading(false);
@@ -191,7 +225,7 @@ export function useChatThread({ conversationId, currentUser, partner }) {
    */
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
-    const partnerId = partner?.id || partner?.userId || partner?.user_id;
+    const partnerId = partner?.id || partner?.userId || partner?.user_id || (conversationId ? (conversationId.startsWith('conv_') ? conversationId.replace('conv_', '') : (conversationId.startsWith('chat_') ? conversationId.replace('chat_', '') : null)) : null);
     const currentUserId = currentUser?.id;
     const channelKey = conversationId || (partnerId && currentUserId ? `dm_pair_${[currentUserId, partnerId].sort().join('_')}` : null);
 
@@ -199,15 +233,33 @@ export function useChatThread({ conversationId, currentUser, partner }) {
       if (!incomingMsg) return;
       if (incomingMsg.sender_id === currentUserId) return;
 
+      const incomingSender = String(incomingMsg.sender_id || '');
+      const incomingReceiver = String(incomingMsg.receiver_id || incomingMsg.recipient_id || '');
+      const incomingConv = String(incomingMsg.conversation_id || '');
+
       const isForThisThread =
-        (incomingMsg.conversation_id && conversationId && String(incomingMsg.conversation_id) === String(conversationId)) ||
-        (partnerId && (String(incomingMsg.sender_id) === String(partnerId) || String(incomingMsg.recipient_id) === String(partnerId) || String(incomingMsg.receiver_id) === String(partnerId)));
+        (incomingConv && conversationId && incomingConv === String(conversationId)) ||
+        (partnerId && (incomingSender === String(partnerId) || incomingReceiver === String(partnerId))) ||
+        (incomingSender && partnerId && incomingSender === String(partnerId));
 
       if (!isForThisThread) return;
 
+      const formatted = {
+        id: incomingMsg.id || `inc_${Date.now()}`,
+        conversation_id: conversationId,
+        sender_id: incomingMsg.sender_id,
+        message_type: incomingMsg.message_type || (incomingMsg.audio_url ? 'audio' : (incomingMsg.media_url ? 'image' : 'text')),
+        content: incomingMsg.content || incomingMsg.text || '',
+        media_url: incomingMsg.media_url || incomingMsg.audio_url || null,
+        metadata: incomingMsg.metadata || {},
+        status: 'sent',
+        is_vanished: Boolean(incomingMsg.is_vanished),
+        created_at: incomingMsg.created_at || new Date().toISOString()
+      };
+
       setMessages((prev) => {
-        if (prev.some((m) => m.id === incomingMsg.id)) return prev;
-        const next = [...prev, incomingMsg];
+        if (prev.some((m) => m.id === formatted.id)) return prev;
+        const next = [...prev, formatted];
         persistMessagesCache(next);
         return next;
       });
@@ -218,7 +270,7 @@ export function useChatThread({ conversationId, currentUser, partner }) {
       }
     };
 
-    // 1. Listen to custom window event if App.jsx received it first
+    // 1. Listen to custom window events if App.jsx received it first
     const handleWindowDm = (e) => {
       if (e.detail) {
         handleIncoming(e.detail);
@@ -227,7 +279,7 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     window.addEventListener('direct_message_received', handleWindowDm);
     window.addEventListener('new_message_received', handleWindowDm);
 
-    // 2. Realtime WebSocket Channel
+    // 2. Realtime WebSocket Channels
     const channel = supabase
       .channel(`dm:${channelKey || 'general'}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' }, (payload) => {

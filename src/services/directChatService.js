@@ -240,36 +240,72 @@ export const directChatService = {
 
     const isValidUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(str || ''));
 
+    // 1. Resolve recipient ID if not explicitly provided
+    let targetRecipientId = recipientId;
+    if (!targetRecipientId && conversationId) {
+      if (String(conversationId).startsWith('conv_')) {
+        targetRecipientId = String(conversationId).replace('conv_', '');
+      } else if (String(conversationId).startsWith('chat_')) {
+        targetRecipientId = String(conversationId).replace('chat_', '');
+      }
+    }
+
+    let realConvId = conversationId;
+
     if (isSupabaseConfigured()) {
       try {
-        // Persist to Postgres direct_messages database only if conversationId is a valid UUID
-        if (isValidUUID(conversationId)) {
-          const { error } = await supabase.from('direct_messages').insert(newRecord);
-          if (error) {
-            console.warn('Direct message DB insert note:', error.message);
+        // If conversationId is not a UUID, get or create the real UUID conversation row in PostgreSQL
+        if (!isValidUUID(conversationId) && targetRecipientId && isValidUUID(targetRecipientId) && senderId && isValidUUID(senderId)) {
+          try {
+            const convRes = await directChatService.getOrCreateDirectConversation(targetRecipientId);
+            if (convRes && convRes.conversation_id && isValidUUID(convRes.conversation_id)) {
+              realConvId = convRes.conversation_id;
+            }
+          } catch (_) {}
+        }
+
+        const newRecord = {
+          id: isValidUUID(msgId) ? msgId : undefined,
+          conversation_id: isValidUUID(realConvId) ? realConvId : undefined,
+          sender_id: senderId,
+          message_type: messageType,
+          content,
+          media_url: mediaUrl,
+          metadata,
+          reply_to_id: isValidUUID(replyToId) ? replyToId : null,
+          status: 'sent',
+          is_vanished: isVanished,
+          created_at: now,
+          updated_at: now
+        };
+
+        // Persist to Postgres direct_messages database only if realConvId is a valid UUID
+        if (isValidUUID(realConvId)) {
+          const { error: dmErr } = await supabase.from('direct_messages').insert(newRecord);
+          if (dmErr) {
+            console.warn('Direct message DB insert note:', dmErr.message);
+          } else {
+            // Update conversation updated_at and last_message_at
+            await supabase
+              .from('conversations')
+              .update({ updated_at: now, last_message_at: now })
+              .eq('id', realConvId);
           }
         }
 
-        // Resolve recipient ID if not explicitly provided
-        let targetRecipientId = recipientId;
-        if (!targetRecipientId && conversationId) {
-          if (String(conversationId).startsWith('conv_')) {
-            targetRecipientId = String(conversationId).replace('conv_', '');
-          } else if (String(conversationId).startsWith('chat_')) {
-            targetRecipientId = String(conversationId).replace('chat_', '');
-          } else if (isValidUUID(conversationId)) {
-            try {
-              const { data: parts } = await supabase
-                .from('conversation_participants')
-                .select('user_id')
-                .eq('conversation_id', conversationId)
-                .neq('user_id', senderId)
-                .limit(1);
-              if (parts && parts.length > 0) {
-                targetRecipientId = parts[0].user_id;
-              }
-            } catch (pe) {}
-          }
+        // If recipient was not resolved yet, check conversation_participants
+        if (!targetRecipientId && isValidUUID(realConvId)) {
+          try {
+            const { data: parts } = await supabase
+              .from('conversation_participants')
+              .select('user_id')
+              .eq('conversation_id', realConvId)
+              .neq('user_id', senderId)
+              .limit(1);
+            if (parts && parts.length > 0) {
+              targetRecipientId = parts[0].user_id;
+            }
+          } catch (pe) {}
         }
 
         // Update chat_states to un-delete conversation if previously deleted
@@ -292,7 +328,7 @@ export const directChatService = {
               user_id: targetRecipientId,
               actor_id: senderId,
               type: 'message',
-              reference_id: isValidUUID(conversationId) ? conversationId : null,
+              reference_id: isValidUUID(realConvId) ? realConvId : null,
               content: notifContent,
               is_read: false
             });
@@ -322,18 +358,36 @@ export const directChatService = {
         // 4. INSTANT MULTI-CHANNEL WEBSOCKET BROADCASTS (Delivery <20ms guaranteed)
         try {
           const broadcastPayload = {
-            message: newRecord,
-            conversationId,
+            message: {
+              ...newRecord,
+              id: msgId,
+              conversation_id: realConvId,
+              receiver_id: targetRecipientId,
+              recipient_id: targetRecipientId,
+              text: content
+            },
+            conversationId: realConvId,
+            originalConversationId: conversationId,
             senderId,
             recipientId: targetRecipientId
           };
 
           // A. Broadcast on conversation thread channel (for in-chat instant UI append)
-          supabase.channel(`dm:${conversationId}`).send({
-            type: 'broadcast',
-            event: 'new_direct_message',
-            payload: broadcastPayload
-          }).catch(() => {});
+          if (realConvId) {
+            supabase.channel(`dm:${realConvId}`).send({
+              type: 'broadcast',
+              event: 'new_direct_message',
+              payload: broadcastPayload
+            }).catch(() => {});
+          }
+
+          if (conversationId && conversationId !== realConvId) {
+            supabase.channel(`dm:${conversationId}`).send({
+              type: 'broadcast',
+              event: 'new_direct_message',
+              payload: broadcastPayload
+            }).catch(() => {});
+          }
 
           // B. Broadcast to target recipient's private user channel (for instant floating banner & badge)
           if (targetRecipientId && targetRecipientId !== senderId) {
@@ -348,6 +402,12 @@ export const directChatService = {
           supabase.channel('realtime:direct_messages').send({
             type: 'broadcast',
             event: 'new_direct_message',
+            payload: broadcastPayload
+          }).catch(() => {});
+
+          supabase.channel('realtime:messages').send({
+            type: 'broadcast',
+            event: 'new_message',
             payload: broadcastPayload
           }).catch(() => {});
         } catch (bErr) {
