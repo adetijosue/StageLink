@@ -278,10 +278,24 @@ export const SUPABASE_STORAGE_KEYS = [
 ];
 
 /**
+ * Reset all realtime channels and listeners on the Supabase client
+ */
+export function resetSupabaseClient() {
+  try {
+    if (supabase && typeof supabase.removeAllChannels === 'function') {
+      supabase.removeAllChannels();
+    }
+  } catch (e) {
+    console.warn('resetSupabaseClient note:', e);
+  }
+}
+
+/**
  * Clear all Supabase Auth session tokens & cached keys from storage
  */
 export function clearSupabaseAuthStorage() {
   try {
+    resetSupabaseClient();
     if (typeof localStorage !== 'undefined') {
       // 1. Remove explicit keys
       SUPABASE_STORAGE_KEYS.forEach(key => {
