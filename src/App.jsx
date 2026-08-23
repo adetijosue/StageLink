@@ -618,6 +618,217 @@ function MainApp() {
     };
   }, [allUsers]);
 
+  // Universal Sync Function for Posts, Stories & Profiles from Supabase
+  const syncPostsStoriesAndProfiles = useCallback(async () => {
+    if (!isSupabaseConfigured()) return;
+    try {
+      // 1. Sync Live Profiles
+      let currentUsersList = allUsers;
+      const { data: supaProfiles } = await supabase.from('profiles').select('*').limit(150);
+      if (supaProfiles && supaProfiles.length > 0) {
+        const mappedSupa = supaProfiles
+          .filter(p => !isTestArtifact(p))
+          .map(p => ({
+            id: p.id,
+            name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
+            email: p.email || '',
+            role: p.role || 'Artiste',
+            company: p.company || '',
+            avatar: p.avatar_url || '',
+            verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+            badgeType: p.verified_badge || 'none',
+            bio: p.bio || '',
+            location: p.location || '',
+            instruments: p.instruments || [],
+            genres: p.genres || [],
+            gear: p.gear || []
+          }));
+
+        setAllUsers(prev => {
+          const uMap = new Map();
+          mappedSupa.forEach(u => uMap.set(u.id, u));
+          (prev || []).filter(u => !isTestArtifact(u)).forEach(u => {
+            if (!uMap.has(u.id)) {
+              uMap.set(u.id, u);
+            }
+          });
+          currentUsersList = Array.from(uMap.values());
+          return currentUsersList;
+        });
+      }
+
+      const userLookup = new Map(currentUsersList.map(u => [u.id, u]));
+
+      // 2. Sync Live Posts with resilient fallback
+      let supaPosts = null;
+      try {
+        const res = await supabase
+          .from('posts')
+          .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge), post_likes(user_id), post_comments(id, user_id, content, created_at, profiles:user_id(full_name))')
+          .order('created_at', { ascending: false });
+        if (res.data && !res.error) {
+          supaPosts = res.data;
+        } else {
+          const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(50);
+          if (simpleRes.data) supaPosts = simpleRes.data;
+        }
+      } catch (pe) {
+        const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(50);
+        if (simpleRes.data) supaPosts = simpleRes.data;
+      }
+
+      if (Array.isArray(supaPosts)) {
+        const freshPosts = supaPosts.map(p => {
+          const authorProfile = userLookup.get(p.user_id) || p.profiles || {};
+          const isCurrentUser = p.user_id === currentUser?.id;
+          const authorName = isCurrentUser ? (currentUser.name || currentUser.full_name || authorProfile.full_name || 'Artiste') : (authorProfile.name || authorProfile.full_name || p.profiles?.full_name || 'Artiste');
+          const authorAvatar = isCurrentUser ? (currentUser.avatar || currentUser.avatar_url || authorProfile.avatar_url || '') : (authorProfile.avatar || authorProfile.avatar_url || p.profiles?.avatar_url || '');
+          const authorRole = isCurrentUser ? (currentUser.role || 'Artiste') : (authorProfile.role || p.profiles?.role || 'Membre StageLink');
+          const isVerified = isCurrentUser ? currentUser.verified : (authorProfile.verified || authorProfile.verified_badge === 'gold' || authorProfile.verified_badge === 'blue' || p.profiles?.verified_badge === 'gold');
+          const badgeType = isCurrentUser ? currentUser.badgeType : (authorProfile.badgeType || authorProfile.verified_badge || p.profiles?.verified_badge || 'none');
+
+          let textContent = p.content || '';
+          let proServiceData = null;
+          if (textContent.includes('___PRO_SERVICE___:')) {
+            const parts = textContent.split('___PRO_SERVICE___:');
+            textContent = parts[0].trim();
+            try {
+              proServiceData = JSON.parse(parts[1]);
+            } catch(e) {}
+          }
+
+          const isVid = isVideoMediaUrl(p.media_url);
+          const rawUrl = p.media_url && typeof p.media_url === 'string' && p.media_url !== 'null' && p.media_url !== 'undefined' && p.media_url.trim() !== '' ? p.media_url : null;
+          const postCreatedAt = p.created_at || new Date().toISOString();
+
+          return {
+            id: p.id,
+            userId: p.user_id,
+            userName: authorName,
+            userRole: authorRole,
+            userAvatar: authorAvatar,
+            isVerified: isVerified,
+            badgeType: badgeType,
+            text: textContent,
+            proServiceData: proServiceData,
+            image: !isVid ? rawUrl : null,
+            video: isVid ? rawUrl : null,
+            media_url: rawUrl,
+            mediaList: rawUrl ? [{ type: isVid ? 'video' : 'image', url: rawUrl }] : [],
+            hasAudio: Boolean(p.audio_url),
+            audioTitle: p.audio_title || 'Extrait Audio',
+            audioUrl: p.audio_url || null,
+            likesCount: p.post_likes ? p.post_likes.length : (p.likes_count || 0),
+            isLiked: p.post_likes ? p.post_likes.some(l => l.user_id === currentUser?.id) : false,
+            commentsCount: p.post_comments ? p.post_comments.length : (p.comments_count || (p.comments ? p.comments.length : 0)),
+            comments: p.post_comments ? p.post_comments.map(c => ({
+              id: c.id,
+              userId: c.user_id,
+              userName: c.profiles?.full_name || userLookup.get(c.user_id)?.name || 'Artiste',
+              text: c.content,
+              time: formatTimeAgo(c.created_at, language)
+            })) : [],
+            created_at: postCreatedAt,
+            createdAt: postCreatedAt,
+            timeAgo: formatTimeAgo(postCreatedAt, language)
+          };
+        });
+        const sanitizedPosts = freshPosts.filter(p => !isTestArtifact(p));
+
+        // Preserve any pending local optimistic posts created recently by current user
+        const currentLocalPosts = getStoredItem(STORAGE_KEYS.POSTS, []) || [];
+        const supaPostIds = new Set(sanitizedPosts.map(sp => sp.id));
+        const pendingLocalPosts = currentLocalPosts.filter(lp => lp && lp.id && !supaPostIds.has(lp.id) && !lp.isDeleted && !isTestArtifact(lp));
+        const mergedPosts = [...pendingLocalPosts, ...sanitizedPosts];
+
+        setPosts(mergedPosts);
+        setStoredItem(STORAGE_KEYS.POSTS, mergedPosts);
+      }
+
+      // 3. Sync Live Stories with resilient fallback
+      let supaStories = null;
+      let storySyncOk = false;
+      try {
+        const res = await supabase
+          .from('stories')
+          .select('*, profiles:user_id(full_name, avatar_url), story_views(viewer_id, profiles:viewer_id(full_name, avatar_url, role)), story_likes(user_id)')
+          .order('created_at', { ascending: false });
+        if (res.data && !res.error) {
+          supaStories = res.data;
+          storySyncOk = true;
+        } else {
+          const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false }).limit(50);
+          if (simpleRes.data && !simpleRes.error) {
+            supaStories = simpleRes.data;
+            storySyncOk = true;
+          }
+        }
+      } catch (se) {
+        const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false }).limit(50);
+        if (simpleRes.data && !simpleRes.error) {
+          supaStories = simpleRes.data;
+          storySyncOk = true;
+        }
+      }
+
+      if (storySyncOk && Array.isArray(supaStories)) {
+        const freshStories = supaStories.map(s => {
+          const authorProfile = userLookup.get(s.user_id) || s.profiles || {};
+          const isCurrentUser = s.user_id === currentUser?.id;
+          const authorName = isCurrentUser ? (currentUser?.name || 'Moi') : (authorProfile.name || authorProfile.full_name || s.profiles?.full_name || 'Artiste');
+          const authorAvatar = isCurrentUser ? (currentUser?.avatar || '') : (authorProfile.avatar || authorProfile.avatar_url || s.profiles?.avatar_url || '');
+          const rawStoryMedia = s.media_url && typeof s.media_url === 'string' && s.media_url !== 'null' && s.media_url !== 'undefined' && s.media_url.trim() !== '' ? s.media_url : null;
+          const isText = !rawStoryMedia || rawStoryMedia === '';
+          const storyCreatedAt = s.created_at || new Date().toISOString();
+
+          return {
+            id: s.id,
+            userId: s.user_id,
+            userName: authorName,
+            avatar: authorAvatar,
+            userAvatar: authorAvatar,
+            hasUnread: s.story_views ? !s.story_views.some(v => v.viewer_id === currentUser?.id) : true,
+            storyMedia: isText ? null : rawStoryMedia,
+            mediaUrl: isText ? '' : rawStoryMedia,
+            isTextStory: isText,
+            mediaType: isText ? 'text' : (s.is_video ? 'video' : ((rawStoryMedia && (rawStoryMedia.includes('.mp4') || rawStoryMedia.includes('.webm') || rawStoryMedia.includes('.mov') || rawStoryMedia.startsWith('data:video'))) ? 'video' : 'image')),
+            isVideo: s.is_video || (rawStoryMedia && (rawStoryMedia.includes('.mp4') || rawStoryMedia.includes('.webm') || rawStoryMedia.includes('.mov'))),
+            caption: s.caption || '',
+            likesCount: s.story_likes ? s.story_likes.length : 0,
+            isLiked: s.story_likes ? s.story_likes.some(l => l.user_id === currentUser?.id) : false,
+            viewers: s.story_views ? s.story_views.map(v => ({
+              id: v.viewer_id,
+              name: v.profiles?.full_name || userLookup.get(v.viewer_id)?.name || 'Artiste',
+              avatar: v.profiles?.avatar_url || userLookup.get(v.viewer_id)?.avatar || '',
+              role: v.profiles?.role || 'Artiste'
+            })) : [],
+            created_at: storyCreatedAt,
+            createdAt: storyCreatedAt,
+            createdAtTimestamp: new Date(storyCreatedAt).getTime(),
+            time: formatTimeAgo(storyCreatedAt, language)
+          };
+        });
+
+        // Source of truth: Supabase. Do not keep deleted stories from other users.
+        setStories(prevStories => {
+          const freshIds = new Set(freshStories.map(s => s.id));
+          const now = Date.now();
+          const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+          const localUnsynced = (prevStories || []).filter(localS => {
+            if (freshIds.has(localS.id)) return false;
+            const isMyPendingDraft = (localS.userId === currentUser?.id || localS.isLocalPending || String(localS.id).startsWith('local_')) && !localS.isDeleted;
+            if (!isMyPendingDraft) return false;
+            const storyTimestamp = localS.createdAtTimestamp || (localS.created_at ? new Date(localS.created_at).getTime() : (localS.expires_at ? new Date(localS.expires_at).getTime() - ONE_DAY_MS : now));
+            return (now - storyTimestamp) < ONE_DAY_MS;
+          });
+          const merged = [...localUnsynced, ...freshStories];
+          setStoredItem(STORAGE_KEYS.STORIES, merged);
+          return merged;
+        });
+      }
+    } catch (e) { console.error("Suppressed error:", e); }
+  }, [currentUser, allUsers, language]);
+
   const handleRefreshData = async () => {
     soundEngine.playPopSound();
     if (isSupabaseConfigured()) {
@@ -1280,214 +1491,7 @@ function MainApp() {
 
       loadInitialData();
 
-      // Function to sync posts, stories & profiles from Supabase
-      const syncPostsStoriesAndProfiles = async () => {
-        if (!isSupabaseConfigured()) return;
-        try {
-          // 1. Sync Live Profiles
-          let currentUsersList = allUsers;
-          const { data: supaProfiles } = await supabase.from('profiles').select('*').limit(150);
-          if (supaProfiles && supaProfiles.length > 0) {
-            const mappedSupa = supaProfiles.map(p => ({
-              id: p.id,
-              name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
-              email: p.email || '',
-              role: p.role || 'Artiste',
-              company: p.company || '',
-              avatar: p.avatar_url || '',
-              verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
-              badgeType: p.verified_badge || 'none',
-              bio: p.bio || '',
-              location: p.location || '',
-              instruments: p.instruments || [],
-              genres: p.genres || [],
-              gear: p.gear || []
-            }));
 
-            setAllUsers(prev => {
-              const uMap = new Map();
-              mappedSupa.forEach(u => uMap.set(u.id, u));
-              prev.forEach(u => {
-                if (!uMap.has(u.id) && !Array.from(uMap.values()).some(m => m.name === u.name)) {
-                  uMap.set(u.id, u);
-                }
-              });
-              currentUsersList = Array.from(uMap.values());
-              return currentUsersList;
-            });
-          }
-
-          const userLookup = new Map(currentUsersList.map(u => [u.id, u]));
-
-          // 2. Sync Live Posts with resilient fallback
-          let supaPosts = null;
-          try {
-            const res = await supabase
-              .from('posts')
-              .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge), post_likes(user_id), post_comments(id, user_id, content, created_at, profiles:user_id(full_name))')
-              .order('created_at', { ascending: false });
-            if (res.data && !res.error) {
-              supaPosts = res.data;
-            } else {
-              const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(50);
-              if (simpleRes.data) supaPosts = simpleRes.data;
-            }
-          } catch (pe) {
-            const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(50);
-            if (simpleRes.data) supaPosts = simpleRes.data;
-          }
-
-          if (Array.isArray(supaPosts)) {
-            const freshPosts = supaPosts.map(p => {
-              const authorProfile = userLookup.get(p.user_id) || p.profiles || {};
-              const isCurrentUser = p.user_id === currentUser?.id;
-              const authorName = isCurrentUser ? (currentUser.name || currentUser.full_name || authorProfile.full_name || 'Artiste') : (authorProfile.name || authorProfile.full_name || p.profiles?.full_name || 'Artiste');
-              const authorAvatar = isCurrentUser ? (currentUser.avatar || currentUser.avatar_url || authorProfile.avatar_url || '') : (authorProfile.avatar || authorProfile.avatar_url || p.profiles?.avatar_url || '');
-              const authorRole = isCurrentUser ? (currentUser.role || 'Artiste') : (authorProfile.role || p.profiles?.role || 'Membre StageLink');
-              const isVerified = isCurrentUser ? currentUser.verified : (authorProfile.verified || authorProfile.verified_badge === 'gold' || authorProfile.verified_badge === 'blue' || p.profiles?.verified_badge === 'gold');
-              const badgeType = isCurrentUser ? currentUser.badgeType : (authorProfile.badgeType || authorProfile.verified_badge || p.profiles?.verified_badge || 'none');
-
-              let textContent = p.content || '';
-              let proServiceData = null;
-              if (textContent.includes('___PRO_SERVICE___:')) {
-                const parts = textContent.split('___PRO_SERVICE___:');
-                textContent = parts[0].trim();
-                try {
-                  proServiceData = JSON.parse(parts[1]);
-                } catch(e) {}
-              }
-
-              const isVid = isVideoMediaUrl(p.media_url);
-              const rawUrl = p.media_url && typeof p.media_url === 'string' && p.media_url !== 'null' && p.media_url !== 'undefined' && p.media_url.trim() !== '' ? p.media_url : null;
-              const postCreatedAt = p.created_at || new Date().toISOString();
-
-              return {
-                id: p.id,
-                userId: p.user_id,
-                userName: authorName,
-                userRole: authorRole,
-                userAvatar: authorAvatar,
-                isVerified: isVerified,
-                badgeType: badgeType,
-                text: textContent,
-                proServiceData: proServiceData,
-                image: !isVid ? rawUrl : null,
-                video: isVid ? rawUrl : null,
-                media_url: rawUrl,
-                mediaList: rawUrl ? [{ type: isVid ? 'video' : 'image', url: rawUrl }] : [],
-                hasAudio: Boolean(p.audio_url),
-                audioTitle: p.audio_title || 'Extrait Audio',
-                audioUrl: p.audio_url || null,
-                likesCount: p.post_likes ? p.post_likes.length : (p.likes_count || 0),
-                isLiked: p.post_likes ? p.post_likes.some(l => l.user_id === currentUser?.id) : false,
-                commentsCount: p.post_comments ? p.post_comments.length : (p.comments_count || (p.comments ? p.comments.length : 0)),
-                comments: p.post_comments ? p.post_comments.map(c => ({
-                  id: c.id,
-                  userId: c.user_id,
-                  userName: c.profiles?.full_name || userLookup.get(c.user_id)?.name || 'Artiste',
-                  text: c.content,
-                  time: formatTimeAgo(c.created_at, language)
-                })) : [],
-                created_at: postCreatedAt,
-                createdAt: postCreatedAt,
-                timeAgo: formatTimeAgo(postCreatedAt, language)
-              };
-            });
-            const sanitizedPosts = freshPosts.filter(p => !isTestArtifact(p));
-
-            // Preserve any pending local optimistic posts created recently by current user
-            const currentLocalPosts = getStoredItem(STORAGE_KEYS.POSTS, []) || [];
-            const supaPostIds = new Set(sanitizedPosts.map(sp => sp.id));
-            const pendingLocalPosts = currentLocalPosts.filter(lp => lp && lp.id && !supaPostIds.has(lp.id) && !lp.isDeleted && !isTestArtifact(lp));
-            const mergedPosts = [...pendingLocalPosts, ...sanitizedPosts];
-
-            setPosts(mergedPosts);
-            setStoredItem(STORAGE_KEYS.POSTS, mergedPosts);
-          }
-
-          // 3. Sync Live Stories with resilient fallback
-          let supaStories = null;
-          let storySyncOk = false;
-          try {
-            const res = await supabase
-              .from('stories')
-              .select('*, profiles:user_id(full_name, avatar_url), story_views(viewer_id, profiles:viewer_id(full_name, avatar_url, role)), story_likes(user_id)')
-              .order('created_at', { ascending: false });
-            if (res.data && !res.error) {
-              supaStories = res.data;
-              storySyncOk = true;
-            } else {
-              const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false }).limit(50);
-              if (simpleRes.data && !simpleRes.error) {
-                supaStories = simpleRes.data;
-                storySyncOk = true;
-              }
-            }
-          } catch (se) {
-            const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false }).limit(50);
-            if (simpleRes.data && !simpleRes.error) {
-              supaStories = simpleRes.data;
-              storySyncOk = true;
-            }
-          }
-
-          if (storySyncOk && Array.isArray(supaStories)) {
-            const freshStories = supaStories.map(s => {
-              const authorProfile = userLookup.get(s.user_id) || s.profiles || {};
-              const isCurrentUser = s.user_id === currentUser?.id;
-              const authorName = isCurrentUser ? (currentUser?.name || 'Moi') : (authorProfile.name || authorProfile.full_name || s.profiles?.full_name || 'Artiste');
-              const authorAvatar = isCurrentUser ? (currentUser?.avatar || '') : (authorProfile.avatar || authorProfile.avatar_url || s.profiles?.avatar_url || '');
-              const rawStoryMedia = s.media_url && typeof s.media_url === 'string' && s.media_url !== 'null' && s.media_url !== 'undefined' && s.media_url.trim() !== '' ? s.media_url : null;
-              const isText = !rawStoryMedia || rawStoryMedia === '';
-              const storyCreatedAt = s.created_at || new Date().toISOString();
-
-              return {
-                id: s.id,
-                userId: s.user_id,
-                userName: authorName,
-                avatar: authorAvatar,
-                userAvatar: authorAvatar,
-                hasUnread: s.story_views ? !s.story_views.some(v => v.viewer_id === currentUser?.id) : true,
-                storyMedia: isText ? null : rawStoryMedia,
-                mediaUrl: isText ? '' : rawStoryMedia,
-                isTextStory: isText,
-                mediaType: isText ? 'text' : (s.is_video ? 'video' : ((rawStoryMedia && (rawStoryMedia.includes('.mp4') || rawStoryMedia.includes('.webm') || rawStoryMedia.includes('.mov') || rawStoryMedia.startsWith('data:video'))) ? 'video' : 'image')),
-                isVideo: s.is_video || (rawStoryMedia && (rawStoryMedia.includes('.mp4') || rawStoryMedia.includes('.webm') || rawStoryMedia.includes('.mov'))),
-                caption: s.caption || '',
-                likesCount: s.story_likes ? s.story_likes.length : 0,
-                isLiked: s.story_likes ? s.story_likes.some(l => l.user_id === currentUser?.id) : false,
-                viewers: s.story_views ? s.story_views.map(v => ({
-                  id: v.viewer_id,
-                  name: v.profiles?.full_name || userLookup.get(v.viewer_id)?.name || 'Artiste',
-                  avatar: v.profiles?.avatar_url || userLookup.get(v.viewer_id)?.avatar || '',
-                  role: v.profiles?.role || 'Artiste'
-                })) : [],
-                created_at: storyCreatedAt,
-                createdAt: storyCreatedAt,
-                createdAtTimestamp: new Date(storyCreatedAt).getTime(),
-                time: formatTimeAgo(storyCreatedAt, language)
-              };
-            });
-
-            // Source of truth: Supabase. Do not keep deleted stories from other users.
-            setStories(prevStories => {
-              const freshIds = new Set(freshStories.map(s => s.id));
-              const now = Date.now();
-              const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-              const localUnsynced = (prevStories || []).filter(localS => {
-                if (freshIds.has(localS.id)) return false;
-                const isMyPendingDraft = (localS.userId === currentUser?.id || localS.isLocalPending || String(localS.id).startsWith('local_')) && !localS.isDeleted;
-                if (!isMyPendingDraft) return false;
-                const storyTimestamp = localS.createdAtTimestamp || (localS.created_at ? new Date(localS.created_at).getTime() : (localS.expires_at ? new Date(localS.expires_at).getTime() - ONE_DAY_MS : now));
-                return (now - storyTimestamp) < ONE_DAY_MS;
-              });
-              const merged = [...localUnsynced, ...freshStories];
-              setStoredItem(STORAGE_KEYS.STORIES, merged);
-              return merged;
-            });
-          }
-        } catch (e) { console.error("Suppressed error:", e); }
-      };
 
       const updateUnreadDirectMessagesCount = async () => {
         if (!isSupabaseConfigured() || !currentUser?.id) return;
