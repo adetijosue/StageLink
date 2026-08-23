@@ -268,13 +268,16 @@ export async function signInUser({ email, password }) {
 }
 
 /**
- * Sign out the current user session
+ * Sign out the user session globally across all devices
  */
-export async function signOutUser() {
+export async function signOutUser(options = { scope: 'global' }) {
   try {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut(options);
     return { success: true };
   } catch (err) {
+    try {
+      await supabase.auth.signOut();
+    } catch (_) {}
     return { success: false, error: err.message };
   }
 }
