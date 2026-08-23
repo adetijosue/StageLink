@@ -283,6 +283,31 @@ export async function signOutUser(options = { scope: 'global' }) {
 }
 
 /**
+ * Delete current user account and cascade data across Supabase & Auth
+ */
+export async function deleteCurrentUserAccount() {
+  try {
+    const { error: rpcErr } = await supabase.rpc('delete_user_account');
+    if (!rpcErr) {
+      await signOutUser({ scope: 'global' });
+      return { success: true };
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) {
+      await supabase.from('profiles').delete().eq('id', user.id);
+    }
+    await signOutUser({ scope: 'global' });
+    return { success: true };
+  } catch (err) {
+    try {
+      await signOutUser({ scope: 'global' });
+    } catch (_) {}
+    return { success: false, error: err?.message || 'Erreur lors de la suppression.' };
+  }
+}
+
+/**
  * Subscribe to Realtime Messages Channel
  */
 export function subscribeToRealtimeMessages(callback) {
