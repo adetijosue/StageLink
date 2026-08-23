@@ -457,6 +457,62 @@ export function useChatThread({ conversationId, currentUser, partner }) {
   }, [conversationId, currentUser, isVanishMode, replyingTo, partner, persistMessagesCache]);
 
   /**
+   * Delete Message For Me (local hide & cache update)
+   */
+  const deleteMessageForMe = useCallback(async (messageId) => {
+    if (!messageId) return;
+    soundEngine.playPopSound();
+    haptics.medium();
+
+    setMessages((prev) => {
+      const next = prev.filter((m) => m.id !== messageId);
+      persistMessagesCache(next);
+      return next;
+    });
+
+    if (currentUser?.id && conversationId && isSupabaseConfigured()) {
+      try {
+        await directChatService.deleteMessageForMe(messageId, currentUser.id);
+      } catch (e) {
+        console.warn('Delete message for me note:', e);
+      }
+    }
+  }, [conversationId, currentUser?.id, persistMessagesCache]);
+
+  /**
+   * Delete Message For Everyone (Unsend / full purge)
+   */
+  const deleteMessageForEveryone = useCallback(async (messageId) => {
+    if (!messageId) return;
+    soundEngine.playPopSound();
+    haptics.heavy();
+
+    setMessages((prev) => {
+      const next = prev.filter((m) => m.id !== messageId);
+      persistMessagesCache(next);
+      return next;
+    });
+
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('direct_messages').delete().eq('id', messageId);
+        await supabase.from('messages').delete().eq('id', messageId);
+
+        // Broadcast deletion event to partner
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'message_deleted',
+            payload: { messageId, conversationId }
+          });
+        }
+      } catch (e) {
+        console.warn('Delete message for everyone note:', e);
+      }
+    }
+  }, [conversationId, persistMessagesCache]);
+
+  /**
    * Toggle Emoji Reaction
    */
   const toggleReaction = useCallback(async (messageId, emoji) => {
@@ -509,6 +565,8 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     replyingTo,
     setReplyingTo,
     sendMessage,
+    deleteMessageForMe,
+    deleteMessageForEveryone,
     toggleReaction,
     toggleVanishMode,
     refreshMessages: () => loadMessages(false)

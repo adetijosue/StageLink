@@ -14,6 +14,8 @@ export default function ReactionOverlay({
   onReply,
   onCopy,
   onDelete,
+  onDeleteForMe,
+  onDeleteForEveryone,
   onClose,
   onOpenCustomPicker,
   isDarkMode = false
@@ -55,11 +57,21 @@ export default function ReactionOverlay({
     onClose();
   };
 
-  const handleDeleteAction = (e) => {
+  const handleDeleteForMeAction = (e) => {
     e.stopPropagation();
     haptics.medium();
     soundEngine.playPopSound();
-    if (onDelete) onDelete(message);
+    if (onDeleteForMe) onDeleteForMe(message);
+    else if (onDelete) onDelete(message);
+    onClose();
+  };
+
+  const handleDeleteForEveryoneAction = (e) => {
+    e.stopPropagation();
+    haptics.heavy();
+    soundEngine.playPopSound();
+    if (onDeleteForEveryone) onDeleteForEveryone(message);
+    else if (onDelete) onDelete(message);
     onClose();
   };
 
@@ -233,9 +245,33 @@ export default function ReactionOverlay({
             </button>
           )}
 
-          {isMine && onDelete && (
+          {/* WhatsApp-Style Delete for Me */}
+          <button
+            onClick={handleDeleteForMeAction}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 12px',
+              border: 'none',
+              borderRadius: '12px',
+              background: 'transparent',
+              color: '#EF4444',
+              fontSize: '0.84rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              textAlign: 'left'
+            }}
+          >
+            <span>{isMine ? 'Supprimer pour moi' : 'Supprimer le message'}</span>
+            <Trash2 size={16} color="#EF4444" />
+          </button>
+
+          {/* WhatsApp-Style Delete for Everyone (if author) */}
+          {isMine && (
             <button
-              onClick={handleDeleteAction}
+              onClick={handleDeleteForEveryoneAction}
               style={{
                 width: '100%',
                 display: 'flex',
@@ -245,15 +281,15 @@ export default function ReactionOverlay({
                 border: 'none',
                 borderRadius: '12px',
                 background: 'transparent',
-                color: '#EF4444',
+                color: '#DC2626',
                 fontSize: '0.84rem',
-                fontWeight: 600,
+                fontWeight: 700,
                 cursor: 'pointer',
                 textAlign: 'left'
               }}
             >
-              <span>Supprimer</span>
-              <Trash2 size={16} color="#EF4444" />
+              <span>Supprimer pour tous</span>
+              <Trash2 size={16} color="#DC2626" />
             </button>
           )}
         </div>

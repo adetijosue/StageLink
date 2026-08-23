@@ -29,17 +29,44 @@ const SwipeableDiscussionItem = React.memo(function SwipeableDiscussionItem({
   const ACTION_WIDTH = 76;
   const SNAP_THRESHOLD = 38;
 
+  const longPressTimerRef = useRef(null);
+  const isLongPressTriggeredRef = useRef(false);
+
+  const startLongPress = () => {
+    isLongPressTriggeredRef.current = false;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressTriggeredRef.current = true;
+      try {
+        if (navigator.vibrate) navigator.vibrate(30);
+      } catch (_) {}
+      soundEngine.playPopSound();
+      onDeleteConv(conv);
+    }, 480);
+  };
+
+  const clearLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
   // Touch handlers
   const handleTouchStart = (e) => {
     startXRef.current = e.touches[0].clientX;
     isDraggingRef.current = true;
     setIsDragging(true);
+    startLongPress();
   };
 
   const handleTouchMove = (e) => {
-    if (!isDraggingRef.current) return;
     const current = e.touches[0].clientX;
     const diff = current - startXRef.current;
+    if (Math.abs(diff) > 8) {
+      clearLongPress();
+    }
+    if (!isDraggingRef.current) return;
     if (diff < 0) {
       const val = Math.max(diff, -ACTION_WIDTH - 20);
       currentXRef.current = val;
@@ -51,6 +78,12 @@ const SwipeableDiscussionItem = React.memo(function SwipeableDiscussionItem({
   };
 
   const handleTouchEnd = () => {
+    clearLongPress();
+    if (isLongPressTriggeredRef.current) {
+      isDraggingRef.current = false;
+      setIsDragging(false);
+      return;
+    }
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
     setIsDragging(false);
@@ -75,11 +108,15 @@ const SwipeableDiscussionItem = React.memo(function SwipeableDiscussionItem({
     startXRef.current = e.clientX;
     isDraggingRef.current = true;
     setIsDragging(true);
+    startLongPress();
   };
 
   const handleMouseMove = (e) => {
-    if (!isDraggingRef.current) return;
     const diff = e.clientX - startXRef.current;
+    if (Math.abs(diff) > 8) {
+      clearLongPress();
+    }
+    if (!isDraggingRef.current) return;
     if (diff < 0) {
       const val = Math.max(diff, -ACTION_WIDTH - 20);
       currentXRef.current = val;
@@ -91,6 +128,12 @@ const SwipeableDiscussionItem = React.memo(function SwipeableDiscussionItem({
   };
 
   const handleMouseUp = () => {
+    clearLongPress();
+    if (isLongPressTriggeredRef.current) {
+      isDraggingRef.current = false;
+      setIsDragging(false);
+      return;
+    }
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
     setIsDragging(false);

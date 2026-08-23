@@ -119,6 +119,8 @@ export default function MessageThread({
     replyingTo,
     setReplyingTo,
     sendMessage,
+    deleteMessageForMe,
+    deleteMessageForEveryone,
     toggleReaction,
     toggleVanishMode
   } = useChatThread({ conversationId, currentUser, partner: activePartner });
@@ -295,29 +297,6 @@ export default function MessageThread({
           >
             <Video size={18} />
           </button>
-
-          <button
-            onClick={() => {
-              soundEngine.playPopSound();
-              setShowDeleteModal(true);
-            }}
-            title={language === 'en' ? 'Delete conversation' : 'Supprimer la discussion'}
-            style={{
-              background: 'rgba(239, 68, 68, 0.08)',
-              color: '#EF4444',
-              border: 'none',
-              borderRadius: '50%',
-              width: '36px',
-              height: '36px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'background 0.15s ease'
-            }}
-          >
-            <Trash2 size={17} />
-          </button>
         </div>
       </div>
 
@@ -436,8 +415,11 @@ export default function MessageThread({
         onCopy={(msg) => {
           // Handled inside ReactionOverlay with clipboard API
         }}
-        onDelete={(msg) => {
-          setMessages(prev => prev.filter(m => m.id !== msg.id));
+        onDeleteForMe={(msg) => {
+          deleteMessageForMe(msg.id);
+        }}
+        onDeleteForEveryone={(msg) => {
+          deleteMessageForEveryone(msg.id);
         }}
         onClose={() => setReactionOverlayData(null)}
       />
