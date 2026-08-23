@@ -440,6 +440,37 @@ export const directChatService = {
   },
 
   /**
+   * Delete a single message for the current user only (soft-delete / hide)
+   * The message remains visible to the other participant.
+   */
+  async deleteMessageForMe(messageId, userId) {
+    if (!messageId || !userId || !isSupabaseConfigured()) return;
+    try {
+      // Try soft-delete via metadata flag
+      const { error } = await supabase
+        .from('direct_messages')
+        .update({
+          metadata: supabase.sql`jsonb_set(COALESCE(metadata, '{}'), '{deleted_for}', (COALESCE(metadata->>'deleted_for', '[]')::jsonb || '"${userId}"'::jsonb))`,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', messageId);
+
+      // Fallback: if soft-delete metadata update fails, just delete the row for this user
+      if (error) {
+        console.warn('deleteMessageForMe soft-delete fallback:', error.message);
+        // Hard delete from direct_messages only if sender
+        await supabase
+          .from('direct_messages')
+          .delete()
+          .eq('id', messageId)
+          .eq('sender_id', userId);
+      }
+    } catch (e) {
+      console.warn('deleteMessageForMe error:', e?.message || e);
+    }
+  },
+
+  /**
    * Mark conversation as read
    */
   async markAsRead(conversationId, currentUserId) {

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { directChatService } from '../services/directChatService';
 import { soundEngine } from '../services/audioService';
+import { haptics } from '../services/hapticsService';
 
 export function useChatThread({ conversationId, currentUser, partner }) {
   // 1. Instant Cache-First Initial State (0ms render)
@@ -32,18 +33,30 @@ export function useChatThread({ conversationId, currentUser, partner }) {
   const channelRef = useRef(null);
   const isMountedRef = useRef(true);
   const initialLoadRef = useRef(messages.length > 0);
+  const messagesLengthRef = useRef(messages.length);
+  const objectUrlsRef = useRef([]);
+
+  // Keep ref in sync so cleanup reads current value without re-triggering the effect
+  useEffect(() => {
+    messagesLengthRef.current = messages.length;
+  }, [messages.length]);
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      // Revoke any created Object URLs to prevent memory leaks
+      objectUrlsRef.current.forEach(url => {
+        try { URL.revokeObjectURL(url); } catch (_) {}
+      });
+      objectUrlsRef.current = [];
       // If thread had 0 messages when closed, clean up stub conversation from DB
-      if (conversationId && messages.length === 0) {
+      if (conversationId && messagesLengthRef.current === 0) {
         directChatService.cleanupEmptyConversation(conversationId);
         window.dispatchEvent(new Event('refresh_conversations'));
       }
     };
-  }, [conversationId, messages.length]);
+  }, [conversationId]);
 
   const persistMessagesCache = useCallback((msgs) => {
     if (!conversationId || !Array.isArray(msgs)) return;
@@ -300,12 +313,12 @@ export function useChatThread({ conversationId, currentUser, partner }) {
 
     channelRef.current = channel;
 
-    // 3. Fallback active polling every 2.5 seconds to guarantee 100% fresh message stream
+    // 3. Fallback safety-net polling every 15 seconds (Realtime WebSocket handles instant delivery)
     const pollTimer = setInterval(() => {
       if (isMountedRef.current) {
         loadMessages(true);
       }
-    }, 2500);
+    }, 15000);
 
     return () => {
       window.removeEventListener('direct_message_received', handleWindowDm);
@@ -340,7 +353,7 @@ export function useChatThread({ conversationId, currentUser, partner }) {
       sender_id: currentUser.id,
       message_type: mediaType,
       content: text,
-      media_url: mediaUrl || (mediaBlob ? URL.createObjectURL(mediaBlob) : null),
+      media_url: mediaUrl || (mediaBlob ? (() => { const url = URL.createObjectURL(mediaBlob); objectUrlsRef.current.push(url); return url; })() : null),
       metadata: {
         ...metadata,
         quotedMessage: replyingTo ? {

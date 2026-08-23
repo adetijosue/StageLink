@@ -43,7 +43,7 @@ import PullToRefresh from './components/common/PullToRefresh';
 import OfflineStatusBanner from './components/common/OfflineStatusBanner';
 import { getStoredItem, setStoredItem, STORAGE_KEYS, isTestArtifact } from './services/mockData';
 import { soundEngine } from './services/audioService';
-import { supabase, isSupabaseConfigured } from './services/supabaseClient';
+import { supabase, isSupabaseConfigured, dataURLtoFile } from './services/supabaseClient';
 import { useGlobalPresence } from './hooks/useGlobalPresence';
 import { nativeNotificationService } from './services/nativeNotificationService';
 import { nativeCallKit } from './services/nativeCallKitBridge';
@@ -55,25 +55,7 @@ import { generateUUID } from './utils/uuid';
 import { compressImage } from './utils/imageCompressor';
 import { formatTimeAgo } from './utils/timeAgo';
 
-// Helper to convert Data URL to File for Supabase Storage Upload
-const dataURLtoFile = (dataurl, filename = 'media_upload') => {
-  try {
-    const arr = dataurl.split(',');
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-    const ext = mime.includes('video/mp4') ? 'mp4' : mime.includes('video/webm') ? 'webm' : mime.includes('video/quicktime') ? 'mov' : mime.includes('video/3gpp') ? '3gp' : mime.includes('video/x-m4v') ? 'm4v' : mime.includes('audio') ? 'webm' : (mime.split('/')[1] || 'jpg');
-    return new File([u8arr], `${filename}.${ext}`, { type: mime });
-  } catch (e) {
-    console.error('DataURL conversion error:', e);
-    return null;
-  }
-};
+
 
 const isVideoMediaUrl = (url) => {
   if (!url || typeof url !== 'string') return false;

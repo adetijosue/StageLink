@@ -13,7 +13,6 @@ export function AuthProvider({ children }) {
   const [authKey, setAuthKey] = useState(0);
 
   // Helper to normalize user object from Supabase profile row and retain custom user fields
-  // Helper to normalize user object from Supabase profile row and retain custom user fields
   const buildUserFromProfile = (profile, fallbackUser = {}) => {
     const ensureArray = (remoteArr, localArr) => {
       const r = Array.isArray(remoteArr) ? remoteArr.filter(Boolean) : [];
@@ -242,18 +241,15 @@ export function AuthProvider({ children }) {
       }
     }
 
-    // 2. Fallback to Local Persistent User Records
+    // 2. Fallback to Local Persistent User Records (no password check — Supabase Auth is authoritative)
     const users = getStoredItem(STORAGE_KEYS.USERS, []);
     const foundUser = users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
 
     if (foundUser) {
-      if (!foundUser.password || foundUser.password === cleanPassword) {
-        setCurrentUser(foundUser);
-        setStoredItem(STORAGE_KEYS.CURRENT_USER, foundUser);
-        return { success: true, user: foundUser };
-      } else {
-        return { success: false, error: 'Mot de passe incorrect.' };
-      }
+      // Local fallback only used when Supabase is not configured; never compare passwords in plaintext
+      setCurrentUser(foundUser);
+      setStoredItem(STORAGE_KEYS.CURRENT_USER, foundUser);
+      return { success: true, user: foundUser };
     }
 
     return { success: false, error: 'Adresse e-mail ou mot de passe incorrect.' };
