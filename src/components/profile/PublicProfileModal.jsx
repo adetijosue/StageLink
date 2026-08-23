@@ -142,7 +142,7 @@ export default function PublicProfileModal({
   const profile = hydratedUser || user;
 
   // Normalized user fields
-  const userName = profile.name || profile.full_name || profile.userName || profile.title || 'Artiste StageLink';
+  const userName = profile.name || profile.full_name || profile.userName || profile.title || (profile.email ? profile.email.split('@')[0] : 'Artiste');
   const userAvatarUrl = profile.avatar || profile.avatar_url || profile.userAvatar || profile.image || '';
   const userRole = profile.role || profile.userRole || profile.category || 'Artiste Musicien';
   const userBio = profile.bio || profile.description || 'Artiste passionné et créateur sur le réseau musical StageLink. Prêt pour de nouvelles collaborations et projets de scène ou de studio.';

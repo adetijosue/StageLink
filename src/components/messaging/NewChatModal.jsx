@@ -4,6 +4,8 @@ import UserAvatar from '../common/UserAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 
+import { getStoredItem, STORAGE_KEYS, INITIAL_USERS } from '../../services/mockData';
+
 const normalizeStr = (str) => {
   return String(str || '')
     .normalize('NFD')
@@ -30,7 +32,7 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
           .from('profiles')
           .select('*')
           .order('created_at', { ascending: false })
-          .limit(50);
+          .limit(100);
 
         if (data && !error && isMounted) {
           const mapped = data
@@ -41,24 +43,29 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
               return !name.includes('test subagent') && !name.includes('subagent') && !email.includes('subagent') && !id.includes('subagent');
             })
             .map(p => ({
-            id: p.id,
-            name: p.full_name || p.username || 'Artiste',
-            userName: p.username || p.full_name || 'Artiste',
-            full_name: p.full_name || p.username || 'Artiste',
-            username: p.username || '',
-            role: p.role || 'Artiste',
-            userRole: p.role || 'Artiste',
-            avatar: p.avatar_url || '',
-            avatar_url: p.avatar_url || '',
-            userAvatar: p.avatar_url || '',
-            verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
-            location: p.location || '',
-            email: p.email || ''
-          }));
+              id: p.id,
+              name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
+              userName: p.username || p.full_name || (p.email ? p.email.split('@')[0] : 'Artiste'),
+              full_name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
+              username: p.username || '',
+              role: p.role || 'Artiste',
+              userRole: p.role || 'Artiste',
+              avatar: p.avatar_url || '',
+              avatar_url: p.avatar_url || '',
+              userAvatar: p.avatar_url || '',
+              verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+              badgeType: p.verified_badge || 'none',
+              location: p.location || '',
+              company: p.company || '',
+              bio: p.bio || '',
+              email: p.email || '',
+              instruments: Array.isArray(p.instruments) ? p.instruments : [],
+              genres: Array.isArray(p.genres) ? p.genres : []
+            }));
           setRemoteUsers(mapped);
         }
       } catch (e) {
-        console.warn('Initial profiles load note for chat modal:', e?.message || e);
+        console.warn('Initial profiles load note (NewChatModal):', e?.message || e);
       }
     };
 
@@ -78,13 +85,15 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
     const timer = setTimeout(async () => {
       setIsSearchingRemote(true);
       try {
-        const q = searchQuery.trim().replace(/[,()"]/g, ' ');
-        if (!q) return;
+        const rawQ = searchQuery.trim();
+        const cleanQ = rawQ.replace(/[,()"]/g, ' ').replace(/^@/, '').trim();
+        if (!cleanQ) return;
+
         const { data, error } = await supabase
           .from('profiles')
           .select('*')
-          .or(`full_name.ilike.%${q}%,role.ilike.%${q}%,location.ilike.%${q}%`)
-          .limit(30);
+          .or(`full_name.ilike.%${cleanQ}%,username.ilike.%${cleanQ}%,email.ilike.%${cleanQ}%,role.ilike.%${cleanQ}%,location.ilike.%${cleanQ}%,company.ilike.%${cleanQ}%,bio.ilike.%${cleanQ}%`)
+          .limit(50);
 
         if (data && !error) {
           const mapped = data
@@ -95,33 +104,35 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
               return !name.includes('test subagent') && !name.includes('subagent') && !email.includes('subagent') && !id.includes('subagent');
             })
             .map(p => ({
-            id: p.id,
-            name: p.full_name || p.username || 'Artiste',
-            userName: p.username || p.full_name || 'Artiste',
-            full_name: p.full_name || p.username || 'Artiste',
-            username: p.username || '',
-            role: p.role || 'Artiste',
-            userRole: p.role || 'Artiste',
-            avatar: p.avatar_url || '',
-            avatar_url: p.avatar_url || '',
-            userAvatar: p.avatar_url || '',
-            verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
-            location: p.location || '',
-            email: p.email || ''
-          }));
+              id: p.id,
+              name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
+              userName: p.username || p.full_name || (p.email ? p.email.split('@')[0] : 'Artiste'),
+              full_name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
+              username: p.username || '',
+              role: p.role || 'Artiste',
+              userRole: p.role || 'Artiste',
+              avatar: p.avatar_url || '',
+              avatar_url: p.avatar_url || '',
+              userAvatar: p.avatar_url || '',
+              verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+              badgeType: p.verified_badge || 'none',
+              location: p.location || '',
+              company: p.company || '',
+              bio: p.bio || '',
+              email: p.email || '',
+              instruments: Array.isArray(p.instruments) ? p.instruments : [],
+              genres: Array.isArray(p.genres) ? p.genres : []
+            }));
 
           setRemoteUsers(prev => {
-            const combined = [...mapped];
-            (prev || []).forEach(existing => {
-              if (!combined.some(u => u.id === existing.id)) {
-                combined.push(existing);
-              }
-            });
-            return combined;
+            const map = new Map();
+            prev.forEach(u => map.set(u.id, u));
+            mapped.forEach(u => map.set(u.id, u));
+            return Array.from(map.values());
           });
         }
       } catch (e) {
-        console.warn('Live chat user search note:', e?.message || e);
+        console.warn('Live remote search note (NewChatModal):', e?.message || e);
       } finally {
         setIsSearchingRemote(false);
       }
@@ -133,13 +144,19 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
   const rawUsers = users || existingUsers || [];
   const safeUsers = Array.isArray(rawUsers) ? rawUsers : [];
   const combinedUsers = useMemo(() => {
-    const list = [...safeUsers];
-    remoteUsers.forEach(ru => {
-      if (!list.some(u => u.id === ru.id)) {
-        list.push(ru);
+    const storedUsers = getStoredItem(STORAGE_KEYS.USERS, []);
+
+    const map = new Map();
+    [...INITIAL_USERS, ...(Array.isArray(storedUsers) ? storedUsers : []), ...safeUsers, ...remoteUsers].forEach(u => {
+      if (u && u.id) {
+        if (!map.has(u.id)) {
+          map.set(u.id, u);
+        } else {
+          map.set(u.id, { ...map.get(u.id), ...u });
+        }
       }
     });
-    return list;
+    return Array.from(map.values());
   }, [safeUsers, remoteUsers]);
 
   const handleSelectUser = (user) => {
@@ -155,22 +172,48 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
     return combinedUsers.filter((user) => {
       if (!user) return false;
 
-      // Exclude current logged-in user from new chat contact list
+      // Exclude current user from contact list
       if (currentUser) {
         if (user.id && currentUser.id && String(user.id) === String(currentUser.id)) return false;
         if (user.email && currentUser.email && String(user.email).toLowerCase() === String(currentUser.email).toLowerCase()) return false;
       }
 
       const name = normalizeStr(user.name || user.userName || user.full_name || '');
+      const username = normalizeStr(user.username || '');
+      const email = normalizeStr(user.email || '');
       const role = normalizeStr(user.role || user.userRole || '');
       const location = normalizeStr(user.location || '');
+      const company = normalizeStr(user.company || '');
+      const bio = normalizeStr(user.bio || '');
+      const instruments = Array.isArray(user.instruments) ? user.instruments.map(normalizeStr).join(' ') : '';
+      const genres = Array.isArray(user.genres) ? user.genres.map(normalizeStr).join(' ') : '';
 
       const matchesQuery = !normQuery ||
         name.includes(normQuery) ||
+        username.includes(normQuery) ||
+        email.includes(normQuery) ||
         role.includes(normQuery) ||
-        location.includes(normQuery);
+        location.includes(normQuery) ||
+        company.includes(normQuery) ||
+        bio.includes(normQuery) ||
+        instruments.includes(normQuery) ||
+        genres.includes(normQuery);
 
-      const matchesRole = filterRole === 'All' || role.includes(normalizeStr(filterRole));
+      let matchesRole = true;
+      if (filterRole && filterRole !== 'All') {
+        const normFilter = normalizeStr(filterRole);
+        if (normFilter === 'artiste') {
+          matchesRole = role.includes('artiste') || role.includes('chanteu') || role.includes('vocal') || role.includes('guitar') || role.includes('pian') || role.includes('music');
+        } else if (normFilter === 'beatmaker') {
+          matchesRole = role.includes('beatmaker') || role.includes('composit') || role.includes('prod');
+        } else if (normFilter === 'producteur') {
+          matchesRole = role.includes('product') || role.includes('direct') || role.includes('da') || role.includes('manager');
+        } else if (normFilter === 'ingenieur') {
+          matchesRole = role.includes('ingenieur') || role.includes('mix') || role.includes('master') || role.includes('sound');
+        } else {
+          matchesRole = role.includes(normFilter);
+        }
+      }
 
       return matchesQuery && matchesRole;
     });

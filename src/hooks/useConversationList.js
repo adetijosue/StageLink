@@ -7,10 +7,51 @@ export function useConversationList(currentUser) {
   const [conversations, setConversations] = useState(() => {
     if (!currentUser?.id) return [];
     try {
+      const convMap = new Map();
       const cached = localStorage.getItem(`stagelink_cached_conversations_${currentUser.id}`);
-      if (!cached) return [];
-      const parsed = JSON.parse(cached);
-      return Array.isArray(parsed) ? parsed.filter(c => Boolean(c && c.lastMessage)) : [];
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(c => {
+            const key = c.partner?.id || c.participant?.id || c.id;
+            if (key && c.lastMessage) convMap.set(key, c);
+          });
+        }
+      }
+
+      const rawChats = localStorage.getItem('stagelink_chats');
+      if (rawChats) {
+        const parsedChats = JSON.parse(rawChats);
+        if (Array.isArray(parsedChats)) {
+          parsedChats.forEach(chat => {
+            if (chat && (chat.participant || chat.partner)) {
+              const partnerObj = chat.participant || chat.partner;
+              const key = partnerObj.id || chat.id;
+              if (key && !convMap.has(key)) {
+                const lastM = Array.isArray(chat.messages) && chat.messages.length > 0
+                  ? chat.messages[chat.messages.length - 1]
+                  : (chat.lastMessage ? (typeof chat.lastMessage === 'string' ? { content: chat.lastMessage, created_at: chat.updatedAt || new Date().toISOString() } : chat.lastMessage) : null);
+
+                if (lastM) {
+                  convMap.set(key, {
+                    id: chat.id || `conv_${partnerObj.id}`,
+                    type: 'direct',
+                    title: partnerObj.name || partnerObj.full_name || 'Artiste',
+                    avatar: partnerObj.avatar || partnerObj.avatar_url || '',
+                    partner: partnerObj,
+                    participant: partnerObj,
+                    lastMessage: lastM,
+                    updatedAt: chat.updatedAt || new Date().toISOString(),
+                    unreadCount: chat.unread || chat.unreadCount || 0
+                  });
+                }
+              }
+            }
+          });
+        }
+      }
+
+      return Array.from(convMap.values());
     } catch (e) {
       console.warn("Storage read error (conversations):", e);
       return [];
@@ -70,49 +111,91 @@ export function useConversationList(currentUser) {
       const notesPromise = directChatService.fetchActiveNotes().catch(() => []);
 
       // 2. Fetch Conversations where current user is participant
-      const convPromise = supabase
-        .from('conversation_participants')
-        .select(`
-          conversation_id,
-          last_read_at,
-          conversation:conversations(
-            id,
-            type,
-            title,
-            avatar_url,
-            vanish_mode_enabled,
-            updated_at,
-            last_message_at,
-            participants:conversation_participants(
-              user_id,
-              profile:user_id(id, full_name, username, avatar_url, role, verified_badge)
-            ),
-            last_message:direct_messages(
-              id,
-              sender_id,
-              message_type,
-              content,
-              media_url,
-              created_at
-            )
-          )
-        `)
-        .eq('user_id', currentUser.id)
-        .is('left_at', null)
-        .limit(50);
+      const convPromise = (async () => {
+        try {
+          return await supabase
+            .from('conversation_participants')
+            .select(`
+              conversation_id,
+              last_read_at,
+              conversation:conversations(
+                id,
+                type,
+                title,
+                avatar_url,
+                vanish_mode_enabled,
+                updated_at,
+                last_message_at,
+                participants:conversation_participants(
+                  user_id,
+                  profile:user_id(id, full_name, username, avatar_url, role, verified_badge)
+                ),
+                last_message:direct_messages(
+                  id,
+                  sender_id,
+                  message_type,
+                  content,
+                  media_url,
+                  created_at
+                )
+              )
+            `)
+            .eq('user_id', currentUser.id)
+            .is('left_at', null)
+            .limit(50);
+        } catch (e) {
+          return { data: [], error: e };
+        }
+      })();
 
       // 3. Fetch deleted chat states in Supabase
-      const statesPromise = supabase
-        .from('chat_states')
-        .select('partner_id, is_deleted')
-        .eq('user_id', currentUser.id)
-        .eq('is_deleted', true)
-        .catch(() => ({ data: [] }));
+      const statesPromise = (async () => {
+        try {
+          return await supabase
+            .from('chat_states')
+            .select('partner_id, is_deleted')
+            .eq('user_id', currentUser.id)
+            .eq('is_deleted', true);
+        } catch (e) {
+          return { data: [] };
+        }
+      })();
 
-      const [notes, { data: participants, error: partErr }, { data: statesData }] = await Promise.all([
+      // 4. Fetch live messages from messages table in Supabase
+      const messagesTablePromise = (async () => {
+        try {
+          return await supabase
+            .from('messages')
+            .select('*, sender:sender_id(id, full_name, username, avatar_url, role), recipient:receiver_id(id, full_name, username, avatar_url, role)')
+            .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+            .order('created_at', { ascending: false })
+            .limit(100);
+        } catch (e) {
+          return { data: [] };
+        }
+      })();
+
+      // 5. Fetch message notifications to recover conversations from incoming notifications
+      const notifsPromise = (async () => {
+        try {
+          return await supabase
+            .from('notifications')
+            .select('*, actor:actor_id(id, full_name, username, avatar_url, role)')
+            .eq('user_id', currentUser.id)
+            .eq('type', 'message')
+            .order('created_at', { ascending: false })
+            .limit(30);
+        } catch (e) {
+          return { data: [] };
+        }
+      })();
+
+      const [notes, { data: participants, error: partErr }, { data: statesData }, { data: supaMessages }, { data: supaNotifs }] = await Promise.all([
         notesPromise,
         convPromise,
-        statesPromise
+        statesPromise,
+        messagesTablePromise,
+        notifsPromise
       ]);
 
       if (notes && isMountedRef.current) {
@@ -124,11 +207,55 @@ export function useConversationList(currentUser) {
         }
       }
 
-      if (partErr) throw partErr;
+      if (partErr) {
+        console.warn('Supabase conversations fetch note:', partErr.message || partErr);
+      }
+
+      // Helper to extract locally cached discussions
+      let localCachedConvs = [];
+      try {
+        const rawCached = localStorage.getItem(`stagelink_cached_conversations_${currentUser.id}`);
+        if (rawCached) {
+          const parsed = JSON.parse(rawCached);
+          if (Array.isArray(parsed)) localCachedConvs = parsed;
+        }
+      } catch (_) {}
+
+      try {
+        const rawChats = localStorage.getItem('stagelink_chats');
+        if (rawChats) {
+          const parsedChats = JSON.parse(rawChats);
+          if (Array.isArray(parsedChats)) {
+            parsedChats.forEach(chat => {
+              if (chat && chat.participant && !localCachedConvs.some(c => c.id === chat.id || (c.partner && c.partner.id === chat.participant.id))) {
+                const partnerObj = chat.participant;
+                const lastM = Array.isArray(chat.messages) && chat.messages.length > 0
+                  ? chat.messages[chat.messages.length - 1]
+                  : (chat.lastMessage ? { content: typeof chat.lastMessage === 'string' ? chat.lastMessage : chat.lastMessage.text || '', created_at: chat.updatedAt || new Date().toISOString() } : null);
+
+                if (lastM) {
+                  localCachedConvs.push({
+                    id: chat.id || `conv_${partnerObj.id}`,
+                    type: 'direct',
+                    title: partnerObj.name || partnerObj.full_name || 'Artiste',
+                    avatar: partnerObj.avatar || partnerObj.avatar_url || '',
+                    partner: partnerObj,
+                    participant: partnerObj,
+                    lastMessage: lastM,
+                    updatedAt: chat.updatedAt || new Date().toISOString(),
+                    unreadCount: chat.unread || 0
+                  });
+                }
+              }
+            });
+          }
+        }
+      } catch (_) {}
 
       const deletedPartnerIds = new Set((statesData || []).map(s => String(s.partner_id)));
 
-      const formatted = (participants || []).map((item) => {
+      // Process discussions from conversations table
+      const remoteFormatted = (participants || []).map((item) => {
         const conv = item.conversation;
         if (!conv) return null;
 
@@ -147,9 +274,6 @@ export function useConversationList(currentUser) {
           : [];
         const lastMsg = sortedMsgs[0] || null;
 
-        // CRITICAL USER DIRECTIVE (Audio 25):
-        // If no message has ever been written/sent in this conversation (empty draft),
-        // it MUST NOT appear in the user's discussions list!
         if (!lastMsg) {
           return null;
         }
@@ -197,15 +321,150 @@ export function useConversationList(currentUser) {
           participants: conv.participants,
           vanishModeEnabled: conv.vanish_mode_enabled,
           lastMessage: lastMsg,
-          updatedAt: conv.updated_at,
+          updatedAt: conv.updated_at || lastMsg.created_at,
           unreadCount: isUnread ? 1 : 0
         };
       }).filter(Boolean);
 
+      // Process discussions from messages table
+      const messagesFormatted = [];
+      if (Array.isArray(supaMessages) && supaMessages.length > 0) {
+        const grouped = new Map();
+        supaMessages.forEach(msg => {
+          const isMeSender = msg.sender_id === currentUser.id;
+          const partnerId = isMeSender ? msg.receiver_id : msg.sender_id;
+          if (!partnerId || deletedPartnerIds.has(String(partnerId))) return;
+
+          if (!grouped.has(partnerId)) {
+            grouped.set(partnerId, []);
+          }
+          grouped.get(partnerId).push(msg);
+        });
+
+        grouped.forEach((msgs, partnerId) => {
+          const latestMsg = msgs[0];
+          const isMe = latestMsg.sender_id === currentUser.id;
+          const partnerProfile = isMe ? latestMsg.recipient : latestMsg.sender;
+          const partnerName = partnerProfile?.full_name || partnerProfile?.username || 'Artiste';
+          const partnerAvatar = partnerProfile?.avatar_url || '';
+          const partnerRole = partnerProfile?.role || 'Artiste';
+
+          const normalizedPartner = {
+            id: partnerId,
+            full_name: partnerName,
+            name: partnerName,
+            username: partnerProfile?.username || '',
+            avatar: partnerAvatar,
+            avatar_url: partnerAvatar,
+            role: partnerRole,
+            userRole: partnerRole
+          };
+
+          const unread = msgs.some(m => m.sender_id !== currentUser.id && m.is_read === false);
+
+          messagesFormatted.push({
+            id: `chat_${partnerId}`,
+            type: 'direct',
+            title: partnerName,
+            avatar: partnerAvatar,
+            partner: normalizedPartner,
+            participant: normalizedPartner,
+            lastMessage: {
+              id: latestMsg.id,
+              sender_id: latestMsg.sender_id,
+              content: latestMsg.content || latestMsg.text || '',
+              media_url: latestMsg.media_url,
+              created_at: latestMsg.created_at
+            },
+            updatedAt: latestMsg.created_at,
+            unreadCount: unread ? 1 : 0
+          });
+        });
+      }
+
+      // Process discussions from message notifications
+      const notifsFormatted = [];
+      if (Array.isArray(supaNotifs) && supaNotifs.length > 0) {
+        supaNotifs.forEach(notif => {
+          const partnerId = notif.actor_id;
+          if (!partnerId || deletedPartnerIds.has(String(partnerId))) return;
+          if (notifsFormatted.some(n => n.partner?.id === partnerId)) return;
+
+          const actorProfile = Array.isArray(notif.actor) ? notif.actor[0] : notif.actor;
+          const partnerName = actorProfile?.full_name || actorProfile?.username || 'Artiste';
+          const partnerAvatar = actorProfile?.avatar_url || '';
+          const partnerRole = actorProfile?.role || 'Artiste';
+
+          const normalizedPartner = {
+            id: partnerId,
+            full_name: partnerName,
+            name: partnerName,
+            username: actorProfile?.username || '',
+            avatar: partnerAvatar,
+            avatar_url: partnerAvatar,
+            role: partnerRole,
+            userRole: partnerRole
+          };
+
+          notifsFormatted.push({
+            id: notif.reference_id || `chat_${partnerId}`,
+            type: 'direct',
+            title: partnerName,
+            avatar: partnerAvatar,
+            partner: normalizedPartner,
+            participant: normalizedPartner,
+            lastMessage: {
+              id: notif.id,
+              sender_id: partnerId,
+              content: notif.content || 'Nouveau message',
+              created_at: notif.created_at
+            },
+            updatedAt: notif.created_at,
+            unreadCount: notif.is_read === false ? 1 : 0
+          });
+        });
+      }
+
+      // Merge remote, messages, notifications, and local discussions seamlessly with deduplication by partner ID
+      const convMap = new Map();
+      remoteFormatted.forEach(c => {
+        const key = c.partner?.id || c.id;
+        if (key) convMap.set(key, c);
+      });
+      messagesFormatted.forEach(c => {
+        const key = c.partner?.id || c.id;
+        if (key && !convMap.has(key)) {
+          convMap.set(key, c);
+        }
+      });
+      notifsFormatted.forEach(c => {
+        const key = c.partner?.id || c.id;
+        if (key && !convMap.has(key)) {
+          convMap.set(key, c);
+        }
+      });
+      localCachedConvs.forEach(c => {
+        const key = c.partner?.id || c.id;
+        if (key && !convMap.has(key)) {
+          convMap.set(key, c);
+        }
+      });
+
+      const finalConversations = Array.from(convMap.values()).sort((a, b) => {
+        const timeA = new Date(a.lastMessage?.created_at || a.updatedAt || 0).getTime();
+        const timeB = new Date(b.lastMessage?.created_at || b.updatedAt || 0).getTime();
+        return timeB - timeA;
+      });
+
+      const totalUnreadCount = finalConversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
+      try {
+        window.dispatchEvent(new CustomEvent('unread_count_updated', { detail: { count: totalUnreadCount } }));
+      } catch (_) {}
+
       if (isMountedRef.current) {
-        setConversations(formatted);
+        setConversations(finalConversations);
         try {
-          localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(formatted));
+          localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(finalConversations));
         } catch (e) {
           console.warn("Storage write error (conversations):", e);
         }

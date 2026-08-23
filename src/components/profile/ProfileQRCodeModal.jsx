@@ -41,7 +41,7 @@ export default function ProfileQRCodeModal({ isOpen, onClose, user, isDarkMode }
 
   const baseUrl = window.location.origin || 'https://stagelink.app';
   const targetId = user.id || user.userId || 'usr_unknown';
-  const userName = user.name || user.full_name || user.userName || 'Artiste StageLink';
+  const userName = user.name || user.full_name || user.userName || (user.email ? user.email.split('@')[0] : 'Artiste');
   const userAvatar = user.avatar || user.avatar_url || user.image || '';
   const userRole = user.role || user.userRole || 'Artiste Musicien';
   const userLocation = user.location || 'Studio & En ligne';

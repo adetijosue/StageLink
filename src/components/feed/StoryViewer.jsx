@@ -5,6 +5,7 @@ import { soundEngine } from '../../services/audioService';
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
 import UserAvatar from '../common/UserAvatar';
 import confetti from 'canvas-confetti';
+import { formatTimeAgo } from '../../utils/timeAgo';
 
 export default function StoryViewer({
   story,
@@ -437,7 +438,9 @@ export default function StoryViewer({
                     </span>
                   )}
                 </h4>
-                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>{currentStory.time || 'Récemment'}</span>
+                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>
+                  {formatTimeAgo(currentStory.created_at || currentStory.createdAt || currentStory.createdAtTimestamp || currentStory.time)}
+                </span>
               </div>
             </div>
 

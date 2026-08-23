@@ -11,7 +11,7 @@ export const directChatService = {
    * Create or get an existing 1:1 conversation
    */
   async getOrCreateDirectConversation(partnerId) {
-    if (!isSupabaseConfigured()) {
+    if (!isSupabaseConfigured() || !partnerId) {
       return {
         success: true,
         conversation_id: `conv_${partnerId}`,
@@ -24,17 +24,68 @@ export const directChatService = {
       const { data, error } = await supabase.rpc('create_or_get_direct_conversation', {
         p_partner_id: partnerId
       });
-      if (error) throw error;
-      return data;
-    } catch (err) {
-      console.warn('RPC create_or_get_direct_conversation fallback:', err.message);
-      return {
-        success: true,
-        conversation_id: `conv_${partnerId}`,
-        type: 'direct',
-        vanish_mode_enabled: false
-      };
+      if (!error && data?.conversation_id) return data;
+    } catch (_) {}
+
+    // Direct Postgres fallback
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: myParts } = await supabase
+          .from('conversation_participants')
+          .select('conversation_id')
+          .eq('user_id', user.id);
+
+        if (myParts && myParts.length > 0) {
+          const convIds = myParts.map(p => p.conversation_id);
+          const { data: partnerParts } = await supabase
+            .from('conversation_participants')
+            .select('conversation_id, conversation:conversations(*)')
+            .eq('user_id', partnerId)
+            .in('conversation_id', convIds)
+            .limit(1);
+
+          if (partnerParts && partnerParts.length > 0 && partnerParts[0].conversation_id) {
+            return {
+              success: true,
+              conversation_id: partnerParts[0].conversation_id,
+              type: 'direct',
+              vanish_mode_enabled: Boolean(partnerParts[0].conversation?.vanish_mode_enabled)
+            };
+          }
+        }
+
+        // Create new conversation in conversations table
+        const { data: newConv, error: convErr } = await supabase
+          .from('conversations')
+          .insert({ type: 'direct', vanish_mode_enabled: false })
+          .select()
+          .single();
+
+        if (newConv && !convErr) {
+          await supabase.from('conversation_participants').insert([
+            { conversation_id: newConv.id, user_id: user.id },
+            { conversation_id: newConv.id, user_id: partnerId }
+          ]);
+
+          return {
+            success: true,
+            conversation_id: newConv.id,
+            type: 'direct',
+            vanish_mode_enabled: false
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('Direct fallback create conv note:', e?.message || e);
     }
+
+    return {
+      success: true,
+      conversation_id: `conv_${partnerId}`,
+      type: 'direct',
+      vanish_mode_enabled: false
+    };
   },
 
   /**
@@ -187,18 +238,21 @@ export const directChatService = {
       updated_at: now
     };
 
+    const isValidUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(str || ''));
+
     if (isSupabaseConfigured()) {
       try {
-        // Persist to Postgres database
-        const { error } = await supabase.from('direct_messages').insert(newRecord);
-        if (error) {
-          console.warn('Direct message DB insert error:', error.message);
-          throw error;
+        // Persist to Postgres direct_messages database only if conversationId is a valid UUID
+        if (isValidUUID(conversationId)) {
+          const { error } = await supabase.from('direct_messages').insert(newRecord);
+          if (error) {
+            console.warn('Direct message DB insert note:', error.message);
+          }
         }
 
         // Resolve recipient ID if not explicitly provided
         let targetRecipientId = recipientId;
-        if (!targetRecipientId) {
+        if (!targetRecipientId && isValidUUID(conversationId)) {
           try {
             const { data: parts } = await supabase
               .from('conversation_participants')
@@ -213,7 +267,7 @@ export const directChatService = {
         }
 
         // Update chat_states to un-delete conversation if previously deleted
-        if (targetRecipientId && targetRecipientId !== senderId) {
+        if (targetRecipientId && targetRecipientId !== senderId && isValidUUID(senderId) && isValidUUID(targetRecipientId)) {
           try {
             await supabase
               .from('chat_states')
@@ -226,19 +280,37 @@ export const directChatService = {
 
         // Insert notification in notifications table for recipient (instant push & sync across devices)
         const notifContent = content || (messageType === 'audio' ? '🎤 Note vocale' : (messageType === 'image' ? '📷 Photo' : 'Nouveau message'));
-        if (targetRecipientId && targetRecipientId !== senderId) {
+        if (targetRecipientId && targetRecipientId !== senderId && isValidUUID(targetRecipientId) && isValidUUID(senderId)) {
           try {
             await supabase.from('notifications').insert({
               user_id: targetRecipientId,
               actor_id: senderId,
               type: 'message',
-              reference_id: conversationId,
+              reference_id: isValidUUID(conversationId) ? conversationId : null,
               content: notifContent,
               is_read: false
             });
           } catch (ne) {
             console.warn('Direct message notification insert note:', ne.message);
           }
+        }
+
+        // Dual-persist to messages table for backwards/forwards compatibility across all app views
+        if (targetRecipientId && isValidUUID(senderId) && isValidUUID(targetRecipientId)) {
+          try {
+            await supabase.from('messages').insert({
+              id: isValidUUID(msgId) ? msgId : undefined,
+              sender_id: senderId,
+              receiver_id: targetRecipientId,
+              content: content,
+              text: content,
+              media_url: mediaUrl,
+              audio_url: messageType === 'audio' ? mediaUrl : null,
+              metadata: { ...metadata, mediaType, isAudio: messageType === 'audio', isVideo: messageType === 'video' },
+              is_read: false,
+              created_at: now
+            });
+          } catch (_) {}
         }
 
         // 4. INSTANT MULTI-CHANNEL WEBSOCKET BROADCASTS (Delivery <20ms guaranteed)

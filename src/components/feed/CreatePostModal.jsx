@@ -3,6 +3,7 @@ import { X, Image, Video, Eye, Trash2, Send, Mic, Play, Pause } from 'lucide-rea
 import { useAuth } from '../../context/AuthContext';
 import { soundEngine } from '../../services/audioService';
 import UserAvatar from '../common/UserAvatar';
+import { compressImage } from '../../utils/imageCompressor';
 
 export default function CreatePostModal({ isOpen, onClose, onSubmitPost, isDarkMode = true }) {
   const { currentUser } = useAuth();
@@ -25,21 +26,26 @@ export default function CreatePostModal({ isOpen, onClose, onSubmitPost, isDarkM
 
   if (!isOpen || !currentUser) return null;
 
-  const handleImageSelect = (e) => {
-    const file = e.target.files[0];
+  const handleImageSelect = async (e) => {
+    const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedMedia(reader.result);
-        setSelectedVideo(null);
-      };
-      reader.readAsDataURL(file);
+      soundEngine?.playPopSound?.();
+      try {
+        const compressed = await compressImage(file, 1280, 1280, 0.82);
+        if (compressed) {
+          setSelectedMedia(compressed);
+          setSelectedVideo(null);
+        }
+      } catch (err) {
+        console.error('Image compression error in modal:', err);
+      }
     }
   };
 
   const handleVideoSelect = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (file) {
+      soundEngine?.playPopSound?.();
       const reader = new FileReader();
       reader.onloadend = () => {
         setSelectedVideo(reader.result);

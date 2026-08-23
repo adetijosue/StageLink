@@ -61,7 +61,7 @@ function SwipeableChatItem({ chat, onSelectChat, onArchive, onDelete, onToggleUn
     ? (lastMsg.text || (lastMsg.isAudio ? '🎤 Message audio' : (lastMsg.isVideo ? '📹 Vidéo' : (lastMsg.mediaUrl ? '📷 Photo' : (lastMsg.isCallNotice ? '📞 Appel' : 'Message')))))
     : (chat.lastMessage || 'Aucun message');
 
-  const partnerName = chat.participant?.full_name || chat.participant?.name || chat.participant?.fullName || chat.participant?.userName || chat.title || 'Artiste StageLink';
+  const partnerName = chat.participant?.full_name || chat.participant?.name || chat.participant?.fullName || chat.participant?.userName || chat.title || 'Artiste';
   const partnerAvatar = chat.participant?.avatar_url || chat.participant?.avatar || chat.participant?.avatarUrl || chat.avatar || '';
   const isOnline = Boolean(chat.participant?.online);
 

@@ -3,6 +3,7 @@ import { ArrowLeft, Image, Video, Trash2, Send, Eye, Globe, Lock, Mic, Play, Pau
 import { useAuth } from '../../context/AuthContext';
 import { soundEngine } from '../../services/audioService';
 import UserAvatar from '../common/UserAvatar';
+import { compressImage } from '../../utils/imageCompressor';
 
 export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
   const { currentUser } = useAuth();
@@ -41,23 +42,42 @@ export default function CreatePostView({ onBack, onSubmitPost, isDarkMode }) {
     if (!files || files.length === 0) return;
     soundEngine.playPopSound();
 
-    Array.from(files).forEach(file => {
+    Array.from(files).forEach(async (file) => {
       const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|m4v|3gp|mkv|avi|ogv)$/i.test(file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (reader.result) {
-          setSelectedMediaList(prev => [
-            ...prev,
-            {
-              type: isVideo ? 'video' : 'image',
-              url: reader.result,
-              name: file.name,
-              size: file.size
-            }
-          ]);
+      if (isVideo) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (reader.result) {
+            setSelectedMediaList(prev => [
+              ...prev,
+              {
+                type: 'video',
+                url: reader.result,
+                name: file.name,
+                size: file.size
+              }
+            ]);
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        try {
+          const compressed = await compressImage(file, 1280, 1280, 0.82);
+          if (compressed) {
+            setSelectedMediaList(prev => [
+              ...prev,
+              {
+                type: 'image',
+                url: compressed,
+                name: file.name,
+                size: file.size
+              }
+            ]);
+          }
+        } catch (e) {
+          console.error('Image compression error:', e);
         }
-      };
-      reader.readAsDataURL(file);
+      }
     });
   };
 

@@ -7,6 +7,8 @@ import { useLanguage } from '../../context/LanguageContext';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { presenceService } from '../../services/presenceService';
 
+import { getStoredItem, STORAGE_KEYS, INITIAL_USERS } from '../../services/mockData';
+
 const normalizeStr = (str) => {
   return String(str || '')
     .normalize('NFD')
@@ -34,18 +36,34 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
 
   // Fetch initial profiles on modal open to browse community members immediately
   useEffect(() => {
-    if (!isOpen || !isSupabaseConfigured()) return;
+    if (!isOpen) return;
 
     let isMounted = true;
     const fetchInitialProfiles = async () => {
+      if (!isSupabaseConfigured()) return;
+      setIsSearchingRemote(true);
       try {
-        const { data, error } = await supabase
+        // CRITICAL: Wait for Supabase to restore the auth session so the JWT token
+        // is attached. RLS policies require 'authenticated' role to read profiles.
+        try {
+          await supabase.auth.getSession();
+        } catch (_) {}
+
+        let { data, error } = await supabase
           .from('profiles')
           .select('*')
           .order('created_at', { ascending: false })
-          .limit(50);
+          .limit(100);
 
-        if (data && !error && isMounted) {
+        if (error || !data) {
+          const fallbackRes = await supabase.from('profiles').select('*').limit(100);
+          if (fallbackRes.data && !fallbackRes.error) {
+            data = fallbackRes.data;
+            error = null;
+          }
+        }
+
+        if (data && isMounted) {
           const mapped = data
             .filter(p => {
               const name = (p.full_name || p.username || '').toLowerCase();
@@ -54,24 +72,31 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
               return !name.includes('test subagent') && !name.includes('subagent') && !email.includes('subagent') && !id.includes('subagent');
             })
             .map(p => ({
-            id: p.id,
-            name: p.full_name || p.username || 'Artiste',
-            userName: p.username || p.full_name || 'Artiste',
-            full_name: p.full_name || p.username || 'Artiste',
-            username: p.username || '',
-            role: p.role || 'Artiste',
-            userRole: p.role || 'Artiste',
-            avatar: p.avatar_url || '',
-            avatar_url: p.avatar_url || '',
-            userAvatar: p.avatar_url || '',
-            verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
-            location: p.location || '',
-            email: p.email || ''
-          }));
+              id: p.id,
+              name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
+              userName: p.username || p.full_name || (p.email ? p.email.split('@')[0] : 'Artiste'),
+              full_name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
+              username: p.username || '',
+              role: p.role || 'Artiste',
+              userRole: p.role || 'Artiste',
+              avatar: p.avatar_url || '',
+              avatar_url: p.avatar_url || '',
+              userAvatar: p.avatar_url || '',
+              verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+              badgeType: p.verified_badge || 'none',
+              location: p.location || '',
+              company: p.company || '',
+              bio: p.bio || '',
+              email: p.email || '',
+              instruments: Array.isArray(p.instruments) ? p.instruments : [],
+              genres: Array.isArray(p.genres) ? p.genres : []
+            }));
           setRemoteUsers(mapped);
         }
       } catch (e) {
         console.warn('Initial profiles load note:', e?.message || e);
+      } finally {
+        if (isMounted) setIsSearchingRemote(false);
       }
     };
 
@@ -91,13 +116,24 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
     const timer = setTimeout(async () => {
       setIsSearchingRemote(true);
       try {
-        const q = searchQuery.trim().replace(/[,()"]/g, ' ');
-        if (!q) return;
-        const { data, error } = await supabase
+        const rawQ = searchQuery.trim();
+        const cleanQ = rawQ.replace(/[,()"]/g, ' ').replace(/^@/, '').trim();
+        if (!cleanQ) return;
+
+        let { data, error } = await supabase
           .from('profiles')
           .select('*')
-          .or(`full_name.ilike.%${q}%,role.ilike.%${q}%,location.ilike.%${q}%`)
-          .limit(30);
+          .or(`full_name.ilike.%${cleanQ}%,username.ilike.%${cleanQ}%,email.ilike.%${cleanQ}%,role.ilike.%${cleanQ}%,location.ilike.%${cleanQ}%,company.ilike.%${cleanQ}%,bio.ilike.%${cleanQ}%`)
+          .limit(50);
+
+        if (error) {
+          // Fallback: search without PostgREST or filter
+          const fallbackRes = await supabase.from('profiles').select('*').limit(100);
+          if (fallbackRes.data) {
+            data = fallbackRes.data;
+            error = null;
+          }
+        }
 
         if (data && !error) {
           const mapped = data
@@ -108,29 +144,33 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
               return !name.includes('test subagent') && !name.includes('subagent') && !email.includes('subagent') && !id.includes('subagent');
             })
             .map(p => ({
-            id: p.id,
-            name: p.full_name || p.username || 'Artiste',
-            userName: p.username || p.full_name || 'Artiste',
-            full_name: p.full_name || p.username || 'Artiste',
-            username: p.username || '',
-            role: p.role || 'Artiste',
-            userRole: p.role || 'Artiste',
-            avatar: p.avatar_url || '',
-            avatar_url: p.avatar_url || '',
-            userAvatar: p.avatar_url || '',
-            verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
-            location: p.location || '',
-            email: p.email || ''
-          }));
+              id: p.id,
+              name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
+              userName: p.username || p.full_name || (p.email ? p.email.split('@')[0] : 'Artiste'),
+              full_name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
+              username: p.username || '',
+              role: p.role || 'Artiste',
+              userRole: p.role || 'Artiste',
+              avatar: p.avatar_url || '',
+              avatar_url: p.avatar_url || '',
+              userAvatar: p.avatar_url || '',
+              verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+              badgeType: p.verified_badge || 'none',
+              location: p.location || '',
+              company: p.company || '',
+              bio: p.bio || '',
+              email: p.email || '',
+              instruments: Array.isArray(p.instruments) ? p.instruments : [],
+              genres: Array.isArray(p.genres) ? p.genres : []
+            }));
 
           setRemoteUsers(prev => {
-            const combined = [...mapped];
-            (prev || []).forEach(existing => {
-              if (!combined.some(u => u.id === existing.id)) {
-                combined.push(existing);
-              }
+            const map = new Map();
+            mapped.forEach(u => map.set(u.id, u));
+            (prev || []).forEach(u => {
+              if (!map.has(u.id)) map.set(u.id, u);
             });
-            return combined;
+            return Array.from(map.values());
           });
         }
       } catch (e) {
@@ -138,24 +178,31 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
       } finally {
         setIsSearchingRemote(false);
       }
-    }, 250);
+    }, 200);
 
     return () => clearTimeout(timer);
   }, [searchQuery, isOpen]);
 
   const safeLocalUsers = Array.isArray(users) ? users : [];
   const combinedUsers = useMemo(() => {
-    const list = [...safeLocalUsers];
-    remoteUsers.forEach(ru => {
-      if (!list.some(u => u.id === ru.id)) {
-        list.push(ru);
+    const storedUsers = getStoredItem(STORAGE_KEYS.USERS, []);
+
+    const map = new Map();
+    [...INITIAL_USERS, ...(Array.isArray(storedUsers) ? storedUsers : []), ...safeLocalUsers, ...remoteUsers].forEach(u => {
+      if (u && u.id) {
+        if (!map.has(u.id)) {
+          map.set(u.id, u);
+        } else {
+          map.set(u.id, { ...map.get(u.id), ...u });
+        }
       }
     });
-    return list;
+    return Array.from(map.values());
   }, [safeLocalUsers, remoteUsers]);
 
   const filteredUsers = useMemo(() => {
-    const normQuery = normalizeStr(searchQuery);
+    const rawQuery = normalizeStr(searchQuery);
+    const normQuery = rawQuery.replace(/^@/, '');
 
     return combinedUsers.filter((u) => {
       if (!u) return false;
@@ -167,15 +214,41 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
       }
 
       const name = normalizeStr(u.name || u.userName || u.full_name || '');
+      const username = normalizeStr(u.username || '');
+      const email = normalizeStr(u.email || '');
       const role = normalizeStr(u.role || u.userRole || '');
       const location = normalizeStr(u.location || '');
+      const company = normalizeStr(u.company || '');
+      const bio = normalizeStr(u.bio || '');
+      const instruments = Array.isArray(u.instruments) ? u.instruments.map(normalizeStr).join(' ') : '';
+      const genres = Array.isArray(u.genres) ? u.genres.map(normalizeStr).join(' ') : '';
 
       const matchesQuery = !normQuery ||
         name.includes(normQuery) ||
+        username.includes(normQuery) ||
+        email.includes(normQuery) ||
         role.includes(normQuery) ||
-        location.includes(normQuery);
+        location.includes(normQuery) ||
+        company.includes(normQuery) ||
+        bio.includes(normQuery) ||
+        instruments.includes(normQuery) ||
+        genres.includes(normQuery);
 
-      const matchesRole = filterRole === 'All' || role.includes(normalizeStr(filterRole));
+      let matchesRole = true;
+      if (filterRole && filterRole !== 'All') {
+        const normFilter = normalizeStr(filterRole);
+        if (normFilter === 'artiste') {
+          matchesRole = role.includes('artiste') || role.includes('chanteu') || role.includes('vocal') || role.includes('guitar') || role.includes('pian') || role.includes('music');
+        } else if (normFilter === 'beatmaker') {
+          matchesRole = role.includes('beatmaker') || role.includes('composit') || role.includes('prod');
+        } else if (normFilter === 'producteur') {
+          matchesRole = role.includes('product') || role.includes('direct') || role.includes('da') || role.includes('manager');
+        } else if (normFilter === 'ingenieur') {
+          matchesRole = role.includes('ingenieur') || role.includes('mix') || role.includes('master') || role.includes('sound');
+        } else {
+          matchesRole = role.includes(normFilter);
+        }
+      }
 
       return matchesQuery && matchesRole;
     });

@@ -68,6 +68,8 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     }
 
     try {
+      const partnerId = partner?.id || partner?.userId || partner?.user_id || (conversationId && conversationId.startsWith('chat_') ? conversationId.replace('chat_', '') : null);
+
       // 1. Fetch conversation details (e.g. Vanish mode state)
       const convPromise = supabase
         .from('conversations')
@@ -75,7 +77,7 @@ export function useChatThread({ conversationId, currentUser, partner }) {
         .eq('id', conversationId)
         .maybeSingle();
 
-      // 2. Fetch last 50 messages
+      // 2. Fetch last 50 messages from direct_messages
       const msgsPromise = supabase
         .from('direct_messages')
         .select('*, reactions:message_reactions(*)')
@@ -83,32 +85,89 @@ export function useChatThread({ conversationId, currentUser, partner }) {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      const [{ data: conv }, { data: msgs, error }] = await Promise.all([convPromise, msgsPromise]);
+      // 3. Also fetch from messages table for complete backward and forward compatibility
+      const messagesTablePromise = partnerId && currentUser?.id
+        ? supabase
+            .from('messages')
+            .select('*')
+            .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${partnerId}),and(sender_id.eq.${partnerId},receiver_id.eq.${currentUser.id})`)
+            .order('created_at', { ascending: false })
+            .limit(50)
+            .catch(() => ({ data: [] }))
+        : Promise.resolve({ data: [] });
+
+      const [{ data: conv }, { data: msgs }, { data: legacyMsgs }] = await Promise.all([
+        convPromise,
+        msgsPromise,
+        messagesTablePromise
+      ]);
 
       if (conv && isMountedRef.current) {
         setIsVanishMode(Boolean(conv.vanish_mode_enabled));
       }
 
-      if (error) throw error;
-      
-      const orderedMsgs = (msgs || []).reverse();
-      if (isMountedRef.current) {
-        setMessages(orderedMsgs);
-        persistMessagesCache(orderedMsgs);
+      const allMsgsMap = new Map();
+      (legacyMsgs || []).forEach(m => {
+        if (!m || !m.id) return;
+        allMsgsMap.set(m.id, {
+          id: m.id,
+          conversation_id: conversationId,
+          sender_id: m.sender_id,
+          message_type: m.metadata?.mediaType || (m.audio_url ? 'audio' : (m.media_url ? 'image' : 'text')),
+          content: m.content || m.text || '',
+          media_url: m.media_url || m.audio_url || null,
+          metadata: m.metadata || {},
+          status: 'sent',
+          is_vanished: false,
+          created_at: m.created_at || new Date().toISOString()
+        });
+      });
+
+      (msgs || []).forEach(m => {
+        if (!m || !m.id) return;
+        allMsgsMap.set(m.id, m);
+      });
+
+      const mergedList = Array.from(allMsgsMap.values()).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+      if (isMountedRef.current && mergedList.length > 0) {
+        setMessages(mergedList);
+        persistMessagesCache(mergedList);
       }
 
-      // 3. Mark conversation as read
+      // Mark conversation as read across all systems
       if (currentUser?.id) {
         directChatService.markAsRead(conversationId, currentUser.id);
+
+        if (partnerId) {
+          try {
+            supabase
+              .from('messages')
+              .update({ is_read: true })
+              .eq('receiver_id', currentUser.id)
+              .eq('sender_id', partnerId)
+              .then(() => {})
+              .catch(() => {});
+
+            supabase
+              .from('notifications')
+              .update({ is_read: true })
+              .eq('user_id', currentUser.id)
+              .eq('actor_id', partnerId)
+              .eq('type', 'message')
+              .then(() => {})
+              .catch(() => {});
+          } catch (_) {}
+        }
       }
     } catch (e) {
-      console.warn('Load messages error:', e);
+      console.warn('Load messages note:', e);
     } finally {
       if (isMountedRef.current) {
         setIsLoading(false);
       }
     }
-  }, [conversationId, currentUser, persistMessagesCache]);
+  }, [conversationId, currentUser, partner, persistMessagesCache]);
 
   useEffect(() => {
     loadMessages(initialLoadRef.current);
@@ -286,6 +345,40 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     });
     setReplyingTo(null);
 
+    // Update cached conversation list item so it immediately appears in Discussions
+    try {
+      if (currentUser?.id && conversationId) {
+        const cachedKey = `stagelink_cached_conversations_${currentUser.id}`;
+        const rawCached = localStorage.getItem(cachedKey);
+        let convList = rawCached ? JSON.parse(rawCached) : [];
+        if (!Array.isArray(convList)) convList = [];
+
+        const existingIdx = convList.findIndex(c => c.id === conversationId);
+        const updatedConvItem = {
+          id: conversationId,
+          type: 'direct',
+          title: partner?.full_name || partner?.name || 'Artiste',
+          avatar: partner?.avatar_url || partner?.avatar || '',
+          partner: partner,
+          participant: partner,
+          vanishModeEnabled: isVanishMode,
+          lastMessage: optimisticMsg,
+          updatedAt: new Date().toISOString(),
+          unreadCount: 0
+        };
+
+        if (existingIdx >= 0) {
+          convList[existingIdx] = { ...convList[existingIdx], ...updatedConvItem };
+        } else {
+          convList.unshift(updatedConvItem);
+        }
+        localStorage.setItem(cachedKey, JSON.stringify(convList));
+        window.dispatchEvent(new CustomEvent('refresh_conversations', { detail: { conversationId, lastMessage: optimisticMsg } }));
+      }
+    } catch (ce) {
+      console.warn('Update conversation cache note:', ce);
+    }
+
     // 2. Background Upload if Blob provided
     let finalMediaUrl = mediaUrl;
     if (mediaBlob && !mediaUrl) {
@@ -313,6 +406,22 @@ export function useChatThread({ conversationId, currentUser, partner }) {
         persistMessagesCache(next);
         return next;
       });
+
+      // Also update conversation cache with server record
+      try {
+        if (currentUser?.id && conversationId) {
+          const cachedKey = `stagelink_cached_conversations_${currentUser.id}`;
+          const rawCached = localStorage.getItem(cachedKey);
+          let convList = rawCached ? JSON.parse(rawCached) : [];
+          if (Array.isArray(convList)) {
+            const idx = convList.findIndex(c => c.id === conversationId);
+            if (idx >= 0) {
+              convList[idx].lastMessage = savedRecord;
+              localStorage.setItem(cachedKey, JSON.stringify(convList));
+            }
+          }
+        }
+      } catch (_) {}
     } catch (err) {
       console.warn("Message server sync fallback:", err);
       // Keep optimistic message locally with final media URL so media is never lost

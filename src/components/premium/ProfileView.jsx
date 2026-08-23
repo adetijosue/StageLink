@@ -288,12 +288,28 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
             <form onSubmit={handleSaveAll} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                <div>
                  <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748B', display: 'block', marginBottom: '5px' }}>{language === 'en' ? 'ARTIST NAME' : "NOM D'ARTISTE"}</label>
-                 <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: 'transparent', color: 'inherit', outline: 'none' }} />
+                 <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: 'transparent', color: 'inherit', outline: 'none' }} placeholder={language === 'en' ? 'Your artist or display name' : "Votre nom d'artiste"} />
+               </div>
+
+               <div>
+                 <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748B', display: 'block', marginBottom: '5px' }}>{language === 'en' ? 'ROLE / SPECIALTY' : 'RÔLE / SPÉCIALITÉ'}</label>
+                 <input value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: 'transparent', color: 'inherit', outline: 'none' }} placeholder="Ex: Beatmaker, Chanteur, Ingénieur du son..." />
                </div>
 
                <div>
                  <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748B', display: 'block', marginBottom: '5px' }}>{language === 'en' ? 'BIO / PRESENTATION' : 'BIO / PRÉSENTATION'}</label>
-                 <textarea value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: 'transparent', color: 'inherit', height: '80px', resize: 'none', outline: 'none' }} />
+                 <textarea value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: 'transparent', color: 'inherit', height: '80px', resize: 'none', outline: 'none' }} placeholder={language === 'en' ? 'Introduce your musical universe...' : 'Présentez votre univers musical, vos influences...'} />
+               </div>
+
+               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                 <div>
+                   <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748B', display: 'block', marginBottom: '5px' }}>{language === 'en' ? 'LOCATION' : 'VILLE / PAYS'}</label>
+                   <input value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: 'transparent', color: 'inherit', outline: 'none', fontSize: '0.85rem' }} placeholder="Ex: Paris, France" />
+                 </div>
+                 <div>
+                   <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748B', display: 'block', marginBottom: '5px' }}>{language === 'en' ? 'STRUCTURE / LABEL' : 'LABEL / STUDIO'}</label>
+                   <input value={formData.company} onChange={e => setFormData({...formData, company: e.target.value})} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: 'transparent', color: 'inherit', outline: 'none', fontSize: '0.85rem' }} placeholder="Ex: Indépendant, Studio..." />
+                 </div>
                </div>
 
                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '15px' }}>

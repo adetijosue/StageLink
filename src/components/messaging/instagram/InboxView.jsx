@@ -524,19 +524,57 @@ const InboxView = React.memo(function InboxView({
 
       {/* 4. Conversations List with Swipeable Items */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px' }}>
-        {conversations.filter(c => Boolean(c && c.lastMessage)).length === 0 ? (
+        {conversations.length === 0 ? (
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            height: '240px',
-            color: '#94A3B8'
+            height: '280px',
+            color: '#94A3B8',
+            textAlign: 'center',
+            padding: '20px'
           }}>
-            <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>{language === 'en' ? 'No conversations found' : 'Aucune discussion trouvée'}</p>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'rgba(0, 102, 255, 0.1)',
+              color: '#0066FF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '16px'
+            }}>
+              <Plus size={32} />
+            </div>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-dark, #0F172A)', margin: '0 0 6px 0' }}>
+              {language === 'en' ? 'No conversations yet' : 'Aucune discussion pour l’instant'}
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748B)', margin: '0 0 16px 0', maxWidth: '280px', lineHeight: 1.4 }}>
+              {language === 'en'
+                ? 'Discover community artists and start collaborating in direct messages.'
+                : 'Découvrez les artistes de la communauté et commencez à collaborer en messages privés.'}
+            </p>
+            <button
+              onClick={onOpenNewChatModal}
+              style={{
+                background: '#0066FF',
+                color: '#FFF',
+                border: 'none',
+                borderRadius: '14px',
+                padding: '10px 20px',
+                fontWeight: 700,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(0, 102, 255, 0.3)'
+              }}
+            >
+              {language === 'en' ? 'Start a conversation' : 'Démarrer une discussion'}
+            </button>
           </div>
         ) : (
-          conversations.filter(c => Boolean(c && c.lastMessage)).map((conv) => (
+          conversations.map((conv) => (
             <SwipeableDiscussionItem
               key={conv.id}
               conv={conv}

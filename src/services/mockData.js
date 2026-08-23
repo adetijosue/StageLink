@@ -17,8 +17,150 @@ const STORAGE_KEYS = {
   PRO_EVENTS: 'stagelink_services_events'
 };
 
-// Clean Virgin Database Seeds for Real Production Users
-const INITIAL_USERS = [];
+// Community Artists Database Seeds for StageLink Ecosystem
+const INITIAL_USERS = [
+  {
+    id: 'artist_alexandre_dubois',
+    name: 'Alexandre Dubois',
+    userName: 'alex_beats',
+    full_name: 'Alexandre Dubois',
+    username: 'alex_beats',
+    role: 'Beatmaker / Compositeur',
+    userRole: 'Beatmaker / Compositeur',
+    email: 'alex.dubois@stagelink.music',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+    avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+    cover_url: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=1200',
+    coverPhoto: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=1200',
+    bio: 'Producteur & Beatmaker spécialisé Trap, Drill et Afrobeat. Plus de 50 prods certifiées et collaborations avec des artistes émergents.',
+    location: 'Paris, France',
+    company: 'JABE Records',
+    verified: true,
+    badgeType: 'gold',
+    instruments: ['FL Studio', 'MPC Live', 'Clavier Maître'],
+    genres: ['Trap', 'Afrobeat', 'Drill', 'Hip-Hop'],
+    gear: ['Yamaha HS8', 'Apollo Twin X', 'Shure SM7B'],
+    spotifyUrl: 'https://spotify.com',
+    instagramUrl: 'https://instagram.com'
+  },
+  {
+    id: 'artist_lea_morel',
+    name: 'Léa Morel',
+    userName: 'lea_voice',
+    full_name: 'Léa Morel',
+    username: 'lea_voice',
+    role: 'Chanteuse / Auteure-Compositrice',
+    userRole: 'Chanteuse / Auteure-Compositrice',
+    email: 'lea.morel@stagelink.music',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
+    avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
+    cover_url: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1200',
+    coverPhoto: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=1200',
+    bio: 'Chanteuse R&B / Pop Soul & Toplineuse. Voix chaude, harmonies travaillées et textes en français & anglais.',
+    location: 'Lyon, France',
+    company: 'Indépendante',
+    verified: true,
+    badgeType: 'blue',
+    instruments: ['Chant Lead', 'Piano / Synthé', 'Toplining'],
+    genres: ['R&B', 'Pop Soul', 'Neo-Soul', 'Variété Urbaine'],
+    gear: ['Neumann TLM 103', 'Logic Pro X', 'Apollo Solo'],
+    spotifyUrl: 'https://spotify.com',
+    instagramUrl: 'https://instagram.com'
+  },
+  {
+    id: 'artist_marcus_chen',
+    name: 'Marcus Chen',
+    userName: 'marcus_sound',
+    full_name: 'Marcus Chen',
+    username: 'marcus_sound',
+    role: 'Ingénieur du Son / Mix & Master',
+    userRole: 'Ingénieur du Son / Mix & Master',
+    email: 'marcus.chen@stagelink.music',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+    cover_url: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=1200',
+    coverPhoto: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=1200',
+    bio: 'Ingénieur mixage & mastering analogique & numérique. Prêt à faire sonner vos titres aux standards radios et plateformes de streaming.',
+    location: 'Bruxelles, Belgique',
+    company: 'Skyline Audio Lab',
+    verified: true,
+    badgeType: 'gold',
+    instruments: ['Pro Tools HD', 'Console SSL', 'Mastering Dolby Atmos'],
+    genres: ['Hip-Hop', 'Pop', 'Électro', 'Rock'],
+    gear: ['Focal Trio6 Be', 'Universal Audio UAD-2', 'Manley Massive Passive'],
+    spotifyUrl: 'https://spotify.com'
+  },
+  {
+    id: 'artist_david_kone',
+    name: 'David Koné',
+    userName: 'david_guitar',
+    full_name: 'David Koné',
+    username: 'david_guitar',
+    role: 'Guitariste / Compositeur',
+    userRole: 'Guitariste / Compositeur',
+    email: 'david.kone@stagelink.music',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
+    avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
+    cover_url: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=1200',
+    coverPhoto: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=1200',
+    bio: 'Guitariste électrique & acoustique session. Spécialiste des riffs Afrobeat, Funk et solos Rock mélodiques.',
+    location: 'Abidjan / Paris',
+    company: 'Groove Collective',
+    verified: true,
+    badgeType: 'gold',
+    instruments: ['Guitare Électrique', 'Guitare Acoustique', 'Basse'],
+    genres: ['Afrobeat', 'Funk', 'Rock', 'Reggae'],
+    gear: ['Fender Stratocaster Custom', 'Gibson Les Paul', 'Kemper Profiler'],
+    instagramUrl: 'https://instagram.com'
+  },
+  {
+    id: 'artist_sofia_rossi',
+    name: 'Sofia Rossi',
+    userName: 'sofia_keys',
+    full_name: 'Sofia Rossi',
+    username: 'sofia_keys',
+    role: 'Claviériste / Pianiste',
+    userRole: 'Claviériste / Pianiste',
+    email: 'sofia.rossi@stagelink.music',
+    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400',
+    avatar_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400',
+    cover_url: 'https://images.unsplash.com/photo-1520523839898-507127043811?w=1200',
+    coverPhoto: 'https://images.unsplash.com/photo-1520523839898-507127043811?w=1200',
+    bio: 'Pianiste classique et claviériste Jazz/Neo-Soul. Enregistrement d’arrangements piano, rhodes et synthétiseurs pour vos morceaux.',
+    location: 'Marseille, France',
+    company: 'StageLink Artists',
+    verified: true,
+    badgeType: 'blue',
+    instruments: ['Piano à queue', 'Rhodes', 'Moog Sub 37', 'Nord Stage 3'],
+    genres: ['Neo-Soul', 'Jazz', 'Pop', 'Cinématique'],
+    gear: ['Nord Stage 3', 'Apollo Twin', 'Logic Pro'],
+    youtubeUrl: 'https://youtube.com'
+  },
+  {
+    id: 'artist_sarah_benali',
+    name: 'Sarah Benali',
+    userName: 'sarah_topline',
+    full_name: 'Sarah Benali',
+    username: 'sarah_topline',
+    role: 'Toplineuse / Directrice Artistique',
+    userRole: 'Toplineuse / Directrice Artistique',
+    email: 'sarah.benali@stagelink.music',
+    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400',
+    avatar_url: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400',
+    cover_url: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200',
+    coverPhoto: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200',
+    bio: 'Créatrice de refrains entêtants et toplines sur-mesure. Coaching vocal et accompagnement en studio.',
+    location: 'Montréal / Paris',
+    company: 'HitCraft Studios',
+    verified: true,
+    badgeType: 'gold',
+    instruments: ['Voix Lead', 'Harmonies', 'Arrangements'],
+    genres: ['Pop Urbaine', 'Électro', 'Afro-Pop', 'R&B'],
+    gear: ['Shure KSM9', 'Universal Audio Arrow', 'Ableton Live'],
+    tiktokUrl: 'https://tiktok.com'
+  }
+];
+
 const INITIAL_STORIES = [];
 const INITIAL_POSTS = [];
 const INITIAL_SWIPE_MATCHES = [];
@@ -153,9 +295,18 @@ export const initializeStorage = () => {
     }
   } catch (e) {}
 
-  if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-    setStoredItem(STORAGE_KEYS.USERS, INITIAL_USERS);
+  const existingUsers = getStoredItem(STORAGE_KEYS.USERS, []);
+  const userMap = new Map();
+  INITIAL_USERS.forEach(u => userMap.set(u.id, u));
+  if (Array.isArray(existingUsers)) {
+    existingUsers.forEach(u => {
+      if (u && u.id) {
+        userMap.set(u.id, { ...(userMap.get(u.id) || {}), ...u });
+      }
+    });
   }
+  setStoredItem(STORAGE_KEYS.USERS, Array.from(userMap.values()));
+
   if (!localStorage.getItem(STORAGE_KEYS.POSTS)) {
     setStoredItem(STORAGE_KEYS.POSTS, INITIAL_POSTS);
   }
@@ -170,4 +321,4 @@ export const initializeStorage = () => {
   }
 };
 
-export { STORAGE_KEYS };
+export { STORAGE_KEYS, INITIAL_USERS };

@@ -11,6 +11,7 @@ import { haptics } from '../../services/hapticsService';
 import ConfirmDeleteModal from '../common/ConfirmDeleteModal';
 import confetti from 'canvas-confetti';
 import UserAvatar from '../common/UserAvatar';
+import { useTimeAgo } from '../../utils/timeAgo';
 
 const isVideoMediaUrl = (url) => {
   if (!url || typeof url !== 'string') return false;
@@ -25,6 +26,12 @@ const isVideoMediaUrl = (url) => {
     url.includes('.avi') ||
     url.includes('/videos/')
   );
+};
+
+const isValidMediaUrl = (url) => {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  return trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined';
 };
 
 function FeedCard({ 
@@ -48,6 +55,10 @@ function FeedCard({
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
+  // Dynamic real-time elapsed time
+  const postTimestamp = post.created_at || post.createdAt || post.createdAtTimestamp || post.timeAgo;
+  const liveTimeAgo = useTimeAgo(postTimestamp, language);
+
   // Double Click / Touch Tap Heart Burst Animation State
   const [showDoubleTapHeart, setShowDoubleTapHeart] = useState(false);
   const lastTapRef = useRef(0);
@@ -61,7 +72,7 @@ function FeedCard({
     window.dispatchEvent(new CustomEvent('play_global_audio', {
       detail: {
         title: post.audioTitle || (post.content ? post.content.substring(0, 32) : 'Publication Vocale'),
-        artist: post.userName || 'Artiste StageLink',
+        artist: post.userName || 'Artiste',
         genre: post.category || 'Afro-Gospel',
         coverUrl: post.userAvatar || post.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400',
         audioUrl: post.audioUrl || null,
@@ -135,6 +146,17 @@ function FeedCard({
   };
 
   const pro = post.proServiceData;
+
+  // Filter valid media list items
+  const validMediaList = Array.isArray(post.mediaList)
+    ? post.mediaList.filter(m => m && isValidMediaUrl(m.url || (typeof m === 'string' ? m : '')))
+    : [];
+
+  const rawSingleImage = post.image || (!isVideoMediaUrl(post.media_url) ? post.media_url : null);
+  const rawSingleVideo = post.video || (isVideoMediaUrl(post.media_url) ? post.media_url : (isVideoMediaUrl(post.image) ? post.image : null));
+
+  const validSingleImage = isValidMediaUrl(rawSingleImage) ? rawSingleImage : null;
+  const validSingleVideo = isValidMediaUrl(rawSingleVideo) ? rawSingleVideo : null;
 
   return (
     <div
@@ -251,7 +273,7 @@ function FeedCard({
                 </button>
               )}
             </div>
-            <span style={{ fontSize: '0.75rem', color: '#64748B' }}>{post.userRole} • {post.timeAgo}</span>
+            <span style={{ fontSize: '0.75rem', color: '#64748B' }}>{post.userRole} • {liveTimeAgo}</span>
           </div>
         </div>
 
@@ -521,16 +543,17 @@ function FeedCard({
       )}
 
       {/* Multi-Media List (Carousel-like vertical list) */}
-      {!pro && post.mediaList && post.mediaList.length > 0 ? (
+      {!pro && validMediaList.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-          {post.mediaList.map((m, i) => {
-            const isVid = m.type === 'video' || isVideoMediaUrl(m.url);
+          {validMediaList.map((m, i) => {
+            const itemUrl = m.url || (typeof m === 'string' ? m : '');
+            const isVid = m.type === 'video' || isVideoMediaUrl(itemUrl);
             return (
               <div key={i} style={{ borderRadius: '16px', overflow: 'hidden', background: '#0F172A', border: '1px solid var(--border-light, #E2E8F0)' }}>
                 {isVid ? (
                   <div style={{ position: 'relative', width: '100%', background: '#000000' }} onClick={(e) => e.stopPropagation()}>
                     <video
-                      src={m.url}
+                      src={itemUrl}
                       controls
                       playsInline
                       preload="metadata"
@@ -539,10 +562,15 @@ function FeedCard({
                   </div>
                 ) : (
                   <img
-                    src={m.url}
+                    src={itemUrl}
                     alt={`Media ${i}`}
                     loading="lazy"
                     decoding="async"
+                    onError={(e) => {
+                      if (e.currentTarget.parentElement) {
+                        e.currentTarget.parentElement.style.display = 'none';
+                      }
+                    }}
                     style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain' }}
                   />
                 )}
@@ -553,7 +581,7 @@ function FeedCard({
       ) : !pro && (
         <>
           {/* Direct single video or video disguised in image/media_url */}
-          {(post.video || isVideoMediaUrl(post.image) || isVideoMediaUrl(post.media_url)) ? (
+          {validSingleVideo ? (
             <div
               onClick={(e) => e.stopPropagation()}
               style={{
@@ -565,7 +593,7 @@ function FeedCard({
               }}
             >
               <video
-                src={post.video || (isVideoMediaUrl(post.image) ? post.image : post.media_url)}
+                src={validSingleVideo}
                 controls
                 playsInline
                 preload="metadata"
@@ -578,13 +606,18 @@ function FeedCard({
                 }}
               />
             </div>
-          ) : post.image ? (
+          ) : validSingleImage ? (
             <div style={{ borderRadius: '16px', overflow: 'hidden', marginBottom: '12px', background: '#F8FAFC', border: '1px solid var(--border-light, #E2E8F0)', cursor: 'pointer' }}>
               <img
-                src={post.image}
+                src={validSingleImage}
                 alt="Media Attachment"
                 loading="lazy"
                 decoding="async"
+                onError={(e) => {
+                  if (e.currentTarget.parentElement) {
+                    e.currentTarget.parentElement.style.display = 'none';
+                  }
+                }}
                 style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain' }}
               />
             </div>

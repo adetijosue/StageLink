@@ -53,6 +53,7 @@ import { haptics } from './services/hapticsService';
 const INITIAL_COMMUNITY_USERS = [];
 import { generateUUID } from './utils/uuid';
 import { compressImage } from './utils/imageCompressor';
+import { formatTimeAgo } from './utils/timeAgo';
 
 // Helper to convert Data URL to File for Supabase Storage Upload
 const dataURLtoFile = (dataurl, filename = 'media_upload') => {
@@ -517,7 +518,18 @@ function MainApp() {
     };
 
     window.addEventListener('profileUpdated', handleProfileUpdated);
-    return () => window.removeEventListener('profileUpdated', handleProfileUpdated);
+
+    const handleUnreadCount = (e) => {
+      if (typeof e.detail?.count === 'number') {
+        setUnreadDirectMessagesCount(e.detail.count);
+      }
+    };
+    window.addEventListener('unread_count_updated', handleUnreadCount);
+
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdated);
+      window.removeEventListener('unread_count_updated', handleUnreadCount);
+    };
   }, []);
 
   // Deep-Link & QR Code Scan Auto-Navigator (Directly opens Public Profile Modal & allows instant Follow)
@@ -563,7 +575,7 @@ function MainApp() {
             if (data && !error) {
               target = {
                 id: data.id,
-                name: data.full_name || data.username || 'Artiste StageLink',
+                name: data.full_name || data.username || (data.email ? data.email.split('@')[0] : 'Artiste'),
                 full_name: data.full_name || data.username,
                 avatar: data.avatar_url,
                 avatar_url: data.avatar_url,
@@ -649,7 +661,7 @@ function MainApp() {
           localStorage.removeItem(STORAGE_KEYS.CHATS);
           localStorage.removeItem(STORAGE_KEYS.POSTS);
           localStorage.removeItem(STORAGE_KEYS.STORIES);
-          localStorage.removeItem(STORAGE_KEYS.USERS);
+          // NOTE: Do NOT purge STORAGE_KEYS.USERS — profile data should survive cache resets
           localStorage.removeItem(STORAGE_KEYS.MATCHES);
           localStorage.setItem('stagelink_cache_version', CACHE_VERSION);
         }
@@ -660,17 +672,90 @@ function MainApp() {
         let loadedUsers = getStoredItem(STORAGE_KEYS.USERS, []);
         let loadedChats = getStoredItem(STORAGE_KEYS.CHATS, []);
 
+        // Ensure the current authenticated user is always seeded into the users list
+        if (currentUser?.id && !loadedUsers.some(u => String(u.id) === String(currentUser.id))) {
+          loadedUsers.push({
+            id: currentUser.id,
+            name: currentUser.name || currentUser.full_name || (currentUser.email ? currentUser.email.split('@')[0] : 'Artiste'),
+            userName: currentUser.userName || currentUser.name || '',
+            full_name: currentUser.name || currentUser.full_name || '',
+            username: currentUser.userName || '',
+            email: currentUser.email || '',
+            role: currentUser.role || 'Artiste',
+            userRole: currentUser.role || 'Artiste',
+            company: currentUser.company || '',
+            avatar: currentUser.avatar || currentUser.avatar_url || '',
+            avatar_url: currentUser.avatar || currentUser.avatar_url || '',
+            verified: currentUser.verified || false,
+            badgeType: currentUser.badgeType || 'none',
+            bio: currentUser.bio || '',
+            location: currentUser.location || '',
+            instruments: Array.isArray(currentUser.instruments) ? currentUser.instruments : [],
+            genres: Array.isArray(currentUser.genres) ? currentUser.genres : [],
+            gear: Array.isArray(currentUser.gear) ? currentUser.gear : []
+          });
+          setStoredItem(STORAGE_KEYS.USERS, loadedUsers);
+        }
+
+        // Compute real match cards from community users for Match Pro deck
+        const otherUsersInitial = loadedUsers.filter(u => u && u.id !== currentUser?.id && (!currentUser?.email || u.email !== currentUser?.email));
+        const initialMatchCards = otherUsersInitial.map(u => ({
+          id: `match_${u.id}`,
+          userId: u.id,
+          title: u.name || u.full_name || u.username || 'Artiste',
+          name: u.name || u.full_name || u.username || 'Artiste',
+          role: u.role || 'Artiste',
+          category: u.role || 'Artiste',
+          location: u.location || 'Paris & En ligne',
+          matchPercentage: 92 + Math.floor(Math.random() * 7),
+          image: u.cover_url || u.avatar || u.avatar_url || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800',
+          avatar: u.avatar || u.avatar_url || '',
+          cover_url: u.cover_url || '',
+          bio: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
+          description: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
+          skills: [...(Array.isArray(u.genres) ? u.genres : []), ...(Array.isArray(u.instruments) ? u.instruments : [])],
+          company: u.company || '',
+          creator: u.name || u.full_name || 'Artiste',
+          creatorAvatar: u.avatar || '',
+          verified: u.verified,
+          badgeType: u.badgeType,
+          rawUser: u
+        }));
+
         // Optimistic UI: Render the app instantly from local cache while Supabase fetches in the background
         setAllUsers(loadedUsers);
         setPosts(loadedPosts);
         setStories(loadedStories);
-        setMatches(loadedMatches);
+        setMatches(initialMatchCards.length > 0 ? initialMatchCards : loadedMatches);
         setChats(loadedChats);
 
         if (isSupabaseConfigured()) {
+          // CRITICAL: Wait for Supabase to restore the auth session so the JWT token
+          // is attached to all subsequent requests. Without this, RLS policies that
+          // require 'authenticated' role will return 0 rows.
           try {
+            await supabase.auth.getSession();
+          } catch (_) {}
+
+          try {
+            // Pre-flight: Ensure current authenticated user exists in Supabase profiles table
+            if (currentUser?.id) {
+              supabase.from('profiles').upsert({
+                id: currentUser.id,
+                full_name: currentUser.name || currentUser.full_name || (currentUser.email ? currentUser.email.split('@')[0] : 'Artiste'),
+                username: currentUser.userName || (currentUser.email ? currentUser.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_') : 'user_' + currentUser.id.slice(0, 6)),
+                email: currentUser.email || '',
+                role: currentUser.role || 'Artiste',
+                avatar_url: currentUser.avatar || currentUser.avatar_url || '',
+                bio: currentUser.bio || '',
+                location: currentUser.location || '',
+                company: currentUser.company || '',
+                verified_badge: currentUser.verified ? (currentUser.badgeType || 'blue') : 'none'
+              }, { onConflict: 'id' }).then(() => {}).catch(() => {});
+            }
+
             // Fetch live profiles from Supabase
-            const { data: supaProfiles, error: supaProfilesErr } = await supabase.from('profiles').select('*').limit(100);
+            const { data: supaProfiles, error: supaProfilesErr } = await supabase.from('profiles').select('*').limit(150);
             if (supaProfilesErr) {
               console.warn('Supabase live profiles fetch returned error:', supaProfilesErr.message);
             } else {
@@ -685,9 +770,9 @@ function MainApp() {
                   })
                   .map(p => ({
                     id: p.id,
-                    name: p.full_name || p.username || 'Artiste',
-                    userName: p.username || p.full_name || 'Artiste',
-                    full_name: p.full_name || p.username || 'Artiste',
+                    name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
+                    userName: p.username || p.full_name || (p.email ? p.email.split('@')[0] : 'Artiste'),
+                    full_name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
                     username: p.username || '',
                     email: p.email || '',
                     role: p.role || 'Artiste',
@@ -695,17 +780,88 @@ function MainApp() {
                     company: p.company || '',
                     avatar: p.avatar_url || '',
                     avatar_url: p.avatar_url || '',
+                    userAvatar: p.avatar_url || '',
                     verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
                     badgeType: p.verified_badge || 'none',
                     bio: p.bio || '',
                     location: p.location || '',
-                    instruments: p.instruments || [],
-                    genres: p.genres || [],
-                    gear: p.gear || []
+                    instruments: Array.isArray(p.instruments) ? p.instruments : [],
+                    genres: Array.isArray(p.genres) ? p.genres : [],
+                    gear: Array.isArray(p.gear) ? p.gear : []
                   }));
               }
-              loadedUsers = mappedSupaUsers;
+
+              // Merge live Supabase profiles with local/community users seamlessly
+              if (mappedSupaUsers.length > 0) {
+                const mergedMap = new Map();
+                (loadedUsers || []).forEach(u => {
+                  if (u && u.id) mergedMap.set(String(u.id), u);
+                });
+                mappedSupaUsers.forEach(u => {
+                  if (u && u.id) {
+                    const existing = mergedMap.get(String(u.id)) || {};
+                    mergedMap.set(String(u.id), { ...existing, ...u });
+                  }
+                });
+                loadedUsers = Array.from(mergedMap.values());
+              }
+
+              // ALWAYS ensure the current authenticated user is present in the list
+              if (currentUser?.id && !loadedUsers.some(u => String(u.id) === String(currentUser.id))) {
+                loadedUsers.push({
+                  id: currentUser.id,
+                  name: currentUser.name || currentUser.full_name || (currentUser.email ? currentUser.email.split('@')[0] : 'Artiste'),
+                  userName: currentUser.userName || currentUser.name || (currentUser.email ? currentUser.email.split('@')[0] : 'Artiste'),
+                  full_name: currentUser.name || currentUser.full_name || (currentUser.email ? currentUser.email.split('@')[0] : 'Artiste'),
+                  username: currentUser.userName || '',
+                  email: currentUser.email || '',
+                  role: currentUser.role || 'Artiste',
+                  userRole: currentUser.role || 'Artiste',
+                  company: currentUser.company || '',
+                  avatar: currentUser.avatar || currentUser.avatar_url || '',
+                  avatar_url: currentUser.avatar || currentUser.avatar_url || '',
+                  userAvatar: currentUser.avatar || currentUser.avatar_url || '',
+                  verified: currentUser.verified || false,
+                  badgeType: currentUser.badgeType || 'none',
+                  bio: currentUser.bio || '',
+                  location: currentUser.location || '',
+                  instruments: Array.isArray(currentUser.instruments) ? currentUser.instruments : [],
+                  genres: Array.isArray(currentUser.genres) ? currentUser.genres : [],
+                  gear: Array.isArray(currentUser.gear) ? currentUser.gear : []
+                });
+              }
+
               setStoredItem(STORAGE_KEYS.USERS, loadedUsers);
+              setAllUsers(loadedUsers);
+
+              // Recompute matches from all available users
+              const otherUsersLive = loadedUsers.filter(u => u && u.id !== currentUser?.id && (!currentUser?.email || u.email !== currentUser?.email));
+              const liveMatchCards = otherUsersLive.map(u => ({
+                id: `match_${u.id}`,
+                userId: u.id,
+                title: u.name || u.full_name || u.username || 'Artiste',
+                name: u.name || u.full_name || u.username || 'Artiste',
+                role: u.role || 'Artiste',
+                category: u.role || 'Artiste',
+                location: u.location || 'Paris & En ligne',
+                matchPercentage: 94,
+                image: u.cover_url || u.avatar || u.avatar_url || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800',
+                avatar: u.avatar || u.avatar_url || '',
+                cover_url: u.cover_url || '',
+                bio: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
+                description: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
+                skills: [...(Array.isArray(u.genres) ? u.genres : []), ...(Array.isArray(u.instruments) ? u.instruments : [])],
+                company: u.company || '',
+                creator: u.name || u.full_name || 'Artiste',
+                creatorAvatar: u.avatar || '',
+                verified: u.verified,
+                badgeType: u.badgeType,
+                rawUser: u
+              }));
+              if (liveMatchCards.length > 0) {
+                setMatches(liveMatchCards);
+                setStoredItem(STORAGE_KEYS.MATCHES, liveMatchCards);
+              }
             }
           } catch (err) {
             console.warn('Supabase live profiles fetch note:', err.message);
@@ -735,7 +891,7 @@ function MainApp() {
               const mappedSupaPosts = supaPosts.map(p => {
                 const authorProfile = userLookup.get(p.user_id) || p.profiles || {};
                 const isCurrentUser = p.user_id === currentUser?.id;
-                const authorName = isCurrentUser ? (currentUser.name || currentUser.full_name || authorProfile.full_name || 'Artiste StageLink') : (authorProfile.name || authorProfile.full_name || p.profiles?.full_name || 'Artiste StageLink');
+                const authorName = isCurrentUser ? (currentUser.name || currentUser.full_name || authorProfile.full_name || 'Artiste') : (authorProfile.name || authorProfile.full_name || p.profiles?.full_name || 'Artiste');
                 const authorAvatar = isCurrentUser ? (currentUser.avatar || currentUser.avatar_url || authorProfile.avatar_url || '') : (authorProfile.avatar || authorProfile.avatar_url || p.profiles?.avatar_url || '');
                 const authorRole = isCurrentUser ? (currentUser.role || 'Artiste') : (authorProfile.role || p.profiles?.role || 'Membre StageLink');
                 const isVerified = isCurrentUser ? (currentUser.verified || currentUser.badgeType === 'gold' || currentUser.badgeType === 'blue') : (authorProfile.verified || authorProfile.verified_badge === 'gold' || authorProfile.verified_badge === 'blue' || p.profiles?.verified_badge === 'gold');
@@ -752,9 +908,12 @@ function MainApp() {
                 }
 
                 const isVideo = isVideoMediaUrl(p.media_url);
+                const rawUrl = p.media_url && typeof p.media_url === 'string' && p.media_url !== 'null' && p.media_url !== 'undefined' && p.media_url.trim() !== '' ? p.media_url : null;
                 const postMediaList = Array.isArray(p.metadata?.mediaList) && p.metadata.mediaList.length > 0
-                  ? p.metadata.mediaList
-                  : (p.media_url ? [{ type: isVideo ? 'video' : 'image', url: p.media_url }] : []);
+                  ? p.metadata.mediaList.filter(m => m && m.url && m.url !== 'null' && m.url !== 'undefined' && m.url.trim() !== '')
+                  : (rawUrl ? [{ type: isVideo ? 'video' : 'image', url: rawUrl }] : []);
+
+                const postCreatedAt = p.created_at || new Date().toISOString();
 
                 return {
                   id: p.id,
@@ -765,9 +924,9 @@ function MainApp() {
                   isVerified: isVerified,
                   badgeType: badgeType,
                   text: textContent,
-                  image: !isVideo ? p.media_url : null,
-                  video: isVideo ? p.media_url : null,
-                  media_url: p.media_url || null,
+                  image: !isVideo ? rawUrl : null,
+                  video: isVideo ? rawUrl : null,
+                  media_url: rawUrl,
                   mediaList: postMediaList,
                   proServiceData: proServiceData,
                   hasAudio: Boolean(p.audio_url),
@@ -781,9 +940,11 @@ function MainApp() {
                     userId: c.user_id,
                     userName: c.profiles?.full_name || userLookup.get(c.user_id)?.name || 'Artiste',
                     text: c.content,
-                    time: new Date(c.created_at).toLocaleDateString()
+                    time: formatTimeAgo(c.created_at, language)
                   })) : [],
-                  timeAgo: 'Récemment'
+                  created_at: postCreatedAt,
+                  createdAt: postCreatedAt,
+                  timeAgo: formatTimeAgo(postCreatedAt, language)
                 };
               });
 
@@ -827,9 +988,11 @@ function MainApp() {
               const mappedSupa = supaStories.map(s => {
                 const authorProfile = userLookup.get(s.user_id) || s.profiles || {};
                 const isCurrentUser = s.user_id === currentUser?.id;
-                const authorName = isCurrentUser ? (currentUser?.name || 'Artiste StageLink') : (authorProfile.name || authorProfile.full_name || s.profiles?.full_name || 'Artiste StageLink');
+                const authorName = isCurrentUser ? (currentUser?.name || 'Moi') : (authorProfile.name || authorProfile.full_name || s.profiles?.full_name || 'Artiste');
                 const authorAvatar = isCurrentUser ? (currentUser?.avatar || '') : (authorProfile.avatar || authorProfile.avatar_url || s.profiles?.avatar_url || '');
-                const isText = !s.media_url || s.media_url === '' || s.media_url === 'null';
+                const rawStoryMedia = s.media_url && typeof s.media_url === 'string' && s.media_url !== 'null' && s.media_url !== 'undefined' && s.media_url.trim() !== '' ? s.media_url : null;
+                const isText = !rawStoryMedia || rawStoryMedia === '';
+                const storyCreatedAt = s.created_at || new Date().toISOString();
 
                 return {
                   id: s.id,
@@ -838,11 +1001,11 @@ function MainApp() {
                   avatar: authorAvatar,
                   userAvatar: authorAvatar,
                   hasUnread: s.story_views ? !s.story_views.some(v => v.viewer_id === currentUser?.id) : true,
-                  storyMedia: isText ? null : s.media_url,
-                  mediaUrl: isText ? '' : s.media_url,
+                  storyMedia: isText ? null : rawStoryMedia,
+                  mediaUrl: isText ? '' : rawStoryMedia,
                   isTextStory: isText,
-                  mediaType: isText ? 'text' : (s.is_video ? 'video' : ((s.media_url && (s.media_url.includes('.mp4') || s.media_url.includes('.webm') || s.media_url.includes('.mov') || s.media_url.startsWith('data:video'))) ? 'video' : 'image')),
-                  isVideo: s.is_video || (s.media_url && (s.media_url.includes('.mp4') || s.media_url.includes('.webm') || s.media_url.includes('.mov'))),
+                  mediaType: isText ? 'text' : (s.is_video ? 'video' : ((rawStoryMedia && (rawStoryMedia.includes('.mp4') || rawStoryMedia.includes('.webm') || rawStoryMedia.includes('.mov') || rawStoryMedia.startsWith('data:video'))) ? 'video' : 'image')),
+                  isVideo: s.is_video || (rawStoryMedia && (rawStoryMedia.includes('.mp4') || rawStoryMedia.includes('.webm') || rawStoryMedia.includes('.mov'))),
                   caption: s.caption || '',
                   likesCount: s.story_likes ? s.story_likes.length : 0,
                   isLiked: s.story_likes ? s.story_likes.some(l => l.user_id === currentUser?.id) : false,
@@ -852,7 +1015,10 @@ function MainApp() {
                     avatar: v.profiles?.avatar_url || userLookup.get(v.viewer_id)?.avatar || '',
                     role: v.profiles?.role || 'Artiste'
                   })) : [],
-                  time: 'Récemment'
+                  created_at: storyCreatedAt,
+                  createdAt: storyCreatedAt,
+                  createdAtTimestamp: new Date(storyCreatedAt).getTime(),
+                  time: formatTimeAgo(storyCreatedAt, language)
                 };
               });
 
@@ -924,7 +1090,7 @@ function MainApp() {
                   const partnerProfile = isMeSender ? msg.recipient : msg.sender;
                   const partnerUser = (loadedUsers || []).find(u => u.id === partnerId);
 
-                  const partnerName = partnerProfile?.full_name || partnerUser?.name || 'Artiste StageLink';
+                  const partnerName = partnerProfile?.full_name || partnerUser?.name || 'Artiste';
                   const partnerAvatar = partnerProfile?.avatar_url || partnerUser?.avatar || '';
                   const partnerRole = partnerProfile?.role || partnerUser?.role || 'Artiste';
 
@@ -1124,7 +1290,7 @@ function MainApp() {
           if (supaProfiles && supaProfiles.length > 0) {
             const mappedSupa = supaProfiles.map(p => ({
               id: p.id,
-              name: p.full_name || 'Artiste StageLink',
+              name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
               email: p.email || '',
               role: p.role || 'Artiste',
               company: p.company || '',
@@ -1175,8 +1341,8 @@ function MainApp() {
             const freshPosts = supaPosts.map(p => {
               const authorProfile = userLookup.get(p.user_id) || p.profiles || {};
               const isCurrentUser = p.user_id === currentUser?.id;
-              const authorName = isCurrentUser ? currentUser.name : (authorProfile.name || authorProfile.full_name || p.profiles?.full_name || 'Artiste StageLink');
-              const authorAvatar = isCurrentUser ? currentUser.avatar : (authorProfile.avatar || authorProfile.avatar_url || p.profiles?.avatar_url || '');
+              const authorName = isCurrentUser ? (currentUser.name || currentUser.full_name || authorProfile.full_name || 'Artiste') : (authorProfile.name || authorProfile.full_name || p.profiles?.full_name || 'Artiste');
+              const authorAvatar = isCurrentUser ? (currentUser.avatar || currentUser.avatar_url || authorProfile.avatar_url || '') : (authorProfile.avatar || authorProfile.avatar_url || p.profiles?.avatar_url || '');
               const authorRole = isCurrentUser ? (currentUser.role || 'Artiste') : (authorProfile.role || p.profiles?.role || 'Membre StageLink');
               const isVerified = isCurrentUser ? currentUser.verified : (authorProfile.verified || authorProfile.verified_badge === 'gold' || authorProfile.verified_badge === 'blue' || p.profiles?.verified_badge === 'gold');
               const badgeType = isCurrentUser ? currentUser.badgeType : (authorProfile.badgeType || authorProfile.verified_badge || p.profiles?.verified_badge || 'none');
@@ -1192,6 +1358,9 @@ function MainApp() {
               }
 
               const isVid = isVideoMediaUrl(p.media_url);
+              const rawUrl = p.media_url && typeof p.media_url === 'string' && p.media_url !== 'null' && p.media_url !== 'undefined' && p.media_url.trim() !== '' ? p.media_url : null;
+              const postCreatedAt = p.created_at || new Date().toISOString();
+
               return {
                 id: p.id,
                 userId: p.user_id,
@@ -1202,10 +1371,10 @@ function MainApp() {
                 badgeType: badgeType,
                 text: textContent,
                 proServiceData: proServiceData,
-                image: !isVid ? (p.media_url || null) : null,
-                video: isVid ? p.media_url : null,
-                media_url: p.media_url || null,
-                mediaList: p.media_url ? [{ type: isVid ? 'video' : 'image', url: p.media_url }] : [],
+                image: !isVid ? rawUrl : null,
+                video: isVid ? rawUrl : null,
+                media_url: rawUrl,
+                mediaList: rawUrl ? [{ type: isVid ? 'video' : 'image', url: rawUrl }] : [],
                 hasAudio: Boolean(p.audio_url),
                 audioTitle: p.audio_title || 'Extrait Audio',
                 audioUrl: p.audio_url || null,
@@ -1217,9 +1386,11 @@ function MainApp() {
                   userId: c.user_id,
                   userName: c.profiles?.full_name || userLookup.get(c.user_id)?.name || 'Artiste',
                   text: c.content,
-                  time: new Date(c.created_at).toLocaleDateString()
+                  time: formatTimeAgo(c.created_at, language)
                 })) : [],
-                timeAgo: 'Récemment'
+                created_at: postCreatedAt,
+                createdAt: postCreatedAt,
+                timeAgo: formatTimeAgo(postCreatedAt, language)
               };
             });
             const sanitizedPosts = freshPosts.filter(p => !isTestArtifact(p));
@@ -1264,9 +1435,11 @@ function MainApp() {
             const freshStories = supaStories.map(s => {
               const authorProfile = userLookup.get(s.user_id) || s.profiles || {};
               const isCurrentUser = s.user_id === currentUser?.id;
-              const authorName = isCurrentUser ? (currentUser?.name || 'Artiste StageLink') : (authorProfile.name || authorProfile.full_name || s.profiles?.full_name || 'Artiste StageLink');
+              const authorName = isCurrentUser ? (currentUser?.name || 'Moi') : (authorProfile.name || authorProfile.full_name || s.profiles?.full_name || 'Artiste');
               const authorAvatar = isCurrentUser ? (currentUser?.avatar || '') : (authorProfile.avatar || authorProfile.avatar_url || s.profiles?.avatar_url || '');
-              const isText = !s.media_url || s.media_url === '' || s.media_url === 'null';
+              const rawStoryMedia = s.media_url && typeof s.media_url === 'string' && s.media_url !== 'null' && s.media_url !== 'undefined' && s.media_url.trim() !== '' ? s.media_url : null;
+              const isText = !rawStoryMedia || rawStoryMedia === '';
+              const storyCreatedAt = s.created_at || new Date().toISOString();
 
               return {
                 id: s.id,
@@ -1275,11 +1448,11 @@ function MainApp() {
                 avatar: authorAvatar,
                 userAvatar: authorAvatar,
                 hasUnread: s.story_views ? !s.story_views.some(v => v.viewer_id === currentUser?.id) : true,
-                storyMedia: isText ? null : s.media_url,
-                mediaUrl: isText ? '' : s.media_url,
+                storyMedia: isText ? null : rawStoryMedia,
+                mediaUrl: isText ? '' : rawStoryMedia,
                 isTextStory: isText,
-                mediaType: isText ? 'text' : (s.is_video ? 'video' : ((s.media_url && (s.media_url.includes('.mp4') || s.media_url.includes('.webm') || s.media_url.includes('.mov') || s.media_url.startsWith('data:video'))) ? 'video' : 'image')),
-                isVideo: s.is_video || (s.media_url && (s.media_url.includes('.mp4') || s.media_url.includes('.webm') || s.media_url.includes('.mov'))),
+                mediaType: isText ? 'text' : (s.is_video ? 'video' : ((rawStoryMedia && (rawStoryMedia.includes('.mp4') || rawStoryMedia.includes('.webm') || rawStoryMedia.includes('.mov') || rawStoryMedia.startsWith('data:video'))) ? 'video' : 'image')),
+                isVideo: s.is_video || (rawStoryMedia && (rawStoryMedia.includes('.mp4') || rawStoryMedia.includes('.webm') || rawStoryMedia.includes('.mov'))),
                 caption: s.caption || '',
                 likesCount: s.story_likes ? s.story_likes.length : 0,
                 isLiked: s.story_likes ? s.story_likes.some(l => l.user_id === currentUser?.id) : false,
@@ -1289,7 +1462,10 @@ function MainApp() {
                   avatar: v.profiles?.avatar_url || userLookup.get(v.viewer_id)?.avatar || '',
                   role: v.profiles?.role || 'Artiste'
                 })) : [],
-                time: 'Récemment'
+                created_at: storyCreatedAt,
+                createdAt: storyCreatedAt,
+                createdAtTimestamp: new Date(storyCreatedAt).getTime(),
+                time: formatTimeAgo(storyCreatedAt, language)
               };
             });
 
@@ -2426,7 +2602,7 @@ function MainApp() {
     const targetUserId = storyUser.userId || storyUser.id || `usr_story_${Date.now()}`;
     const targetUserName = storyUser.userName || storyUser.name;
     const targetAvatar = storyUser.userAvatar || storyUser.avatar;
-    const targetRole = storyUser.userRole || storyUser.role || 'Artiste StageLink';
+    const targetRole = storyUser.userRole || storyUser.role || 'Artiste';
 
     let targetChat = chats.find(
       (c) => c.participant?.id === targetUserId || c.participant?.name === targetUserName
@@ -2574,7 +2750,7 @@ function MainApp() {
     const reconstructedStory = {
       id: msg.storyId || `story_msg_${Date.now()}`,
       userId: msg.storyUserId || selectedChat?.participant?.id || 'usr_story',
-      userName: msg.storyUserName || selectedChat?.participant?.name || 'Artiste StageLink',
+      userName: msg.storyUserName || selectedChat?.participant?.name || 'Artiste',
       userAvatar: msg.storyUserAvatar || selectedChat?.participant?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
       mediaUrl: msg.storyThumbnail || msg.storyMedia || null,
       storyMedia: msg.storyThumbnail || msg.storyMedia || null,
@@ -2765,8 +2941,15 @@ function MainApp() {
     setIsUploadingPost(true);
     const postUuid = generateUUID();
 
+    const sanitizeMedia = (url) => {
+      if (!url || typeof url !== 'string') return null;
+      const trimmed = url.trim();
+      return (trimmed !== '' && trimmed !== 'null' && trimmed !== 'undefined') ? trimmed : null;
+    };
+
     // 1. Resolve preliminary media (instant Data URLs or existing URLs) for 0ms instantaneous display
     let rawMedia = newPostData.image || (newPostData.mediaList && newPostData.mediaList[0]?.url) || (newPostData.mediaList && typeof newPostData.mediaList[0] === 'string' ? newPostData.mediaList[0] : null);
+    rawMedia = sanitizeMedia(rawMedia);
     let preliminaryMediaUrl = rawMedia;
     const isVideoMedia = Boolean(
       newPostData.video ||
@@ -2779,11 +2962,17 @@ function MainApp() {
 
     let preliminaryMediaList = [];
     if (Array.isArray(newPostData.mediaList) && newPostData.mediaList.length > 0) {
-      preliminaryMediaList = newPostData.mediaList.map((m, idx) => ({
-        type: m.type || (isVideoMediaUrl(m.url || m) ? 'video' : 'image'),
-        url: m.url || (typeof m === 'string' ? m : ''),
-        name: m.name || `media_${idx}`
-      }));
+      preliminaryMediaList = newPostData.mediaList
+        .map((m, idx) => {
+          const itemUrl = sanitizeMedia(m.url || (typeof m === 'string' ? m : ''));
+          if (!itemUrl) return null;
+          return {
+            type: m.type || (isVideoMediaUrl(itemUrl) ? 'video' : 'image'),
+            url: itemUrl,
+            name: m.name || `media_${idx}`
+          };
+        })
+        .filter(Boolean);
     } else if (preliminaryMediaUrl) {
       preliminaryMediaList = [{
         type: isVideoMedia ? 'video' : 'image',
@@ -2791,9 +2980,10 @@ function MainApp() {
       }];
     }
 
-    const authorName = currentUser.name || currentUser.full_name || 'Artiste StageLink';
+    const authorName = currentUser.name || currentUser.full_name || 'Artiste';
     const authorAvatar = currentUser.avatar || currentUser.avatar_url || '';
     const authorRole = currentUser.role || 'Artiste';
+    const postCreatedAt = new Date().toISOString();
 
     // 2. Build instant optimistic post object
     const optimisticPost = {
@@ -2813,7 +3003,9 @@ function MainApp() {
       hasAudio: !!newPostData.hasAudio || !!preliminaryAudioUrl,
       audioUrl: preliminaryAudioUrl,
       audioTitle: newPostData.audioTitle || (newPostData.hasAudio ? 'Note Vocale' : null),
-      timeAgo: 'À l\'instant',
+      created_at: postCreatedAt,
+      createdAt: postCreatedAt,
+      timeAgo: "À l'instant",
       likesCount: 0,
       isLiked: false,
       commentsCount: 0,
@@ -2861,8 +3053,9 @@ function MainApp() {
 
         let finalMediaList = [];
         if (Array.isArray(newPostData.mediaList) && newPostData.mediaList.length > 0) {
-          finalMediaList = await Promise.all(newPostData.mediaList.map(async (m, idx) => {
-            let itemUrl = m.url || (typeof m === 'string' ? m : '');
+          finalMediaList = (await Promise.all(newPostData.mediaList.map(async (m, idx) => {
+            let itemUrl = sanitizeMedia(m.url || (typeof m === 'string' ? m : ''));
+            if (!itemUrl) return null;
             let itemType = m.type || (isVideoMediaUrl(itemUrl) ? 'video' : 'image');
             if (itemUrl && typeof itemUrl === 'string' && itemUrl.startsWith('data:')) {
               itemUrl = await safeUploadToStorage(itemType === 'video' ? 'posts' : 'chat_media', `post_media_${Date.now()}_${idx}`, itemUrl);
@@ -2872,7 +3065,7 @@ function MainApp() {
               url: itemUrl,
               name: m.name || `media_${idx}`
             };
-          }));
+          }))).filter(Boolean);
         } else if (finalMediaUrl) {
           finalMediaList = [{
             type: isVideoMedia ? 'video' : 'image',
@@ -2883,10 +3076,10 @@ function MainApp() {
         // Silently update the post in state & storage with final storage URLs
         const finalizedPost = {
           ...optimisticPost,
-          image: !isVideoMedia ? finalMediaUrl : null,
-          video: isVideoMedia ? finalMediaUrl : null,
-          media_url: finalMediaUrl,
-          audioUrl: finalAudioUrl,
+          image: !isVideoMedia ? sanitizeMedia(finalMediaUrl) : null,
+          video: isVideoMedia ? sanitizeMedia(finalMediaUrl) : null,
+          media_url: sanitizeMedia(finalMediaUrl),
+          audioUrl: sanitizeMedia(finalAudioUrl),
           mediaList: finalMediaList
         };
 
@@ -2921,8 +3114,8 @@ function MainApp() {
             id: postUuid,
             user_id: currentUser.id,
             content: textContent,
-            media_url: finalMediaUrl || null,
-            audio_url: finalAudioUrl || null,
+            media_url: sanitizeMedia(finalMediaUrl),
+            audio_url: sanitizeMedia(finalAudioUrl),
             audio_title: newPostData.audioTitle || (newPostData.hasAudio ? 'Extrait Audio' : null)
           };
 
@@ -2987,7 +3180,7 @@ function MainApp() {
         }
       }
 
-      if (!finalMediaUrl) {
+      if (!finalMediaUrl || finalMediaUrl === 'null' || finalMediaUrl === 'undefined') {
         finalMediaUrl = '';
       }
 
@@ -2995,6 +3188,7 @@ function MainApp() {
       const privacyType = storyData.privacyType || 'all_contacts';
       const isText = storyData.isTextStory || !finalMediaUrl || finalMediaUrl === '';
       const isVideo = storyData.mediaType === 'video' || storyData.isVideo || (typeof finalMediaUrl === 'string' && (finalMediaUrl.includes('.mp4') || finalMediaUrl.includes('.webm') || finalMediaUrl.includes('.mov') || finalMediaUrl.startsWith('data:video')));
+      const storyCreatedAt = new Date().toISOString();
 
       const newStory = {
         id: storyUuid,
@@ -3017,8 +3211,10 @@ function MainApp() {
         isReshared: storyData.isReshared || false,
         resharedFrom: storyData.resharedFrom || null,
         privacyType: privacyType,
+        created_at: storyCreatedAt,
+        createdAt: storyCreatedAt,
         createdAtTimestamp: Date.now(),
-        time: 'À l\'instant'
+        time: "À l'instant"
       };
 
       // Save story directly to Supabase Database for real-time sync with all users
@@ -3027,7 +3223,7 @@ function MainApp() {
         try {
           await supabase.from('profiles').upsert({
             id: currentUser.id,
-            full_name: currentUser.name || 'Artiste StageLink',
+            full_name: currentUser.name || 'Artiste',
             avatar_url: currentUser.avatar || '',
             role: currentUser.role || 'Artiste'
           }, { onConflict: 'id' });
@@ -3194,7 +3390,7 @@ function MainApp() {
             },
             senderProfile: {
               id: currentUser.id,
-              full_name: currentUser.name || 'Artiste StageLink',
+              full_name: currentUser.name || currentUser.full_name || 'Artiste',
               avatar_url: currentUser.avatar || '',
               role: currentUser.role || 'Artiste'
             }
@@ -3243,7 +3439,7 @@ function MainApp() {
           try {
             await supabase.from('profiles').upsert({
               id: currentUser.id,
-              full_name: currentUser.name || 'Artiste StageLink',
+              full_name: currentUser.name || currentUser.full_name || 'Artiste',
               avatar_url: currentUser.avatar || '',
               role: currentUser.role || 'Artiste'
             }, { onConflict: 'id' });
@@ -3573,7 +3769,7 @@ function MainApp() {
       try {
         const { data: supaProfiles, error } = await supabase
           .from('profiles')
-          .select('id, full_name, username, avatar_url, cover_url, role, bio, location, company, verified_badge, genres, instruments, skills, gear')
+          .select('id, full_name, username, avatar_url, cover_url, role, bio, location, company, verified_badge, genres, instruments, gear')
           .limit(100);
 
         if (!error && supaProfiles) {
