@@ -1,42 +1,64 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-const InboxView = React.lazy(() => import('./components/messaging/instagram/InboxView'));
-const MessageThread = React.lazy(() => import('./components/messaging/instagram/MessageThread'));
+
+// Auto-reload on stale chunk after deployment (prevents "Failed to fetch dynamically imported module")
+const lazyWithRetry = (importFn) =>
+  React.lazy(() =>
+    importFn().catch((err) => {
+      const hasReloaded = sessionStorage.getItem('stagelink_chunk_reload');
+      if (!hasReloaded) {
+        sessionStorage.setItem('stagelink_chunk_reload', '1');
+        window.location.reload();
+        return new Promise(() => {}); // keep suspended while reloading
+      }
+      sessionStorage.removeItem('stagelink_chunk_reload');
+      throw err; // re-throw if reload didn't fix it
+    })
+  );
+
+// Clear the reload flag on successful load
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => sessionStorage.removeItem('stagelink_chunk_reload'));
+}
+
+const InboxView = lazyWithRetry(() => import('./components/messaging/instagram/InboxView'));
+const MessageThread = lazyWithRetry(() => import('./components/messaging/instagram/MessageThread'));
 import { directChatService } from './services/directChatService';
 
 import { Plus, Volume2, User, Music } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import AuthScreen from './components/auth/AuthScreen';
-const TopBar = React.lazy(() => import('./components/navigation/TopBar'));
-const GlobalUserSearchModal = React.lazy(() => import('./components/navigation/GlobalUserSearchModal'));
-const BottomNav = React.lazy(() => import('./components/navigation/BottomNav'));
+const TopBar = lazyWithRetry(() => import('./components/navigation/TopBar'));
+const GlobalUserSearchModal = lazyWithRetry(() => import('./components/navigation/GlobalUserSearchModal'));
+const BottomNav = lazyWithRetry(() => import('./components/navigation/BottomNav'));
 import UserAvatar from './components/common/UserAvatar';
 import StoryBar from './components/feed/StoryBar';
-const StoryViewer = React.lazy(() => import('./components/feed/StoryViewer'));
+const StoryViewer = lazyWithRetry(() => import('./components/feed/StoryViewer'));
 import FeedCard from './components/feed/FeedCard';
 import CreatePostBar from './components/feed/CreatePostBar';
-const CreatePostView = React.lazy(() => import('./components/feed/CreatePostView'));
-const CameraStoryRecorder = React.lazy(() => import('./components/feed/CameraStoryRecorder'));
-const ShareModal = React.lazy(() => import('./components/feed/ShareModal'));
-const ReportModal = React.lazy(() => import('./components/feed/ReportModal'));
-const PublicProfileModal = React.lazy(() => import('./components/profile/PublicProfileModal'));
-const SwipeMatching = React.lazy(() => import('./components/matching/SwipeMatching'));
-const ChatList = React.lazy(() => import('./components/messaging/ChatList'));
-const ChatRoom = React.lazy(() => import('./components/messaging/ChatRoom'));
-const EphemeralModal = React.lazy(() => import('./components/messaging/EphemeralModal'));
-const VideoCallScreen = React.lazy(() => import('./components/messaging/VideoCallScreen'));
-const NewChatModal = React.lazy(() => import('./components/messaging/NewChatModal'));
-const CallHistoryModal = React.lazy(() => import('./components/messaging/CallHistoryModal'));
-const ProServicesView = React.lazy(() => import('./components/services/ProServicesView'));
-const BuyWorkModal = React.lazy(() => import('./components/services/BuyWorkModal'));
-const OrderServiceModal = React.lazy(() => import('./components/services/OrderServiceModal'));
-const CourseDetailsModal = React.lazy(() => import('./components/services/CourseDetailsModal'));
-const EventTicketModal = React.lazy(() => import('./components/services/EventTicketModal'));
-const ProfileView = React.lazy(() => import('./components/premium/ProfileView'));
-const PaywallModal = React.lazy(() => import('./components/premium/PaywallModal'));
-const NotificationsDrawer = React.lazy(() => import('./components/notifications/NotificationsDrawer'));
-const TopNotificationBanner = React.lazy(() => import('./components/notifications/TopNotificationBanner'));
-const GlobalAudioPlayer = React.lazy(() => import('./components/audio/GlobalAudioPlayer'));
+const CreatePostView = lazyWithRetry(() => import('./components/feed/CreatePostView'));
+const CameraStoryRecorder = lazyWithRetry(() => import('./components/feed/CameraStoryRecorder'));
+const ShareModal = lazyWithRetry(() => import('./components/feed/ShareModal'));
+const ReportModal = lazyWithRetry(() => import('./components/feed/ReportModal'));
+const PublicProfileModal = lazyWithRetry(() => import('./components/profile/PublicProfileModal'));
+const SwipeMatching = lazyWithRetry(() => import('./components/matching/SwipeMatching'));
+const ChatList = lazyWithRetry(() => import('./components/messaging/ChatList'));
+const ChatRoom = lazyWithRetry(() => import('./components/messaging/ChatRoom'));
+const EphemeralModal = lazyWithRetry(() => import('./components/messaging/EphemeralModal'));
+const VideoCallScreen = lazyWithRetry(() => import('./components/messaging/VideoCallScreen'));
+const NewChatModal = lazyWithRetry(() => import('./components/messaging/NewChatModal'));
+const CallHistoryModal = lazyWithRetry(() => import('./components/messaging/CallHistoryModal'));
+const ProServicesView = lazyWithRetry(() => import('./components/services/ProServicesView'));
+const BuyWorkModal = lazyWithRetry(() => import('./components/services/BuyWorkModal'));
+const OrderServiceModal = lazyWithRetry(() => import('./components/services/OrderServiceModal'));
+const CourseDetailsModal = lazyWithRetry(() => import('./components/services/CourseDetailsModal'));
+const EventTicketModal = lazyWithRetry(() => import('./components/services/EventTicketModal'));
+const ProfileView = lazyWithRetry(() => import('./components/premium/ProfileView'));
+const PaywallModal = lazyWithRetry(() => import('./components/premium/PaywallModal'));
+const NotificationsDrawer = lazyWithRetry(() => import('./components/notifications/NotificationsDrawer'));
+const TopNotificationBanner = lazyWithRetry(() => import('./components/notifications/TopNotificationBanner'));
+const GlobalAudioPlayer = lazyWithRetry(() => import('./components/audio/GlobalAudioPlayer'));
+
 import AppSplashScreen from './components/common/AppSplashScreen';
 import PWAInstallPrompt from './components/common/PWAInstallPrompt';
 import PullToRefresh from './components/common/PullToRefresh';

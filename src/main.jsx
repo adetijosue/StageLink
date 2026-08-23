@@ -17,6 +17,15 @@ if (typeof window !== 'undefined') {
     }
     lastTouchEnd = now;
   }, { passive: false });
+
+  // Handle stale chunk errors gracefully by auto-reloading once
+  window.addEventListener('vite:preloadError', (event) => {
+    const reloaded = sessionStorage.getItem('stagelink_preload_reload');
+    if (!reloaded) {
+      sessionStorage.setItem('stagelink_preload_reload', '1');
+      window.location.reload();
+    }
+  });
 }
 
 // Register PWA Service Worker for Native Notifications & Background Execution
