@@ -29,11 +29,21 @@ const INITIAL_CHATS = [];
 export const isTestArtifact = (item) => {
   if (!item) return false;
   if (item.is_test === true || item.is_test_account === true) return true;
-  const author = String(item.userName || item.authorName || item.user_name || item.name || '').toLowerCase().trim();
-  const userId = String(item.userId || item.user_id || item.id || '').toLowerCase().trim();
-  const content = String(item.text || item.content || item.caption || '').toLowerCase();
+  const author = String(item.userName || item.authorName || item.user_name || item.name || item.title || '').toLowerCase().trim();
+  const userId = String(item.userId || item.user_id || item.id || item.conversation_id || item.chatId || '').toLowerCase().trim();
+  const content = String(item.text || item.content || item.caption || item.lastMessage?.content || item.lastMessage?.text || '').toLowerCase();
+  const partnerName = String(item.partner?.name || item.partner?.full_name || item.participant?.name || item.participant?.full_name || '').toLowerCase().trim();
+  const senderName = String(item.senderName || item.sender_name || '').toLowerCase().trim();
   
   if (
+    userId === 'chat_stagelink_official' ||
+    userId.includes('stagelink_official') ||
+    userId.includes('usr_stagelink') ||
+    author.includes('stagelink support') ||
+    partnerName.includes('stagelink support') ||
+    senderName.includes('stagelink support') ||
+    author === 'utilisateur' ||
+    partnerName === 'utilisateur' ||
     userId.startsWith('artist_') ||
     userId.startsWith('mock_') ||
     userId.startsWith('dummy_') ||
@@ -163,6 +173,25 @@ export const initializeStorage = () => {
       if (Array.isArray(parsed)) {
         const clean = parsed.filter(item => !isTestArtifact(item));
         localStorage.setItem(STORAGE_KEYS.CHATS, JSON.stringify(clean));
+      }
+    }
+
+    // Purge cached conversations
+    if (typeof localStorage !== 'undefined') {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('stagelink_cached_conversations') || key.startsWith('stagelink_cached_notes'))) {
+          try {
+            const rawVal = localStorage.getItem(key);
+            if (rawVal) {
+              const parsedVal = JSON.parse(rawVal);
+              if (Array.isArray(parsedVal)) {
+                const cleanVal = parsedVal.filter(item => !isTestArtifact(item));
+                localStorage.setItem(key, JSON.stringify(cleanVal));
+              }
+            }
+          } catch (_) {}
+        }
       }
     }
   } catch (e) {}

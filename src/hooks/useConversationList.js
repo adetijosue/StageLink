@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { directChatService } from '../services/directChatService';
+import { isTestArtifact } from '../services/mockData';
 
 export function useConversationList(currentUser) {
   // 1. Instant Cache-First Initialization (0ms latency)
@@ -12,9 +13,13 @@ export function useConversationList(currentUser) {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
-          parsed.forEach(c => {
-            const key = c.partner?.id || c.participant?.id || c.id;
-            if (key && c.lastMessage) convMap.set(key, c);
+          parsed.filter(c => !isTestArtifact(c)).forEach(c => {
+            const partnerId = c.partner?.id || c.participant?.id;
+            const title = String(c.title || c.partner?.name || '').toLowerCase().trim();
+            if (partnerId && partnerId !== currentUser.id && title !== 'utilisateur' && !title.includes('stagelink support')) {
+              const key = partnerId || c.id;
+              if (key && c.lastMessage) convMap.set(key, c);
+            }
           });
         }
       }
@@ -23,27 +28,30 @@ export function useConversationList(currentUser) {
       if (rawChats) {
         const parsedChats = JSON.parse(rawChats);
         if (Array.isArray(parsedChats)) {
-          parsedChats.forEach(chat => {
+          parsedChats.filter(chat => !isTestArtifact(chat)).forEach(chat => {
             if (chat && (chat.participant || chat.partner)) {
               const partnerObj = chat.participant || chat.partner;
-              const key = partnerObj.id || chat.id;
-              if (key && !convMap.has(key)) {
-                const lastM = Array.isArray(chat.messages) && chat.messages.length > 0
-                  ? chat.messages[chat.messages.length - 1]
-                  : (chat.lastMessage ? (typeof chat.lastMessage === 'string' ? { content: chat.lastMessage, created_at: chat.updatedAt || new Date().toISOString() } : chat.lastMessage) : null);
+              const partnerName = String(partnerObj.name || partnerObj.full_name || '').toLowerCase().trim();
+              if (partnerObj.id && partnerObj.id !== currentUser.id && partnerName !== 'utilisateur' && !partnerName.includes('stagelink support')) {
+                const key = partnerObj.id || chat.id;
+                if (key && !convMap.has(key)) {
+                  const lastM = Array.isArray(chat.messages) && chat.messages.length > 0
+                    ? chat.messages[chat.messages.length - 1]
+                    : (chat.lastMessage ? (typeof chat.lastMessage === 'string' ? { content: chat.lastMessage, created_at: chat.updatedAt || new Date().toISOString() } : chat.lastMessage) : null);
 
-                if (lastM) {
-                  convMap.set(key, {
-                    id: chat.id || `conv_${partnerObj.id}`,
-                    type: 'direct',
-                    title: partnerObj.name || partnerObj.full_name || 'Artiste',
-                    avatar: partnerObj.avatar || partnerObj.avatar_url || '',
-                    partner: partnerObj,
-                    participant: partnerObj,
-                    lastMessage: lastM,
-                    updatedAt: chat.updatedAt || new Date().toISOString(),
-                    unreadCount: chat.unread || chat.unreadCount || 0
-                  });
+                  if (lastM) {
+                    convMap.set(key, {
+                      id: chat.id || `conv_${partnerObj.id}`,
+                      type: 'direct',
+                      title: partnerObj.name || partnerObj.full_name || 'Artiste',
+                      avatar: partnerObj.avatar || partnerObj.avatar_url || '',
+                      partner: partnerObj,
+                      participant: partnerObj,
+                      lastMessage: lastM,
+                      updatedAt: chat.updatedAt || new Date().toISOString(),
+                      unreadCount: chat.unread || chat.unreadCount || 0
+                    });
+                  }
                 }
               }
             }
@@ -382,79 +390,44 @@ export function useConversationList(currentUser) {
         });
       }
 
-      // Process discussions from message notifications
-      const notifsFormatted = [];
-      if (Array.isArray(supaNotifs) && supaNotifs.length > 0) {
-        supaNotifs.forEach(notif => {
-          const partnerId = notif.actor_id;
-          if (!partnerId || deletedPartnerIds.has(String(partnerId))) return;
-          if (notifsFormatted.some(n => n.partner?.id === partnerId)) return;
 
-          const actorProfile = Array.isArray(notif.actor) ? notif.actor[0] : notif.actor;
-          const partnerName = actorProfile?.full_name || actorProfile?.username || 'Artiste';
-          const partnerAvatar = actorProfile?.avatar_url || '';
-          const partnerRole = actorProfile?.role || 'Artiste';
-
-          const normalizedPartner = {
-            id: partnerId,
-            full_name: partnerName,
-            name: partnerName,
-            username: actorProfile?.username || '',
-            avatar: partnerAvatar,
-            avatar_url: partnerAvatar,
-            role: partnerRole,
-            userRole: partnerRole
-          };
-
-          notifsFormatted.push({
-            id: notif.reference_id || `chat_${partnerId}`,
-            type: 'direct',
-            title: partnerName,
-            avatar: partnerAvatar,
-            partner: normalizedPartner,
-            participant: normalizedPartner,
-            lastMessage: {
-              id: notif.id,
-              sender_id: partnerId,
-              content: notif.content || 'Nouveau message',
-              created_at: notif.created_at
-            },
-            updatedAt: notif.created_at,
-            unreadCount: notif.is_read === false ? 1 : 0
-          });
-        });
-      }
-
-      // Merge remote, messages, notifications, and local discussions seamlessly with deduplication by partner ID
+      // Merge remote, messages, and local discussions seamlessly with deduplication by partner ID
       const convMap = new Map();
       remoteFormatted.forEach(c => {
+        if (!c || isTestArtifact(c)) return;
         const key = c.partner?.id || c.id;
         if (key) convMap.set(key, c);
       });
       messagesFormatted.forEach(c => {
-        const key = c.partner?.id || c.id;
-        if (key && !convMap.has(key)) {
-          convMap.set(key, c);
-        }
-      });
-      notifsFormatted.forEach(c => {
+        if (!c || isTestArtifact(c)) return;
         const key = c.partner?.id || c.id;
         if (key && !convMap.has(key)) {
           convMap.set(key, c);
         }
       });
       localCachedConvs.forEach(c => {
+        if (!c || isTestArtifact(c)) return;
         const key = c.partner?.id || c.id;
         if (key && !convMap.has(key)) {
           convMap.set(key, c);
         }
       });
 
-      const finalConversations = Array.from(convMap.values()).sort((a, b) => {
-        const timeA = new Date(a.lastMessage?.created_at || a.updatedAt || 0).getTime();
-        const timeB = new Date(b.lastMessage?.created_at || b.updatedAt || 0).getTime();
-        return timeB - timeA;
-      });
+      const finalConversations = Array.from(convMap.values())
+        .filter(c => {
+          if (!c || isTestArtifact(c)) return false;
+          const partnerId = c.partner?.id || c.participant?.id;
+          if (!partnerId || partnerId === currentUser.id) return false;
+          const title = String(c.title || c.partner?.name || c.partner?.full_name || '').toLowerCase().trim();
+          if (title === 'utilisateur' || title.includes('stagelink support') || title.includes('subagent')) return false;
+          if (!c.lastMessage) return false;
+          return true;
+        })
+        .sort((a, b) => {
+          const timeA = new Date(a.lastMessage?.created_at || a.updatedAt || 0).getTime();
+          const timeB = new Date(b.lastMessage?.created_at || b.updatedAt || 0).getTime();
+          return timeB - timeA;
+        });
 
       const totalUnreadCount = finalConversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
       try {
