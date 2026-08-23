@@ -37,9 +37,10 @@ export function useDirectPresence(conversationId, currentUser, partnerId) {
 
   // 2. Track Conversation-level channel for typing indicators
   useEffect(() => {
-    if (!conversationId || !currentUserId || !isSupabaseConfigured()) return;
+    const channelKey = conversationId || (partnerId && currentUserId ? `presence_pair_${[currentUserId, partnerId].sort().join('_')}` : null);
+    if (!channelKey || !currentUserId || !isSupabaseConfigured()) return;
 
-    const channel = supabase.channel(`presence:${conversationId}`, {
+    const channel = supabase.channel(`presence:${channelKey}`, {
       config: { presence: { key: currentUserId } }
     });
 
@@ -53,7 +54,7 @@ export function useDirectPresence(conversationId, currentUser, partnerId) {
         setTypingUsers((prev) => {
           const next = new Map(prev);
           next.set(payload.userId, {
-            name: payload.userName,
+            name: payload.userName || 'Artiste',
             avatar: payload.userAvatar,
             timestamp: Date.now()
           });
@@ -148,7 +149,7 @@ export function useDirectPresence(conversationId, currentUser, partnerId) {
 
   const typingArray = Array.from(typingUsers.values());
   const typingText = typingArray.length > 0
-    ? `${typingArray.map((u) => u.name?.split(' ')[0]).join(', ')} écrit...`
+    ? `${typingArray.map((u) => u.name?.split(' ')[0]).join(', ')} est en train d'écrire...`
     : null;
 
   const isOnline = isGlobalOnline || isConvOnline;

@@ -253,6 +253,7 @@ function NotificationsDrawer({
   onClose,
   onSelectChat,
   onNavigateTab,
+  onOpenNotification,
   notifications = [],
   chats = [],
   onDeleteNotification,
@@ -265,6 +266,9 @@ function NotificationsDrawer({
     if (!n) return null;
     let title, subtitle, icon, iconBg, iconColor, targetTab;
     const someone = language === 'en' ? 'Someone' : "Quelqu'un";
+    const postId = n.postId || n.post_id || n.reference_id || n.referenceId || n.data?.postId || n.metadata?.postId;
+    const storyId = n.storyId || n.story_id || n.data?.storyId || n.metadata?.storyId;
+
     switch (n.type) {
       case 'like_post':
         title = language === 'en' ? `${n.actorName || someone} liked your post.` : `${n.actorName || someone} a aimé votre publication.`;
@@ -346,8 +350,12 @@ function NotificationsDrawer({
       iconBg: iconBg || '#EFF6FF',
       iconColor: iconColor || '#0066FF',
       targetTab,
+      postId,
+      storyId,
+      referenceId: n.reference_id || n.referenceId,
       isRead: n.isRead,
-      chatObj: n.chatObj
+      chatObj: n.chatObj,
+      raw: n
     };
   };
 
@@ -356,6 +364,11 @@ function NotificationsDrawer({
 
   const handleNotificationClick = (item) => {
     if (typeof onClose === 'function') onClose();
+
+    if (typeof onOpenNotification === 'function') {
+      onOpenNotification(item);
+      return;
+    }
 
     if ((item.type === 'message' || item.type === 'incoming_call_audio' || item.type === 'incoming_call_video') && typeof onSelectChat === 'function') {
       const chatObj = chats.find(c => c.id === item.actorId || (c.participant && c.participant.id === item.actorId));

@@ -177,16 +177,18 @@ export function useChatThread({ conversationId, currentUser, partner }) {
    * Realtime Channel Subscriptions for Messages, Reactions & Vanish Mode
    */
   useEffect(() => {
-    if (!conversationId || !isSupabaseConfigured()) return;
+    if (!isSupabaseConfigured()) return;
+    const partnerId = partner?.id || partner?.userId || partner?.user_id;
+    const currentUserId = currentUser?.id;
+    const channelKey = conversationId || (partnerId && currentUserId ? `dm_pair_${[currentUserId, partnerId].sort().join('_')}` : null);
 
     const handleIncoming = (incomingMsg) => {
       if (!incomingMsg) return;
-      if (incomingMsg.sender_id === currentUser?.id) return;
+      if (incomingMsg.sender_id === currentUserId) return;
 
-      const partnerId = partner?.id || partner?.userId || partner?.user_id;
       const isForThisThread =
         (incomingMsg.conversation_id && conversationId && String(incomingMsg.conversation_id) === String(conversationId)) ||
-        (partnerId && (String(incomingMsg.sender_id) === String(partnerId) || String(incomingMsg.recipient_id) === String(partnerId)));
+        (partnerId && (String(incomingMsg.sender_id) === String(partnerId) || String(incomingMsg.recipient_id) === String(partnerId) || String(incomingMsg.receiver_id) === String(partnerId)));
 
       if (!isForThisThread) return;
 
@@ -198,8 +200,8 @@ export function useChatThread({ conversationId, currentUser, partner }) {
       });
 
       soundEngine.playPopSound();
-      if (currentUser?.id && conversationId) {
-        directChatService.markAsRead(conversationId, currentUser.id);
+      if (currentUserId && conversationId) {
+        directChatService.markAsRead(conversationId, currentUserId);
       }
     };
 
@@ -210,18 +212,26 @@ export function useChatThread({ conversationId, currentUser, partner }) {
       }
     };
     window.addEventListener('direct_message_received', handleWindowDm);
+    window.addEventListener('new_message_received', handleWindowDm);
 
     // 2. Realtime WebSocket Channel
     const channel = supabase
-      .channel(`dm:${conversationId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `conversation_id=eq.${conversationId}` }, (payload) => {
+      .channel(`dm:${channelKey || 'general'}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' }, (payload) => {
+        handleIncoming(payload.new);
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         handleIncoming(payload.new);
       })
       .on('broadcast', { event: 'new_direct_message' }, ({ payload }) => {
         const msg = payload?.message || payload;
         handleIncoming(msg);
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'direct_messages', filter: `conversation_id=eq.${conversationId}` }, (payload) => {
+      .on('broadcast', { event: 'new_message' }, ({ payload }) => {
+        const msg = payload?.message || payload;
+        handleIncoming(msg);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'direct_messages' }, (payload) => {
         const updatedMsg = payload.new;
         if (!updatedMsg) return;
 
@@ -232,11 +242,11 @@ export function useChatThread({ conversationId, currentUser, partner }) {
         });
       })
       .on('broadcast', { event: 'messages_read' }, ({ payload }) => {
-        if (payload?.conversationId === conversationId && payload?.readerId !== currentUser?.id) {
+        if ((payload?.conversationId === conversationId || payload?.partnerId === currentUserId) && payload?.readerId !== currentUserId) {
           // Recipient read our messages -> turn ticks to double blue instantly
           setMessages((prev) => {
             const next = prev.map((m) => {
-              if (m.sender_id === currentUser?.id) {
+              if (m.sender_id === currentUserId) {
                 return { ...m, status: 'read', read: true, isRead: true };
               }
               return m;
@@ -279,7 +289,6 @@ export function useChatThread({ conversationId, currentUser, partner }) {
       .on('broadcast', { event: 'vanish_mode_toggled' }, ({ payload }) => {
         setIsVanishMode(payload.enabled);
         if (!payload.enabled) {
-          // Vanish mode turned off -> remove vanished messages from local view
           setMessages((prev) => {
             const next = prev.filter((m) => !m.is_vanished);
             persistMessagesCache(next);
@@ -291,14 +300,23 @@ export function useChatThread({ conversationId, currentUser, partner }) {
 
     channelRef.current = channel;
 
+    // 3. Fallback active polling every 2.5 seconds to guarantee 100% fresh message stream
+    const pollTimer = setInterval(() => {
+      if (isMountedRef.current) {
+        loadMessages(true);
+      }
+    }, 2500);
+
     return () => {
       window.removeEventListener('direct_message_received', handleWindowDm);
+      window.removeEventListener('new_message_received', handleWindowDm);
+      clearInterval(pollTimer);
       if (channelRef.current) supabase.removeChannel(channelRef.current);
-      if (currentUser?.id && conversationId) {
-        directChatService.markAsRead(conversationId, currentUser.id);
+      if (currentUserId && conversationId) {
+        directChatService.markAsRead(conversationId, currentUserId);
       }
     };
-  }, [conversationId, currentUser, partner, persistMessagesCache]);
+  }, [conversationId, currentUser, partner, persistMessagesCache, loadMessages]);
 
   /**
    * Send Text / Media Message (Optimistic rendering)

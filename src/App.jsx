@@ -4276,6 +4276,74 @@ function MainApp() {
         chats={chats}
         onDeleteNotification={handleDeleteNotification}
         onClearAllNotifications={handleClearAllNotifications}
+        onOpenNotification={(notif) => {
+          setIsNotificationsOpen(false);
+          if (!notif) return;
+
+          const notifType = notif.type || 'info';
+          const partnerId = notif.actorId || notif.partnerId || notif.sender_id || notif.userId;
+          const actorName = notif.actorName || notif.title || notif.senderName || 'Artiste';
+          const actorAvatar = notif.actorAvatar || notif.avatar || notif.avatar_url || '';
+          const postId = notif.postId || notif.post_id || notif.referenceId || notif.reference_id;
+          const storyId = notif.storyId || notif.story_id;
+
+          // 1. Direct Messages & Calls -> Open Chat immediately
+          if (notifType === 'message' || notifType.includes('call') || notif.targetTab === 'discussions') {
+            if (partnerId) {
+              handleStartChatWithUser({
+                id: partnerId,
+                full_name: actorName,
+                name: actorName,
+                avatar_url: actorAvatar,
+                avatar: actorAvatar
+              });
+              setActiveTab('discussions');
+            } else {
+              setActiveTab('discussions');
+            }
+            return;
+          }
+
+          // 2. Post Likes & Comments -> Route to Feed & Scroll smoothly to exact Post
+          if (notifType === 'like_post' || notifType === 'comment_post' || notifType === 'reshare_post' || postId) {
+            setActiveTab('feed');
+            if (postId) {
+              setTimeout(() => {
+                const postElement = document.getElementById(`post-${postId}`);
+                if (postElement) {
+                  postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  postElement.style.animation = 'highlightPulse 1.8s ease-out';
+                }
+              }, 350);
+            }
+            return;
+          }
+
+          // 3. Story Likes, Views & Replies -> Open Story Viewer directly
+          if (notifType === 'like_story' || notifType === 'view_story' || notifType === 'reshare_story' || storyId) {
+            const foundStory = (stories || []).find(s => s.id === storyId || (s.items && s.items.some(i => i.id === storyId)));
+            if (foundStory) {
+              setActiveStory(foundStory);
+            } else if (stories && stories.length > 0) {
+              const myStory = stories.find(s => s.userId === currentUser?.id || s.isMine);
+              setActiveStory(myStory || stories[0]);
+            }
+            return;
+          }
+
+          // 4. Follows & Profile interactions -> Open Profile Modal
+          if (notifType === 'follow' || notifType === 'profile' || notif.targetTab === 'profile') {
+            if (partnerId) {
+              handleOpenPublicProfile({ id: partnerId, name: actorName, full_name: actorName, avatar: actorAvatar, avatar_url: actorAvatar });
+            }
+            return;
+          }
+
+          // 5. Default tab fallback
+          if (notif.targetTab) {
+            setActiveTab(notif.targetTab);
+          }
+        }}
         onSelectChat={(chat) => {
           setIsNotificationsOpen(false);
           handleSelectChat(chat);
@@ -4332,25 +4400,61 @@ function MainApp() {
         notification={toastNotification}
         onOpen={(notif) => {
           if (!notif) return;
-          if (notif.type === 'message' || notif.partnerId) {
-            const partnerId = notif.partnerId || notif.actorId;
+          const notifType = notif.type || 'info';
+          const partnerId = notif.actorId || notif.partnerId || notif.sender_id || notif.userId;
+          const actorName = notif.actorName || notif.title || notif.senderName || 'Artiste';
+          const actorAvatar = notif.actorAvatar || notif.avatar || notif.avatar_url || '';
+          const postId = notif.postId || notif.post_id || notif.referenceId || notif.reference_id;
+          const storyId = notif.storyId || notif.story_id;
+
+          // 1. Direct Messages & Calls -> Open Chat immediately
+          if (notifType === 'message' || notifType.includes('call') || notif.partnerId) {
             if (partnerId) {
               handleStartChatWithUser({
                 id: partnerId,
-                full_name: notif.title,
-                name: notif.title,
-                avatar_url: notif.avatar,
-                avatar: notif.avatar
+                full_name: actorName,
+                name: actorName,
+                avatar_url: actorAvatar,
+                avatar: actorAvatar
               });
               setActiveTab('discussions');
             } else {
               setActiveTab('discussions');
             }
-          } else if (notif.targetTab) {
-            setActiveTab(notif.targetTab);
-          } else if (notif.actorId) {
-            handleOpenPublicProfile({ id: notif.actorId });
           }
+          // 2. Post Likes & Comments -> Route to Feed & Scroll smoothly to exact Post
+          else if (notifType === 'like_post' || notifType === 'comment_post' || notifType === 'reshare_post' || postId) {
+            setActiveTab('feed');
+            if (postId) {
+              setTimeout(() => {
+                const postElement = document.getElementById(`post-${postId}`);
+                if (postElement) {
+                  postElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  postElement.style.animation = 'highlightPulse 1.8s ease-out';
+                }
+              }, 350);
+            }
+          }
+          // 3. Story Likes, Views & Replies -> Open Story Viewer directly
+          else if (notifType === 'like_story' || notifType === 'view_story' || notifType === 'reshare_story' || storyId) {
+            const foundStory = (stories || []).find(s => s.id === storyId || (s.items && s.items.some(i => i.id === storyId)));
+            if (foundStory) {
+              setActiveStory(foundStory);
+            } else if (stories && stories.length > 0) {
+              const myStory = stories.find(s => s.userId === currentUser?.id || s.isMine);
+              setActiveStory(myStory || stories[0]);
+            }
+          }
+          // 4. Follows & Profile interactions -> Open Profile Modal
+          else if (notifType === 'follow' || notifType === 'profile' || notif.actorId) {
+            if (partnerId) {
+              handleOpenPublicProfile({ id: partnerId, name: actorName, full_name: actorName, avatar: actorAvatar, avatar_url: actorAvatar });
+            }
+          }
+          else if (notif.targetTab) {
+            setActiveTab(notif.targetTab);
+          }
+
           setToastNotification(null);
         }}
         onClose={() => setToastNotification(null)}

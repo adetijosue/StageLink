@@ -181,6 +181,7 @@ function FeedCard({
 
   return (
     <div
+      id={`post-${post.id}`}
       className="card"
       onClick={handleCardClick}
       onTouchEnd={handleCardTouchEnd}

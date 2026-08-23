@@ -374,6 +374,48 @@ export default function MessageThread({
             />
           );
         })}
+
+        {/* Animated Typing Indicator Bubble */}
+        {typingText && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-end',
+              gap: '8px',
+              marginTop: '6px',
+              marginBottom: '6px',
+              animation: 'fadeIn 0.2s ease-out'
+            }}
+          >
+            <UserAvatar
+              user={{ name: partnerName, avatar: partnerAvatar }}
+              size={28}
+            />
+            <div
+              style={{
+                background: isVanishMode ? 'rgba(30, 41, 59, 0.85)' : '#F1F5F9',
+                border: isVanishMode ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E2E8F0',
+                padding: '8px 14px',
+                borderRadius: '18px 18px 18px 4px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+              }}
+            >
+              {/* 3 Animated Jumping Dots */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0066FF', display: 'inline-block', animation: 'typingDot 1.2s infinite ease-in-out', animationDelay: '0ms' }} />
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0066FF', display: 'inline-block', animation: 'typingDot 1.2s infinite ease-in-out', animationDelay: '200ms' }} />
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0066FF', display: 'inline-block', animation: 'typingDot 1.2s infinite ease-in-out', animationDelay: '400ms' }} />
+              </div>
+              <span style={{ fontSize: '0.75rem', color: isVanishMode ? '#CBD5E1' : '#64748B', fontWeight: 600 }}>
+                {typingText}
+              </span>
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
