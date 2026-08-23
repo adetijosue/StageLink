@@ -1433,16 +1433,23 @@ function MainApp() {
       const updateUnreadDirectMessagesCount = async () => {
         if (!isSupabaseConfigured() || !currentUser?.id) return;
         try {
-          // 1. Fetch unread notifications of type message
-          const { count: msgNotifCount } = await supabase
+          // 1. Fetch unread message notifications
+          const notifPromise = supabase
             .from('notifications')
             .select('*', { count: 'exact', head: true })
             .eq('user_id', currentUser.id)
             .eq('type', 'message')
             .eq('is_read', false);
 
-          // 2. Fetch unread messages from conversations where last_message is newer than last_read_at
-          const { data: parts } = await supabase
+          // 2. Fetch unread classic messages where receiver is currentUser
+          const classicMsgPromise = supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('receiver_id', currentUser.id)
+            .eq('is_read', false);
+
+          // 3. Fetch unread direct messages from conversation_participants
+          const partsPromise = supabase
             .from('conversation_participants')
             .select(`
               conversation_id,
@@ -1458,6 +1465,12 @@ function MainApp() {
             .eq('user_id', currentUser.id)
             .is('left_at', null)
             .limit(50);
+
+          const [{ count: msgNotifCount }, { count: classicMsgCount }, { data: parts }] = await Promise.all([
+            notifPromise.catch(() => ({ count: 0 })),
+            classicMsgPromise.catch(() => ({ count: 0 })),
+            partsPromise.catch(() => ({ data: [] }))
+          ]);
 
           let convUnread = 0;
           if (parts) {
@@ -1475,7 +1488,18 @@ function MainApp() {
             });
           }
 
-          const totalUnread = Math.max(msgNotifCount || 0, convUnread);
+          let localChatsUnread = 0;
+          try {
+            const rawChats = localStorage.getItem(STORAGE_KEYS.CHATS);
+            if (rawChats) {
+              const parsedChats = JSON.parse(rawChats);
+              if (Array.isArray(parsedChats)) {
+                localChatsUnread = parsedChats.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
+              }
+            }
+          } catch (_) {}
+
+          const totalUnread = Math.max(msgNotifCount || 0, classicMsgCount || 0, convUnread || 0, localChatsUnread || 0);
           setUnreadDirectMessagesCount(totalUnread);
         } catch (e) {
           console.warn('Update unread direct messages note:', e);
@@ -1965,12 +1989,19 @@ function MainApp() {
           const handleIncomingDirectMessage = async (msgRecord) => {
             if (!msgRecord || msgRecord.sender_id === currentUser.id) return;
 
-            // 1. Dispatch custom event for active chat thread (MessageThread.jsx / useChatThread.js)
+            // 1. Audio pop chime & haptics for instant feedback
+            try {
+              soundEngine.playPopSound();
+              haptics.medium();
+            } catch (_) {}
+
+            // 2. Dispatch custom events for active chat thread & conversation list
             window.dispatchEvent(new CustomEvent('direct_message_received', { detail: msgRecord }));
             window.dispatchEvent(new Event('refresh_conversations'));
+            setUnreadDirectMessagesCount(prev => (prev || 0) + 1);
             updateUnreadDirectMessagesCount().catch(() => {});
 
-            // 2. Resolve sender profile & trigger deduplicated in-app floating banner
+            // 3. Resolve sender profile & trigger deduplicated in-app floating banner + native notification
             try {
               let senderName = 'Nouveau message';
               let senderAvatar = '';
@@ -2001,6 +2032,17 @@ function MainApp() {
                 actorId: msgRecord.sender_id,
                 conversationId: msgRecord.conversation_id
               });
+
+              // Trigger Web & Native Push Notification
+              try {
+                nativeNotificationService.sendNotification({
+                  title: senderName,
+                  body: bannerMessage,
+                  icon: senderAvatar || '/stagelink-logo.png',
+                  tag: `dm_${msgRecord.sender_id}`,
+                  data: { url: '/?tab=discussions', partnerId: msgRecord.sender_id }
+                });
+              } catch (_) {}
             } catch (err) {
               console.warn('Error handling incoming direct message banner:', err);
             }
@@ -2115,6 +2157,16 @@ function MainApp() {
                 return prev;
               });
             } else {
+              try {
+                soundEngine.playPopSound();
+                haptics.medium();
+              } catch (_) {}
+
+              setUnreadDirectMessagesCount(prev => (prev || 0) + 1);
+              window.dispatchEvent(new CustomEvent('direct_message_received', { detail: msgRecord }));
+              window.dispatchEvent(new Event('refresh_conversations'));
+              updateUnreadDirectMessagesCount().catch(() => {});
+
               showInAppToast({
                 id: msgRecord.id,
                 type: 'message',
@@ -2124,6 +2176,16 @@ function MainApp() {
                 partnerId: senderId,
                 actorId: senderId
               });
+
+              try {
+                nativeNotificationService.sendNotification({
+                  title: senderProfile?.full_name || 'Nouveau message',
+                  body: formattedMsg.text || (formattedMsg.isAudio ? '🎤 Message audio' : '📷 Média'),
+                  icon: senderProfile?.avatar_url || '/stagelink-logo.png',
+                  tag: `msg_${senderId}`,
+                  data: { url: '/?tab=discussions', partnerId: senderId }
+                });
+              } catch (_) {}
 
               setChats(prevChats => {
                 const chatId = `chat_${senderId}`;
@@ -2329,10 +2391,11 @@ function MainApp() {
         }
       }
 
-      // 2. Background Live Posts, Stories & Profiles Polling Sync (Every 4 seconds)
+      // 2. Background Live Posts, Stories, Profiles & Messages Polling Sync (Every 4 seconds)
       const pollInterval = setInterval(() => {
         syncPostsStoriesAndProfiles();
         syncNotifications();
+        updateUnreadDirectMessagesCount();
         if (syncMessagesFallback) syncMessagesFallback();
       }, 4000);
 
@@ -2341,6 +2404,7 @@ function MainApp() {
         if (document.visibilityState === 'visible') {
           syncPostsStoriesAndProfiles();
           syncNotifications();
+          updateUnreadDirectMessagesCount();
           if (syncMessagesFallback) syncMessagesFallback();
         }
       };
@@ -3823,8 +3887,14 @@ function MainApp() {
       <TopBar
         activeTab={activeTab}
         unreadNotificationsCount={unreadNotificationsCount}
+        unreadMessagesCount={unreadDirectMessagesCount || chats.reduce((acc, c) => acc + (c.unreadCount || 0), 0)}
         onOpenNotifications={handleOpenNotifications}
         onOpenUserSearch={() => setIsUserSearchOpen(true)}
+        onOpenDiscussions={() => {
+          setActiveTab('discussions');
+          setSelectedChat(null);
+          setSelectedConversation(null);
+        }}
         isDarkMode={isDarkMode}
       />
 

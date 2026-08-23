@@ -1,10 +1,18 @@
 import React from 'react';
-import { Bell, Search } from 'lucide-react';
+import { Bell, Search, MessageCircle } from 'lucide-react';
 import Logo from '../common/Logo';
 import { soundEngine } from '../../services/audioService';
 import { useLanguage } from '../../context/LanguageContext';
 
-export default function TopBar({ activeTab, onOpenNotifications, onOpenUserSearch, unreadNotificationsCount = 0, isDarkMode }) {
+export default function TopBar({
+  activeTab,
+  onOpenNotifications,
+  onOpenUserSearch,
+  onOpenDiscussions,
+  unreadNotificationsCount = 0,
+  unreadMessagesCount = 0,
+  isDarkMode
+}) {
   const { t } = useLanguage();
 
   const handleSearchClick = () => {
@@ -61,6 +69,7 @@ export default function TopBar({ activeTab, onOpenNotifications, onOpenUserSearc
         {/* Notifications Bell Button with Dynamic Badge Counter */}
         <button
           onClick={onOpenNotifications}
+          title={t('nav_notifications') || 'Notifications'}
           style={{
             position: 'relative',
             background: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(248, 250, 252, 0.8)',
@@ -86,6 +95,52 @@ export default function TopBar({ activeTab, onOpenNotifications, onOpenUserSearc
               background: '#EF4444',
               border: isDarkMode ? '2px solid #0F172A' : '2px solid #FFFFFF'
             }} />
+          )}
+        </button>
+
+        {/* Direct Messages / Discussions Button with Live Badge Counter */}
+        <button
+          onClick={() => {
+            soundEngine.playPopSound();
+            if (onOpenDiscussions) onOpenDiscussions();
+          }}
+          title={t('nav_discussions') || 'Discussions'}
+          style={{
+            position: 'relative',
+            background: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(248, 250, 252, 0.8)',
+            border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid #E2E8F0',
+            borderRadius: '50%',
+            width: '38px',
+            height: '38px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'transform 0.15s ease'
+          }}
+        >
+          <MessageCircle size={18} color={isDarkMode ? '#38BDF8' : '#0066FF'} />
+          {unreadMessagesCount > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: '-3px',
+              right: '-3px',
+              minWidth: '18px',
+              height: '18px',
+              borderRadius: '9px',
+              background: '#EF4444',
+              color: '#FFFFFF',
+              fontSize: '0.65rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0 4px',
+              border: isDarkMode ? '2px solid #0F172A' : '2px solid #FFFFFF',
+              boxShadow: '0 2px 6px rgba(239, 68, 68, 0.5)'
+            }}>
+              {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+            </span>
           )}
         </button>
       </div>

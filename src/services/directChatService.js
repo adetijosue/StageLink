@@ -252,18 +252,24 @@ export const directChatService = {
 
         // Resolve recipient ID if not explicitly provided
         let targetRecipientId = recipientId;
-        if (!targetRecipientId && isValidUUID(conversationId)) {
-          try {
-            const { data: parts } = await supabase
-              .from('conversation_participants')
-              .select('user_id')
-              .eq('conversation_id', conversationId)
-              .neq('user_id', senderId)
-              .limit(1);
-            if (parts && parts.length > 0) {
-              targetRecipientId = parts[0].user_id;
-            }
-          } catch (pe) {}
+        if (!targetRecipientId && conversationId) {
+          if (String(conversationId).startsWith('conv_')) {
+            targetRecipientId = String(conversationId).replace('conv_', '');
+          } else if (String(conversationId).startsWith('chat_')) {
+            targetRecipientId = String(conversationId).replace('chat_', '');
+          } else if (isValidUUID(conversationId)) {
+            try {
+              const { data: parts } = await supabase
+                .from('conversation_participants')
+                .select('user_id')
+                .eq('conversation_id', conversationId)
+                .neq('user_id', senderId)
+                .limit(1);
+              if (parts && parts.length > 0) {
+                targetRecipientId = parts[0].user_id;
+              }
+            } catch (pe) {}
+          }
         }
 
         // Update chat_states to un-delete conversation if previously deleted
