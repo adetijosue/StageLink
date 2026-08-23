@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getStoredItem, setStoredItem, STORAGE_KEYS, initializeStorage } from '../services/mockData';
-import { signUpUser, signInUser, signOutUser, isSupabaseConfigured, supabase, safeUploadToStorage } from '../services/supabaseClient';
+import { signUpUser, signInUser, signOutUser, isSupabaseConfigured, supabase, safeUploadToStorage, clearSupabaseAuthStorage } from '../services/supabaseClient';
 
 import { compressImage } from '../utils/imageCompressor';
 
@@ -311,29 +311,14 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    try {
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`) || key.startsWith('sb-') || key.includes('auth-token')) {
-          localStorage.removeItem(key);
-        }
-      });
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-    } catch (_) {}
-
+    clearSupabaseAuthStorage();
     await signOutUser({ scope: 'global' });
     setCurrentUser(null);
     setAuthKey(prev => prev + 1);
   };
 
   const resetAuthState = async () => {
-    try {
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('stagelink_cached_') || key.startsWith('sb-') || key.includes('auth-token')) {
-          localStorage.removeItem(key);
-        }
-      });
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-    } catch (_) {}
+    clearSupabaseAuthStorage();
     await signOutUser({ scope: 'global' });
     setCurrentUser(null);
     setAuthKey(prev => prev + 1);
@@ -368,17 +353,10 @@ export function AuthProvider({ children }) {
     const updatedUsers = users.filter(u => u.id !== userId && (!u.email || !userEmail || u.email.toLowerCase() !== userEmail.toLowerCase()));
     setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
 
-    // 3. Clear current user session, purge storage & logout globally
-    setCurrentUser(null);
-    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-    try {
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`) || key.startsWith('sb-') || key.includes('auth-token')) {
-          localStorage.removeItem(key);
-        }
-      });
-    } catch (_) {}
+    // 3. Clear current user session, purge all storage & logout globally
+    clearSupabaseAuthStorage();
     await signOutUser({ scope: 'global' });
+    setCurrentUser(null);
     setAuthKey(prev => prev + 1);
 
     return { success: true };

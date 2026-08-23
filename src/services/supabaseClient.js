@@ -267,17 +267,69 @@ export async function signInUser({ email, password }) {
   }
 }
 
+export const SUPABASE_STORAGE_KEYS = [
+  'sb-access-token',
+  'sb-refresh-token',
+  'sb-auth-token',
+  'sb-session',
+  'supabase.auth.token',
+  'stagelink_supabase_auth_token',
+  'stagelink_current_user'
+];
+
+/**
+ * Clear all Supabase Auth session tokens & cached keys from storage
+ */
+export function clearSupabaseAuthStorage() {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      // 1. Remove explicit keys
+      SUPABASE_STORAGE_KEYS.forEach(key => {
+        try { localStorage.removeItem(key); } catch (_) {}
+      });
+
+      // 2. Remove all pattern-matched keys (sb-*-auth-token, stagelink_cached_*, etc.)
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (
+          k && (
+            k.startsWith('sb-') ||
+            k.startsWith('supabase.') ||
+            k.startsWith('stagelink_cached_') ||
+            k.includes('auth-token') ||
+            k.includes('supabase')
+          )
+        ) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach(k => {
+        try { localStorage.removeItem(k); } catch (_) {}
+      });
+    }
+
+    if (typeof sessionStorage !== 'undefined') {
+      try { sessionStorage.clear(); } catch (_) {}
+    }
+  } catch (e) {
+    console.warn('clearSupabaseAuthStorage note:', e);
+  }
+}
+
 /**
  * Sign out the user session globally across all devices
  */
 export async function signOutUser(options = { scope: 'global' }) {
   try {
     await supabase.auth.signOut(options);
+    clearSupabaseAuthStorage();
     return { success: true };
   } catch (err) {
     try {
       await supabase.auth.signOut();
     } catch (_) {}
+    clearSupabaseAuthStorage();
     return { success: false, error: err.message };
   }
 }
