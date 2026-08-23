@@ -19,7 +19,7 @@ import { getBrandLogoSVG } from '../common/SocialBrandLogo';
 import { compressImage } from '../../utils/imageCompressor';
 
 export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMode, onSimulateIncomingCall }) {
-  const { currentUser, logout, updateUserProfile } = useAuth();
+  const { currentUser, logout, updateUserProfile, refreshUserProfile } = useAuth();
   const { t, language } = useLanguage();
   const avatarRef = useRef(null);
   const coverRef = useRef(null);
@@ -33,6 +33,13 @@ export default function ProfileView({ onOpenPaywall, isDarkMode, onToggleDarkMod
     instruments: [], genres: [], gear: [],
     spotifyUrl: '', instagramUrl: '', tiktokUrl: '', youtubeUrl: ''
   });
+
+  // Always refresh user profile from Supabase on view mount
+  useEffect(() => {
+    if (refreshUserProfile) {
+      refreshUserProfile();
+    }
+  }, []);
 
   useEffect(() => {
     if (currentUser && activeModal === 'edit') {

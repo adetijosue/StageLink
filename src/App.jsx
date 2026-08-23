@@ -165,7 +165,7 @@ const uploadChatMediaToSupabase = async (dataUrl, fileName) => {
 
 
 function MainApp() {
-  const { isAuthenticated, currentUser, updateUserProfile, loading } = useAuth();
+  const { isAuthenticated, currentUser, updateUserProfile, refreshUserProfile, loading } = useAuth();
   const { t, language } = useLanguage();
   useGlobalPresence(currentUser);
 
@@ -659,6 +659,22 @@ function MainApp() {
           currentUsersList = Array.from(uMap.values());
           return currentUsersList;
         });
+
+        // 1b. Automatically refresh self profile if remote data changed on another device
+        if (currentUser?.id) {
+          const myProfile = supaProfiles.find(p => p.id === currentUser.id);
+          if (myProfile) {
+            const hasAvatarChange = myProfile.avatar_url && myProfile.avatar_url !== currentUser.avatar;
+            const hasNameChange = myProfile.full_name && myProfile.full_name !== currentUser.name;
+            const hasBioChange = myProfile.bio !== undefined && myProfile.bio !== (currentUser.bio || '');
+            const hasRoleChange = myProfile.role && myProfile.role !== currentUser.role;
+            const hasCoverChange = myProfile.cover_url && myProfile.cover_url !== (currentUser.coverPhoto || '');
+
+            if (hasAvatarChange || hasNameChange || hasBioChange || hasRoleChange || hasCoverChange) {
+              if (refreshUserProfile) refreshUserProfile().catch(() => {});
+            }
+          }
+        }
       }
 
       const userLookup = new Map(currentUsersList.map(u => [u.id, u]));
@@ -2405,6 +2421,7 @@ function MainApp() {
           syncPostsStoriesAndProfiles();
           syncNotifications();
           updateUnreadDirectMessagesCount();
+          if (refreshUserProfile) refreshUserProfile().catch(() => {});
           if (syncMessagesFallback) syncMessagesFallback();
         }
       };

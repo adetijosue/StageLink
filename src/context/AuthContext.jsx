@@ -201,9 +201,35 @@ export function AuthProvider({ children }) {
         }
       });
 
+      // 3. Realtime self-profile listener (instantly syncs changes made on other devices e.g. PC to smartphone)
+      let selfProfileChannel = null;
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user?.id) {
+          selfProfileChannel = supabase
+            .channel(`self_profile_${session.user.id}`)
+            .on('postgres_changes', {
+              event: '*',
+              schema: 'public',
+              table: 'profiles',
+              filter: `id=eq.${session.user.id}`
+            }, (payload) => {
+              if (payload.new) {
+                const freshUser = buildUserFromProfile(payload.new, { id: session.user.id, email: session.user.email });
+                setCurrentUser(freshUser);
+                setStoredItem(STORAGE_KEYS.CURRENT_USER, freshUser);
+                window.dispatchEvent(new CustomEvent('profileUpdated', { detail: { updatedUser: freshUser } }));
+              }
+            })
+            .subscribe();
+        }
+      });
+
       return () => {
         if (listener?.subscription) {
           listener.subscription.unsubscribe();
+        }
+        if (selfProfileChannel) {
+          supabase.removeChannel(selfProfileChannel);
         }
       };
     } else {
@@ -212,6 +238,30 @@ export function AuthProvider({ children }) {
       if (savedUser) setCurrentUser(savedUser);
     }
   }, []);
+
+  const refreshUserProfile = async () => {
+    const saved = currentUser || getStoredItem(STORAGE_KEYS.CURRENT_USER, null);
+    if (!saved?.id || !isSupabaseConfigured()) return saved;
+
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', saved.id)
+        .maybeSingle();
+
+      if (profile && !error) {
+        const freshUser = buildUserFromProfile(profile, saved);
+        setCurrentUser(freshUser);
+        setStoredItem(STORAGE_KEYS.CURRENT_USER, freshUser);
+        window.dispatchEvent(new CustomEvent('profileUpdated', { detail: { updatedUser: freshUser } }));
+        return freshUser;
+      }
+    } catch (err) {
+      console.warn('refreshUserProfile note:', err);
+    }
+    return saved;
+  };
 
   const login = async (email, password) => {
     const cleanEmail = email.trim().toLowerCase();
@@ -463,7 +513,8 @@ export function AuthProvider({ children }) {
       logout,
       resetAuthState,
       deleteUserAccount,
-      updateUserProfile
+      updateUserProfile,
+      refreshUserProfile
     }}>
       <React.Fragment key={authKey}>
         {children}

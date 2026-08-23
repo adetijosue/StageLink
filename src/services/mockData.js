@@ -91,7 +91,14 @@ export const setStoredItem = (key, value) => {
   } catch (e) {
     console.warn(`Storage Quota note for ${key}:`, e.message);
     try {
-      if (Array.isArray(value)) {
+      if (key === STORAGE_KEYS.CURRENT_USER) {
+        // Clear secondary cache items to prioritize the active user profile
+        try {
+          localStorage.removeItem('stagelink_posts');
+          localStorage.removeItem('stagelink_stories');
+        } catch (_) {}
+        localStorage.setItem(key, JSON.stringify(value));
+      } else if (Array.isArray(value)) {
         const pruned = value.filter(item => !isTestArtifact(item)).map(item => {
           if (item.video && typeof item.video === 'string' && item.video.startsWith('data:')) {
             return { ...item, video: null };
