@@ -241,7 +241,9 @@ export async function signInUser({ email, password }) {
         id: authData.user.id,
         email: authData.user.email,
         name: profile?.full_name || authData.user.user_metadata?.full_name || email.split('@')[0],
+        userName: profile?.username || authData.user.user_metadata?.username || (profile?.full_name ? profile.full_name.toLowerCase().replace(/[^a-z0-9_]/g, '_') : 'artiste'),
         role: profile?.role || authData.user.user_metadata?.role || 'Artiste / Compositeur',
+        gender: profile?.gender || authData.user.user_metadata?.gender || 'male',
         avatar: profile?.avatar_url || '',
         coverPhoto: profile?.cover_url || '',
         bio: profile?.bio || '',
@@ -249,9 +251,13 @@ export async function signInUser({ email, password }) {
         verified: profile?.verified_badge === 'gold' || profile?.verified_badge === 'blue',
         badgeType: profile?.verified_badge || 'none',
         company: profile?.company || '',
-        instruments: profile?.instruments || [],
-        genres: profile?.genres || [],
-        gear: profile?.gear || []
+        instruments: Array.isArray(profile?.instruments) ? profile.instruments : [],
+        genres: Array.isArray(profile?.genres) ? profile.genres : [],
+        gear: Array.isArray(profile?.gear) ? profile.gear : [],
+        spotifyUrl: profile?.spotify_url || '',
+        instagramUrl: profile?.instagram_url || '',
+        tiktokUrl: profile?.tiktok_url || '',
+        youtubeUrl: profile?.youtube_url || ''
       }
     };
   } catch (err) {

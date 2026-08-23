@@ -22,43 +22,67 @@ export function AuthProvider({ children }) {
 
   // Helper to normalize user object from Supabase profile row and retain custom user fields
   const buildUserFromProfile = (profile, fallbackUser = {}) => {
-    const ensureArray = (remoteArr, localArr) => {
-      const r = Array.isArray(remoteArr) ? remoteArr.filter(Boolean) : [];
-      const l = Array.isArray(localArr) ? localArr.filter(Boolean) : [];
-      return r.length > 0 ? r : l;
-    };
+    if (!profile && !fallbackUser) return null;
 
-    const chooseNonEmpty = (remoteVal, localVal, defaultVal = '') => {
-      if (typeof remoteVal === 'string' && remoteVal.trim().length > 0) return remoteVal.trim();
-      if (typeof localVal === 'string' && localVal.trim().length > 0) return localVal.trim();
-      return defaultVal;
-    };
+    const candidateName = (profile?.full_name && profile.full_name.trim())
+      ? profile.full_name.trim()
+      : (fallbackUser.name || fallbackUser.full_name || (fallbackUser.email ? fallbackUser.email.split('@')[0] : 'Artiste'));
 
-    const candidateName = chooseNonEmpty(profile?.full_name, fallbackUser.name || fallbackUser.full_name, fallbackUser.email ? fallbackUser.email.split('@')[0] : 'Artiste');
-    const defaultRole = chooseNonEmpty(profile?.role, fallbackUser.role || fallbackUser.userRole, 'Artiste');
-    const defaultUsername = chooseNonEmpty(profile?.username, fallbackUser.userName || fallbackUser.username, candidateName.toLowerCase().replace(/[^a-z0-9_]/g, '_'));
+    const candidateRole = (profile?.role && profile.role.trim())
+      ? profile.role.trim()
+      : (fallbackUser.role || fallbackUser.userRole || 'Artiste');
+
+    const candidateUsername = (profile?.username && profile.username.trim())
+      ? profile.username.trim()
+      : (fallbackUser.userName || fallbackUser.username || candidateName.toLowerCase().replace(/[^a-z0-9_]/g, '_'));
 
     return {
       id: profile?.id || fallbackUser.id,
       email: profile?.email || fallbackUser.email || '',
       name: candidateName,
-      userName: defaultUsername,
-      role: defaultRole,
+      userName: candidateUsername,
+      role: candidateRole,
       gender: profile?.gender || fallbackUser.gender || 'male',
-      avatar: chooseNonEmpty(profile?.avatar_url, fallbackUser.avatar || fallbackUser.avatar_url, ''),
-      coverPhoto: chooseNonEmpty(profile?.cover_url, fallbackUser.coverPhoto || fallbackUser.cover_url, ''),
-      bio: chooseNonEmpty(profile?.bio, fallbackUser.bio, ''),
-      location: chooseNonEmpty(profile?.location, fallbackUser.location, ''),
-      verified: profile?.verified_badge === 'gold' || profile?.verified_badge === 'blue' || Boolean(fallbackUser.verified),
-      badgeType: (profile?.verified_badge && profile.verified_badge !== 'none') ? profile.verified_badge : (fallbackUser.badgeType || 'none'),
-      company: chooseNonEmpty(profile?.company, fallbackUser.company, ''),
-      instruments: ensureArray(profile?.instruments, fallbackUser.instruments),
-      genres: ensureArray(profile?.genres, fallbackUser.genres),
-      gear: ensureArray(profile?.gear, fallbackUser.gear),
-      spotifyUrl: chooseNonEmpty(profile?.spotify_url, fallbackUser.spotifyUrl, ''),
-      instagramUrl: chooseNonEmpty(profile?.instagram_url, fallbackUser.instagramUrl, ''),
-      tiktokUrl: chooseNonEmpty(profile?.tiktok_url, fallbackUser.tiktokUrl, ''),
-      youtubeUrl: chooseNonEmpty(profile?.youtube_url, fallbackUser.youtubeUrl, ''),
+      avatar: (profile && profile.avatar_url !== undefined && profile.avatar_url !== null) 
+        ? profile.avatar_url 
+        : (fallbackUser.avatar || fallbackUser.avatar_url || ''),
+      coverPhoto: (profile && profile.cover_url !== undefined && profile.cover_url !== null) 
+        ? profile.cover_url 
+        : (fallbackUser.coverPhoto || fallbackUser.cover_url || ''),
+      bio: (profile && profile.bio !== undefined && profile.bio !== null) 
+        ? profile.bio 
+        : (fallbackUser.bio || ''),
+      location: (profile && profile.location !== undefined && profile.location !== null) 
+        ? profile.location 
+        : (fallbackUser.location || ''),
+      verified: profile ? (profile.verified_badge === 'gold' || profile.verified_badge === 'blue') : Boolean(fallbackUser.verified),
+      badgeType: (profile && profile.verified_badge && profile.verified_badge !== 'none') 
+        ? profile.verified_badge 
+        : (fallbackUser.badgeType || 'none'),
+      company: (profile && profile.company !== undefined && profile.company !== null) 
+        ? profile.company 
+        : (fallbackUser.company || ''),
+      instruments: (profile && Array.isArray(profile.instruments)) 
+        ? profile.instruments 
+        : (Array.isArray(fallbackUser.instruments) ? fallbackUser.instruments : []),
+      genres: (profile && Array.isArray(profile.genres)) 
+        ? profile.genres 
+        : (Array.isArray(fallbackUser.genres) ? fallbackUser.genres : []),
+      gear: (profile && Array.isArray(profile.gear)) 
+        ? profile.gear 
+        : (Array.isArray(fallbackUser.gear) ? fallbackUser.gear : []),
+      spotifyUrl: (profile && profile.spotify_url !== undefined && profile.spotify_url !== null) 
+        ? profile.spotify_url 
+        : (fallbackUser.spotifyUrl || ''),
+      instagramUrl: (profile && profile.instagram_url !== undefined && profile.instagram_url !== null) 
+        ? profile.instagram_url 
+        : (fallbackUser.instagramUrl || ''),
+      tiktokUrl: (profile && profile.tiktok_url !== undefined && profile.tiktok_url !== null) 
+        ? profile.tiktok_url 
+        : (fallbackUser.tiktokUrl || ''),
+      youtubeUrl: (profile && profile.youtube_url !== undefined && profile.youtube_url !== null) 
+        ? profile.youtube_url 
+        : (fallbackUser.youtubeUrl || ''),
       isNewRegistration: fallbackUser.isNewRegistration || false
     };
   };

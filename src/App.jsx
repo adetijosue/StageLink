@@ -969,20 +969,9 @@ function MainApp() {
           } catch (_) {}
 
           try {
-            // Pre-flight: Ensure current authenticated user exists in Supabase profiles table
-            if (currentUser?.id) {
-              supabase.from('profiles').upsert({
-                id: currentUser.id,
-                full_name: currentUser.name || currentUser.full_name || (currentUser.email ? currentUser.email.split('@')[0] : 'Artiste'),
-                username: currentUser.userName || (currentUser.email ? currentUser.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_') : 'user_' + currentUser.id.slice(0, 6)),
-                email: currentUser.email || '',
-                role: currentUser.role || 'Artiste',
-                avatar_url: currentUser.avatar || currentUser.avatar_url || '',
-                bio: currentUser.bio || '',
-                location: currentUser.location || '',
-                company: currentUser.company || '',
-                verified_badge: currentUser.verified ? (currentUser.badgeType || 'blue') : 'none'
-              }, { onConflict: 'id' }).then(() => {}).catch(() => {});
+            // Fetch authoritative profile from Supabase Database for the current user
+            if (currentUser?.id && refreshUserProfile) {
+              refreshUserProfile().catch(() => {});
             }
 
             // Fetch live profiles from Supabase
