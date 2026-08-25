@@ -295,12 +295,10 @@ export function AuthProvider({ children }) {
     if (isSupabaseConfigured()) {
       const supaRes = await signInUser({ email: cleanEmail, password: cleanPassword });
       if (supaRes.success && supaRes.user) {
-        const safeUser = { ...supaRes.user };
-
         // Clean out any stale cached data belonging to older user IDs for this email
         try {
           const oldSavedUser = getStoredItem(STORAGE_KEYS.CURRENT_USER, null);
-          if (oldSavedUser && oldSavedUser.id !== safeUser.id) {
+          if (oldSavedUser && oldSavedUser.id !== supaRes.user.id) {
             Object.keys(localStorage).forEach(key => {
               if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`)) {
                 localStorage.removeItem(key);
@@ -309,13 +307,27 @@ export function AuthProvider({ children }) {
           }
         } catch (_) {}
 
+        // Fetch authoritative profile from Supabase Database and normalize via buildUserFromProfile
+        let normalizedUser;
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', supaRes.user.id)
+            .maybeSingle();
+
+          normalizedUser = buildUserFromProfile(profile || null, supaRes.user);
+        } catch (_) {
+          normalizedUser = buildUserFromProfile(null, supaRes.user);
+        }
+
         const users = getStoredItem(STORAGE_KEYS.USERS, []);
-        const updatedUsers = [safeUser, ...users.filter(u => (!u.email || u.email.toLowerCase() !== cleanEmail) && u.id !== safeUser.id)];
+        const updatedUsers = [normalizedUser, ...users.filter(u => (!u.email || u.email.toLowerCase() !== cleanEmail) && u.id !== normalizedUser.id)];
         
         setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
-        setStoredItem(STORAGE_KEYS.CURRENT_USER, safeUser);
-        setCurrentUser(safeUser);
-        return { success: true, user: safeUser };
+        setStoredItem(STORAGE_KEYS.CURRENT_USER, normalizedUser);
+        setCurrentUser(normalizedUser);
+        return { success: true, user: normalizedUser };
       } else if (supaRes.error) {
         return { success: false, error: supaRes.error };
       }
@@ -459,10 +471,10 @@ export function AuthProvider({ children }) {
       ...sanitizedFields
     };
 
-    // 1. Update In-Memory Context
+    // 1. Update In-Memory Context (optimistic)
     setCurrentUser(updatedUser);
 
-    // 2. Persist to Local Storage
+    // 2. Persist to Local Storage (optimistic)
     setStoredItem(STORAGE_KEYS.CURRENT_USER, updatedUser);
 
     const users = getStoredItem(STORAGE_KEYS.USERS, []);
@@ -472,34 +484,35 @@ export function AuthProvider({ children }) {
       setStoredItem(STORAGE_KEYS.USERS, users);
     }
 
-    // 3. Sync to Supabase Database
+    // 3. Sync to Supabase Database (AWAITED — ensures Realtime triggers for other devices)
     if (isSupabaseConfigured()) {
       try {
         const authorFullName = sanitizedFields.name || currentUser.name;
         const authorRole = sanitizedFields.role || currentUser.role;
 
+        // Always bump updated_at with a unique timestamp to guarantee Postgres triggers a Realtime event
         const payload = {
           id: currentUser.id,
           full_name: authorFullName,
+          username: sanitizedFields.userName || sanitizedFields.username || currentUser.userName || currentUser.username,
           role: authorRole,
+          gender: sanitizedFields.gender !== undefined ? sanitizedFields.gender : currentUser.gender,
+          avatar_url: sanitizedFields.avatar !== undefined ? sanitizedFields.avatar : currentUser.avatar,
+          cover_url: sanitizedFields.coverPhoto !== undefined ? sanitizedFields.coverPhoto : (currentUser.coverPhoto || ''),
+          bio: sanitizedFields.bio !== undefined ? sanitizedFields.bio : (currentUser.bio || ''),
+          location: sanitizedFields.location !== undefined ? sanitizedFields.location : (currentUser.location || ''),
+          company: sanitizedFields.company !== undefined ? sanitizedFields.company : (currentUser.company || ''),
+          instruments: sanitizedFields.instruments !== undefined ? sanitizedFields.instruments : (currentUser.instruments || []),
+          genres: sanitizedFields.genres !== undefined ? sanitizedFields.genres : (currentUser.genres || []),
+          gear: sanitizedFields.gear !== undefined ? sanitizedFields.gear : (currentUser.gear || []),
+          spotify_url: sanitizedFields.spotifyUrl !== undefined ? sanitizedFields.spotifyUrl : (currentUser.spotifyUrl || ''),
+          instagram_url: sanitizedFields.instagramUrl !== undefined ? sanitizedFields.instagramUrl : (currentUser.instagramUrl || ''),
+          tiktok_url: sanitizedFields.tiktokUrl !== undefined ? sanitizedFields.tiktokUrl : (currentUser.tiktokUrl || ''),
+          youtube_url: sanitizedFields.youtubeUrl !== undefined ? sanitizedFields.youtubeUrl : (currentUser.youtubeUrl || ''),
           updated_at: new Date().toISOString()
         };
 
-        if (sanitizedFields.username !== undefined) payload.username = sanitizedFields.username;
-        if (sanitizedFields.gender !== undefined) payload.gender = sanitizedFields.gender;
-        if (sanitizedFields.avatar !== undefined) payload.avatar_url = sanitizedFields.avatar;
-        if (sanitizedFields.coverPhoto !== undefined) payload.cover_url = sanitizedFields.coverPhoto;
-        if (sanitizedFields.bio !== undefined) payload.bio = sanitizedFields.bio;
-        if (sanitizedFields.location !== undefined) payload.location = sanitizedFields.location;
-        if (sanitizedFields.company !== undefined) payload.company = sanitizedFields.company;
         if (sanitizedFields.badgeType !== undefined) payload.verified_badge = sanitizedFields.badgeType;
-        if (sanitizedFields.instruments !== undefined) payload.instruments = sanitizedFields.instruments;
-        if (sanitizedFields.genres !== undefined) payload.genres = sanitizedFields.genres;
-        if (sanitizedFields.gear !== undefined) payload.gear = sanitizedFields.gear;
-        if (sanitizedFields.spotifyUrl !== undefined) payload.spotify_url = sanitizedFields.spotifyUrl;
-        if (sanitizedFields.instagramUrl !== undefined) payload.instagram_url = sanitizedFields.instagramUrl;
-        if (sanitizedFields.tiktokUrl !== undefined) payload.tiktok_url = sanitizedFields.tiktokUrl;
-        if (sanitizedFields.youtubeUrl !== undefined) payload.youtube_url = sanitizedFields.youtubeUrl;
 
         const { error: upsertErr } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' });
         if (upsertErr) {
@@ -509,13 +522,13 @@ export function AuthProvider({ children }) {
 
         // Also update Auth user metadata to keep session perfectly aligned
         try {
-          supabase.auth.updateUser({
+          await supabase.auth.updateUser({
             data: {
               full_name: authorFullName,
               role: authorRole,
               avatar_url: sanitizedFields.avatar !== undefined ? sanitizedFields.avatar : currentUser.avatar
             }
-          }).catch(() => {});
+          });
         } catch (me) {}
       } catch (pe) {
         console.warn('Supabase profile sync note:', pe?.message || pe);

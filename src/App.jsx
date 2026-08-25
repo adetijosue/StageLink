@@ -660,19 +660,11 @@ function MainApp() {
           return currentUsersList;
         });
 
-        // 1b. Automatically refresh self profile if remote data changed on another device
+        // 1b. Always refresh self profile from authoritative server data to ensure cross-device sync
         if (currentUser?.id) {
           const myProfile = supaProfiles.find(p => p.id === currentUser.id);
-          if (myProfile) {
-            const hasAvatarChange = myProfile.avatar_url && myProfile.avatar_url !== currentUser.avatar;
-            const hasNameChange = myProfile.full_name && myProfile.full_name !== currentUser.name;
-            const hasBioChange = myProfile.bio !== undefined && myProfile.bio !== (currentUser.bio || '');
-            const hasRoleChange = myProfile.role && myProfile.role !== currentUser.role;
-            const hasCoverChange = myProfile.cover_url && myProfile.cover_url !== (currentUser.coverPhoto || '');
-
-            if (hasAvatarChange || hasNameChange || hasBioChange || hasRoleChange || hasCoverChange) {
-              if (refreshUserProfile) refreshUserProfile().catch(() => {});
-            }
+          if (myProfile && refreshUserProfile) {
+            refreshUserProfile().catch(() => {});
           }
         }
       }
@@ -879,6 +871,25 @@ function MainApp() {
     }
     return () => window.removeEventListener('online', handleOnlineSync);
   }, []);
+
+  // Auto-refresh profile + data when user returns to the app/tab (cross-device sync on focus)
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser?.id) return;
+
+    let lastSyncTime = Date.now();
+    const MIN_SYNC_INTERVAL_MS = 10000; // 10 seconds debounce to avoid hammering
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastSyncTime > MIN_SYNC_INTERVAL_MS) {
+        lastSyncTime = Date.now();
+        if (refreshUserProfile) refreshUserProfile().catch(() => {});
+        if (isSupabaseConfigured()) syncPostsStoriesAndProfiles().catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isAuthenticated, currentUser?.id, refreshUserProfile, syncPostsStoriesAndProfiles]);
 
   useEffect(() => {
     if (isAuthenticated && currentUser) {
