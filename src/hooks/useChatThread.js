@@ -82,39 +82,45 @@ export function useChatThread({ conversationId, currentUser, partner }) {
       }
 
       // 1. Fetch conversation details (e.g. Vanish mode state)
-      const convPromise = resolvedConvId
-        ? supabase
+      const getConv = async () => {
+        if (!resolvedConvId) return { data: null };
+        try {
+          return await supabase
             .from('conversations')
             .select('vanish_mode_enabled')
             .eq('id', resolvedConvId)
-            .maybeSingle()
-        : Promise.resolve({ data: null });
+            .maybeSingle();
+        } catch (_) { return { data: null }; }
+      };
 
-      // 2. Fetch messages from direct_messages table
-      const msgsPromise = resolvedConvId
-        ? supabase
+      const getMsgs = async () => {
+        if (!resolvedConvId) return { data: [] };
+        try {
+          return await supabase
             .from('direct_messages')
             .select('*, reactions:message_reactions(*)')
             .eq('conversation_id', resolvedConvId)
             .order('created_at', { ascending: false })
-            .limit(50)
-        : Promise.resolve({ data: [] });
+            .limit(50);
+        } catch (_) { return { data: [] }; }
+      };
 
-      // 3. Also fetch from messages table for complete backward and forward compatibility
-      const messagesTablePromise = partnerId && currentUser?.id
-        ? supabase
+      const getLegacyMsgs = async () => {
+        if (!partnerId || !currentUser?.id) return { data: [] };
+        try {
+          return await supabase
             .from('messages')
             .select('*')
             .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${partnerId}),and(sender_id.eq.${partnerId},receiver_id.eq.${currentUser.id})`)
             .order('created_at', { ascending: false })
-            .limit(50)
-            .catch(() => ({ data: [] }))
-        : Promise.resolve({ data: [] });
+            .limit(50);
+        } catch (_) { return { data: [] }; }
+      };
 
       const [{ data: conv }, { data: msgs }, { data: legacyMsgs }] = await Promise.all([
-        convPromise.catch(() => ({ data: null })),
-        msgsPromise.catch(() => ({ data: [] })),
-        messagesTablePromise.catch(() => ({ data: [] }))
+        getConv(),
+        getMsgs(),
+        getLegacyMsgs()
       ]);
 
       if (conv && isMountedRef.current) {
