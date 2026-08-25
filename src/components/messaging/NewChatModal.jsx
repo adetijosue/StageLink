@@ -4,7 +4,7 @@ import UserAvatar from '../common/UserAvatar';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 
-import { getStoredItem, STORAGE_KEYS, INITIAL_USERS, isTestArtifact } from '../../services/mockData';
+import { isTestArtifact } from '../../services/mockData';
 
 const normalizeStr = (str) => {
   return String(str || '')
@@ -144,10 +144,8 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
   const rawUsers = users || existingUsers || [];
   const safeUsers = Array.isArray(rawUsers) ? rawUsers : [];
   const combinedUsers = useMemo(() => {
-    const storedUsers = getStoredItem(STORAGE_KEYS.USERS, []);
-
     const map = new Map();
-    [...INITIAL_USERS, ...(Array.isArray(storedUsers) ? storedUsers : []), ...safeUsers, ...remoteUsers].forEach(u => {
+    [...safeUsers, ...remoteUsers].forEach(u => {
       if (u && u.id && !isTestArtifact(u)) {
         if (!map.has(u.id)) {
           map.set(u.id, u);

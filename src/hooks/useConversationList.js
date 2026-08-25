@@ -4,95 +4,14 @@ import { directChatService } from '../services/directChatService';
 import { isTestArtifact } from '../services/mockData';
 
 export function useConversationList(currentUser) {
-  // 1. Instant Cache-First Initialization (0ms latency)
-  const [conversations, setConversations] = useState(() => {
-    if (!currentUser?.id) return [];
-    try {
-      const convMap = new Map();
-      const cached = localStorage.getItem(`stagelink_cached_conversations_${currentUser.id}`);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
-          parsed.filter(c => !isTestArtifact(c)).forEach(c => {
-            const partnerId = c.partner?.id || c.participant?.id;
-            const title = String(c.title || c.partner?.name || '').toLowerCase().trim();
-            if (partnerId && partnerId !== currentUser.id && title !== 'utilisateur' && !title.includes('stagelink support')) {
-              const key = partnerId || c.id;
-              if (key && c.lastMessage) convMap.set(key, c);
-            }
-          });
-        }
-      }
-
-      const rawChats = localStorage.getItem('stagelink_chats');
-      if (rawChats) {
-        const parsedChats = JSON.parse(rawChats);
-        if (Array.isArray(parsedChats)) {
-          parsedChats.filter(chat => !isTestArtifact(chat)).forEach(chat => {
-            if (chat && (chat.participant || chat.partner)) {
-              const partnerObj = chat.participant || chat.partner;
-              const partnerName = String(partnerObj.name || partnerObj.full_name || '').toLowerCase().trim();
-              if (partnerObj.id && partnerObj.id !== currentUser.id && partnerName !== 'utilisateur' && !partnerName.includes('stagelink support')) {
-                const key = partnerObj.id || chat.id;
-                if (key && !convMap.has(key)) {
-                  const lastM = Array.isArray(chat.messages) && chat.messages.length > 0
-                    ? chat.messages[chat.messages.length - 1]
-                    : (chat.lastMessage ? (typeof chat.lastMessage === 'string' ? { content: chat.lastMessage, created_at: chat.updatedAt || new Date().toISOString() } : chat.lastMessage) : null);
-
-                  if (lastM) {
-                    convMap.set(key, {
-                      id: chat.id || `conv_${partnerObj.id}`,
-                      type: 'direct',
-                      title: partnerObj.name || partnerObj.full_name || 'Artiste',
-                      avatar: partnerObj.avatar || partnerObj.avatar_url || '',
-                      partner: partnerObj,
-                      participant: partnerObj,
-                      lastMessage: lastM,
-                      updatedAt: chat.updatedAt || new Date().toISOString(),
-                      unreadCount: chat.unread || chat.unreadCount || 0
-                    });
-                  }
-                }
-              }
-            }
-          });
-        }
-      }
-
-      return Array.from(convMap.values());
-    } catch (e) {
-      console.warn("Storage read error (conversations):", e);
-      return [];
-    }
-  });
-
-  const [directNotes, setDirectNotes] = useState(() => {
-    if (!currentUser?.id) return [];
-    try {
-      const cached = localStorage.getItem(`stagelink_cached_notes_${currentUser.id}`);
-      return cached ? JSON.parse(cached) : [];
-    } catch (e) {
-      console.warn("Storage read error (notes):", e);
-      return [];
-    }
-  });
-
+  const [conversations, setConversations] = useState([]);
+  const [directNotes, setDirectNotes] = useState([]);
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'unread' | 'groups'
   const [searchQuery, setSearchQuery] = useState('');
-  
-  const [isLoading, setIsLoading] = useState(() => {
-    if (!currentUser?.id) return false;
-    try {
-      const cached = localStorage.getItem(`stagelink_cached_conversations_${currentUser.id}`);
-      return !cached || JSON.parse(cached).length === 0;
-    } catch (e) {
-      console.warn("Storage read error (initial loading state):", e);
-      return true;
-    }
-  });
+  const [isLoading, setIsLoading] = useState(true);
 
   const isMountedRef = useRef(true);
-  const initialLoadRef = useRef(conversations.length > 0);
+  const initialLoadRef = useRef(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -208,57 +127,13 @@ export function useConversationList(currentUser) {
 
       if (notes && isMountedRef.current) {
         setDirectNotes(notes);
-        try {
-          localStorage.setItem(`stagelink_cached_notes_${currentUser.id}`, JSON.stringify(notes));
-        } catch (e) {
-          console.warn("Storage write error (notes):", e);
-        }
       }
 
       if (partErr) {
         console.warn('Supabase conversations fetch note:', partErr.message || partErr);
       }
 
-      // Helper to extract locally cached discussions
       let localCachedConvs = [];
-      try {
-        const rawCached = localStorage.getItem(`stagelink_cached_conversations_${currentUser.id}`);
-        if (rawCached) {
-          const parsed = JSON.parse(rawCached);
-          if (Array.isArray(parsed)) localCachedConvs = parsed;
-        }
-      } catch (_) {}
-
-      try {
-        const rawChats = localStorage.getItem('stagelink_chats');
-        if (rawChats) {
-          const parsedChats = JSON.parse(rawChats);
-          if (Array.isArray(parsedChats)) {
-            parsedChats.forEach(chat => {
-              if (chat && chat.participant && !localCachedConvs.some(c => c.id === chat.id || (c.partner && c.partner.id === chat.participant.id))) {
-                const partnerObj = chat.participant;
-                const lastM = Array.isArray(chat.messages) && chat.messages.length > 0
-                  ? chat.messages[chat.messages.length - 1]
-                  : (chat.lastMessage ? { content: typeof chat.lastMessage === 'string' ? chat.lastMessage : chat.lastMessage.text || '', created_at: chat.updatedAt || new Date().toISOString() } : null);
-
-                if (lastM) {
-                  localCachedConvs.push({
-                    id: chat.id || `conv_${partnerObj.id}`,
-                    type: 'direct',
-                    title: partnerObj.name || partnerObj.full_name || 'Artiste',
-                    avatar: partnerObj.avatar || partnerObj.avatar_url || '',
-                    partner: partnerObj,
-                    participant: partnerObj,
-                    lastMessage: lastM,
-                    updatedAt: chat.updatedAt || new Date().toISOString(),
-                    unreadCount: chat.unread || 0
-                  });
-                }
-              }
-            });
-          }
-        }
-      } catch (_) {}
 
       const deletedPartnerIds = new Set((statesData || []).map(s => String(s.partner_id)));
 
@@ -485,11 +360,6 @@ export function useConversationList(currentUser) {
 
       if (isMountedRef.current) {
         setConversations(finalConversations);
-        try {
-          localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(finalConversations));
-        } catch (e) {
-          console.warn("Storage write error (conversations):", e);
-        }
       }
     } catch (e) {
       console.warn('Load inbox data note:', e);
@@ -501,7 +371,7 @@ export function useConversationList(currentUser) {
   }, [currentUser?.id]);
 
   useEffect(() => {
-    // Initial fetch (silent if we already have cached conversations for 0ms instant display)
+    // Initial fetch from Supabase
     loadInboxData(initialLoadRef.current);
     
     const handleRefresh = () => loadInboxData(true);
@@ -510,14 +380,12 @@ export function useConversationList(currentUser) {
     const handleLocalUpdate = (e) => {
       if (e.detail?.conversationId) {
         setConversations(prev => {
-          const nextList = prev.map(c => {
+          return prev.map(c => {
              if (c.id === e.detail.conversationId) {
                  return { ...c, unreadCount: e.detail.unreadCount ?? c.unreadCount };
              }
              return c;
           });
-          try { localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(nextList)); } catch(err) {}
-          return nextList;
         });
       }
     };
@@ -528,14 +396,12 @@ export function useConversationList(currentUser) {
       const partId = e.detail?.partnerId;
       if (convId || partId) {
         setConversations(prev => {
-          const nextList = prev.filter(c => {
+          return prev.filter(c => {
             if (convId && String(c.id) === String(convId)) return false;
             const cPartnerId = c.partner?.id || c.participant?.id || c.partnerId;
             if (partId && cPartnerId && String(cPartnerId) === String(partId)) return false;
             return true;
           });
-          try { localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(nextList)); } catch(err) {}
-          return nextList;
         });
       }
     };
@@ -574,13 +440,7 @@ export function useConversationList(currentUser) {
             }
             
             // Move to top
-            const nextList = [updatedConv, ...prev.slice(0, convIdx), ...prev.slice(convIdx + 1)];
-            
-            try {
-              localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(nextList));
-            } catch(e) {}
-            
-            return nextList;
+            return [updatedConv, ...prev.slice(0, convIdx), ...prev.slice(convIdx + 1)];
           });
         } else if (payload.eventType === 'UPDATE' && payload.new) {
           const updatedMsg = payload.new;
@@ -592,7 +452,6 @@ export function useConversationList(currentUser) {
             if (conv.lastMessage?.id === updatedMsg.id) {
                const nextList = [...prev];
                nextList[convIdx] = { ...conv, lastMessage: updatedMsg };
-               try { localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(nextList)); } catch(e) {}
                return nextList;
             }
             return prev;
@@ -638,16 +497,12 @@ export function useConversationList(currentUser) {
 
     // 1. Instant optimistic local state update (0ms latency)
     setConversations(prev => {
-      const nextList = prev.filter(c => {
+      return prev.filter(c => {
         if (String(c.id) === String(conversationId)) return false;
         const cPartnerId = c.partner?.id || c.participant?.id || c.partnerId;
         if (partnerId && cPartnerId && String(cPartnerId) === String(partnerId)) return false;
         return true;
       });
-      try {
-        localStorage.setItem(`stagelink_cached_conversations_${currentUser.id}`, JSON.stringify(nextList));
-      } catch (e) {}
-      return nextList;
     });
 
     // 2. Persist removal to database & storage
@@ -667,7 +522,7 @@ export function useConversationList(currentUser) {
     });
     if (note) {
       setDirectNotes((prev) => {
-        const next = [
+        return [
           {
             ...note,
             user: {
@@ -678,12 +533,6 @@ export function useConversationList(currentUser) {
           },
           ...prev.filter((n) => n.user_id !== currentUser.id)
         ];
-        try {
-          localStorage.setItem(`stagelink_cached_notes_${currentUser.id}`, JSON.stringify(next));
-        } catch (e) {
-          console.warn("Storage write error (post note):", e);
-        }
-        return next;
       });
     }
   }, [currentUser]);

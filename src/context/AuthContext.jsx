@@ -291,60 +291,31 @@ export function AuthProvider({ children }) {
     const cleanEmail = email.trim().toLowerCase();
     const cleanPassword = password.trim();
 
-    // 1. Try Supabase Auth First
-    if (isSupabaseConfigured()) {
-      const supaRes = await signInUser({ email: cleanEmail, password: cleanPassword });
-      if (supaRes.success && supaRes.user) {
-        // Clean out any stale cached data belonging to older user IDs for this email
-        try {
-          const oldSavedUser = getStoredItem(STORAGE_KEYS.CURRENT_USER, null);
-          if (oldSavedUser && oldSavedUser.id !== supaRes.user.id) {
-            Object.keys(localStorage).forEach(key => {
-              if (key.startsWith(`stagelink_cached_conversations_`) || key.startsWith(`stagelink_cached_msgs_`)) {
-                localStorage.removeItem(key);
-              }
-            });
-          }
-        } catch (_) {}
+    if (!isSupabaseConfigured()) {
+      return { success: false, error: 'Configuration Supabase manquante.' };
+    }
 
-        // Fetch authoritative profile from Supabase Database and normalize via buildUserFromProfile
-        let normalizedUser;
-        try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', supaRes.user.id)
-            .maybeSingle();
+    const supaRes = await signInUser({ email: cleanEmail, password: cleanPassword });
+    if (supaRes.success && supaRes.user) {
+      let normalizedUser;
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', supaRes.user.id)
+          .maybeSingle();
 
-          normalizedUser = buildUserFromProfile(profile || null, supaRes.user);
-        } catch (_) {
-          normalizedUser = buildUserFromProfile(null, supaRes.user);
-        }
-
-        const users = getStoredItem(STORAGE_KEYS.USERS, []);
-        const updatedUsers = [normalizedUser, ...users.filter(u => (!u.email || u.email.toLowerCase() !== cleanEmail) && u.id !== normalizedUser.id)];
-        
-        setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
-        setStoredItem(STORAGE_KEYS.CURRENT_USER, normalizedUser);
-        setCurrentUser(normalizedUser);
-        return { success: true, user: normalizedUser };
-      } else if (supaRes.error) {
-        return { success: false, error: supaRes.error };
+        normalizedUser = buildUserFromProfile(profile || null, supaRes.user);
+      } catch (_) {
+        normalizedUser = buildUserFromProfile(null, supaRes.user);
       }
+
+      setStoredItem(STORAGE_KEYS.CURRENT_USER, normalizedUser);
+      setCurrentUser(normalizedUser);
+      return { success: true, user: normalizedUser };
+    } else {
+      return { success: false, error: supaRes.error || 'Adresse e-mail ou mot de passe incorrect.' };
     }
-
-    // 2. Fallback to Local Persistent User Records (no password check — Supabase Auth is authoritative)
-    const users = getStoredItem(STORAGE_KEYS.USERS, []);
-    const foundUser = users.find(u => u.email && u.email.toLowerCase() === cleanEmail);
-
-    if (foundUser) {
-      // Local fallback only used when Supabase is not configured; never compare passwords in plaintext
-      setCurrentUser(foundUser);
-      setStoredItem(STORAGE_KEYS.CURRENT_USER, foundUser);
-      return { success: true, user: foundUser };
-    }
-
-    return { success: false, error: 'Adresse e-mail ou mot de passe incorrect.' };
   };
 
   const signup = async (userData) => {
@@ -352,50 +323,19 @@ export function AuthProvider({ children }) {
     const cleanPassword = userData.password.trim();
     const cleanName = userData.name.trim();
 
-    // 1. Register via Supabase Auth
-    if (isSupabaseConfigured()) {
-      const supaRes = await signUpUser({ ...userData, email: cleanEmail, password: cleanPassword, name: cleanName });
-      if (supaRes.success && supaRes.user) {
-        const newUser = { ...supaRes.user, isNewRegistration: true };
-        const users = getStoredItem(STORAGE_KEYS.USERS, []);
-        const updatedUsers = [newUser, ...users.filter(u => (!u.email || u.email.toLowerCase() !== cleanEmail) && u.id !== newUser.id)];
-        setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
-        setStoredItem(STORAGE_KEYS.CURRENT_USER, newUser);
-        setCurrentUser(newUser);
-        return { success: true, user: newUser };
-      } else {
-        return { success: false, error: supaRes.error || 'Erreur lors de la création du compte.' };
-      }
+    if (!isSupabaseConfigured()) {
+      return { success: false, error: 'Configuration Supabase manquante.' };
     }
 
-    // 2. Fallback only if Supabase is NOT configured
-    const cleanHex = Array.from(cleanEmail).map(c => c.charCodeAt(0).toString(16)).join('');
-    const paddedHex = (cleanHex + '0'.repeat(32)).slice(0, 32);
-    const uuidStr = `${paddedHex.slice(0, 8)}-${paddedHex.slice(8, 12)}-4${paddedHex.slice(13, 16)}-a${paddedHex.slice(17, 20)}-${paddedHex.slice(20, 32)}`;
-
-    const newUser = {
-      id: uuidStr,
-      email: cleanEmail,
-      name: cleanName,
-      role: userData.role || 'Beatmaker / Compositeur',
-      gender: userData.gender || 'male',
-      avatar: '',
-      verified: false,
-      badgeType: 'none',
-      company: '',
-      instruments: [],
-      genres: [],
-      gear: [],
-      isNewRegistration: true
-    };
-
-    const users = getStoredItem(STORAGE_KEYS.USERS, []);
-    const updatedUsers = [newUser, ...users.filter(u => !u.email || u.email.toLowerCase() !== cleanEmail)];
-    setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
-    setStoredItem(STORAGE_KEYS.CURRENT_USER, newUser);
-    setCurrentUser(newUser);
-
-    return { success: true, user: newUser };
+    const supaRes = await signUpUser({ ...userData, email: cleanEmail, password: cleanPassword, name: cleanName });
+    if (supaRes.success && supaRes.user) {
+      const newUser = { ...supaRes.user, isNewRegistration: true };
+      setStoredItem(STORAGE_KEYS.CURRENT_USER, newUser);
+      setCurrentUser(newUser);
+      return { success: true, user: newUser };
+    } else {
+      return { success: false, error: supaRes.error || 'Erreur lors de la création du compte.' };
+    }
   };
 
   const logout = async () => {
@@ -416,9 +356,7 @@ export function AuthProvider({ children }) {
     if (!currentUser) return { success: false };
 
     const userId = currentUser.id;
-    const userEmail = currentUser.email;
 
-    // 1. Delete user entirely from Supabase Auth (which cascades to profiles and all data)
     if (isSupabaseConfigured() && userId) {
       try {
         const { error } = await supabase.rpc('delete_user_account');
@@ -436,12 +374,6 @@ export function AuthProvider({ children }) {
       }
     }
 
-    // 2. Remove user from local persistent registered users storage
-    const users = getStoredItem(STORAGE_KEYS.USERS, []);
-    const updatedUsers = users.filter(u => u.id !== userId && (!u.email || !userEmail || u.email.toLowerCase() !== userEmail.toLowerCase()));
-    setStoredItem(STORAGE_KEYS.USERS, updatedUsers);
-
-    // 3. Clear current user session, purge all storage & logout globally
     clearSupabaseAuthStorage();
     await signOutUser({ scope: 'global' });
     setCurrentUser(null);
@@ -473,18 +405,9 @@ export function AuthProvider({ children }) {
 
     // 1. Update In-Memory Context (optimistic)
     setCurrentUser(updatedUser);
-
-    // 2. Persist to Local Storage (optimistic)
     setStoredItem(STORAGE_KEYS.CURRENT_USER, updatedUser);
 
-    const users = getStoredItem(STORAGE_KEYS.USERS, []);
-    const userIndex = users.findIndex(u => u.id === currentUser.id);
-    if (userIndex >= 0) {
-      users[userIndex] = updatedUser;
-      setStoredItem(STORAGE_KEYS.USERS, users);
-    }
-
-    // 3. Sync to Supabase Database (AWAITED — ensures Realtime triggers for other devices)
+    // 2. Sync to Supabase Database (AWAITED — ensures Realtime triggers for other devices)
     if (isSupabaseConfigured()) {
       try {
         const authorFullName = sanitizedFields.name || currentUser.name;

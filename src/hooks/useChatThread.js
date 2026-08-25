@@ -5,35 +5,14 @@ import { soundEngine } from '../services/audioService';
 import { haptics } from '../services/hapticsService';
 
 export function useChatThread({ conversationId, currentUser, partner }) {
-  // 1. Instant Cache-First Initial State (0ms render)
-  const [messages, setMessages] = useState(() => {
-    if (!conversationId) return [];
-    try {
-      const cached = localStorage.getItem(`stagelink_cached_msgs_${conversationId}`);
-      return cached ? JSON.parse(cached) : [];
-    } catch (e) {
-      console.warn("Storage read error (messages):", e);
-      return [];
-    }
-  });
-
-  const [isLoading, setIsLoading] = useState(() => {
-    if (!conversationId) return false;
-    try {
-      const cached = localStorage.getItem(`stagelink_cached_msgs_${conversationId}`);
-      return !cached || JSON.parse(cached).length === 0;
-    } catch (e) {
-      console.warn("Storage read error (messages initial state):", e);
-      return true;
-    }
-  });
-
+  const [messages, setMessages] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isVanishMode, setIsVanishMode] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
   const channelRef = useRef(null);
   const isMountedRef = useRef(true);
-  const initialLoadRef = useRef(messages.length > 0);
-  const messagesLengthRef = useRef(messages.length);
+  const initialLoadRef = useRef(false);
+  const messagesLengthRef = useRef(0);
   const objectUrlsRef = useRef([]);
 
   // Keep ref in sync so cleanup reads current value without re-triggering the effect
@@ -58,14 +37,7 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     };
   }, [conversationId]);
 
-  const persistMessagesCache = useCallback((msgs) => {
-    if (!conversationId || !Array.isArray(msgs)) return;
-    try {
-      localStorage.setItem(`stagelink_cached_msgs_${conversationId}`, JSON.stringify(msgs.slice(-50)));
-    } catch (e) {
-      console.warn("Storage write error (persist messages):", e);
-    }
-  }, [conversationId]);
+  const persistMessagesCache = useCallback(() => {}, []);
 
   /**
    * Load Initial Page of Messages
@@ -428,39 +400,7 @@ export function useChatThread({ conversationId, currentUser, partner }) {
     });
     setReplyingTo(null);
 
-    // Update cached conversation list item so it immediately appears in Discussions
-    try {
-      if (currentUser?.id && conversationId) {
-        const cachedKey = `stagelink_cached_conversations_${currentUser.id}`;
-        const rawCached = localStorage.getItem(cachedKey);
-        let convList = rawCached ? JSON.parse(rawCached) : [];
-        if (!Array.isArray(convList)) convList = [];
-
-        const existingIdx = convList.findIndex(c => c.id === conversationId);
-        const updatedConvItem = {
-          id: conversationId,
-          type: 'direct',
-          title: partner?.full_name || partner?.name || 'Artiste',
-          avatar: partner?.avatar_url || partner?.avatar || '',
-          partner: partner,
-          participant: partner,
-          vanishModeEnabled: isVanishMode,
-          lastMessage: optimisticMsg,
-          updatedAt: new Date().toISOString(),
-          unreadCount: 0
-        };
-
-        if (existingIdx >= 0) {
-          convList[existingIdx] = { ...convList[existingIdx], ...updatedConvItem };
-        } else {
-          convList.unshift(updatedConvItem);
-        }
-        localStorage.setItem(cachedKey, JSON.stringify(convList));
-        window.dispatchEvent(new CustomEvent('refresh_conversations', { detail: { conversationId, lastMessage: optimisticMsg } }));
-      }
-    } catch (ce) {
-      console.warn('Update conversation cache note:', ce);
-    }
+    window.dispatchEvent(new CustomEvent('refresh_conversations', { detail: { conversationId, lastMessage: optimisticMsg } }));
 
     // 2. Background Upload if Blob provided
     let finalMediaUrl = mediaUrl;
@@ -490,21 +430,7 @@ export function useChatThread({ conversationId, currentUser, partner }) {
         return next;
       });
 
-      // Also update conversation cache with server record
-      try {
-        if (currentUser?.id && conversationId) {
-          const cachedKey = `stagelink_cached_conversations_${currentUser.id}`;
-          const rawCached = localStorage.getItem(cachedKey);
-          let convList = rawCached ? JSON.parse(rawCached) : [];
-          if (Array.isArray(convList)) {
-            const idx = convList.findIndex(c => c.id === conversationId);
-            if (idx >= 0) {
-              convList[idx].lastMessage = savedRecord;
-              localStorage.setItem(cachedKey, JSON.stringify(convList));
-            }
-          }
-        }
-      } catch (_) {}
+      window.dispatchEvent(new CustomEvent('refresh_conversations', { detail: { conversationId, lastMessage: savedRecord } }));
     } catch (err) {
       console.warn("Message server sync fallback:", err);
       // Keep optimistic message locally with final media URL so media is never lost

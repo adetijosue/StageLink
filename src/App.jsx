@@ -63,7 +63,7 @@ import AppSplashScreen from './components/common/AppSplashScreen';
 import PWAInstallPrompt from './components/common/PWAInstallPrompt';
 import PullToRefresh from './components/common/PullToRefresh';
 import OfflineStatusBanner from './components/common/OfflineStatusBanner';
-import { getStoredItem, setStoredItem, STORAGE_KEYS, isTestArtifact } from './services/mockData';
+import { isTestArtifact } from './services/mockData';
 import { soundEngine } from './services/audioService';
 import { supabase, isSupabaseConfigured, dataURLtoFile } from './services/supabaseClient';
 import { useGlobalPresence } from './hooks/useGlobalPresence';
@@ -231,8 +231,8 @@ function MainApp() {
   const [isCallHistoryModalOpen, setIsCallHistoryModalOpen] = useState(false);
   const [isUserSearchOpen, setIsUserSearchOpen] = useState(false);
 
-  // Persistent Data States (Instant 0ms render from persistent cache on page refresh)
-  const [posts, setPosts] = useState(() => getStoredItem(STORAGE_KEYS.POSTS, []));
+  // Live Data States (Loaded directly from Supabase Database)
+  const [posts, setPosts] = useState([]);
   const [appDataError, setAppDataError] = useState(null);
 
   // Feed Pro Services Action Modals
@@ -425,9 +425,9 @@ function MainApp() {
     }
   }, [currentUser]);
 
-  const [stories, setStories] = useState(() => getStoredItem(STORAGE_KEYS.STORIES, []));
-  const [matches, setMatches] = useState(() => getStoredItem(STORAGE_KEYS.MATCHES, []));
-  const [chats, setChats] = useState(() => getStoredItem(STORAGE_KEYS.CHATS, []));
+  const [stories, setStories] = useState([]);
+  const [matches, setMatches] = useState([]);
+  const [chats, setChats] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [isUploadingStory, setIsUploadingStory] = useState(false);
   const [isUploadingPost, setIsUploadingPost] = useState(false);
@@ -746,15 +746,7 @@ function MainApp() {
           };
         });
         const sanitizedPosts = freshPosts.filter(p => !isTestArtifact(p));
-
-        // Preserve any pending local optimistic posts created recently by current user
-        const currentLocalPosts = getStoredItem(STORAGE_KEYS.POSTS, []) || [];
-        const supaPostIds = new Set(sanitizedPosts.map(sp => sp.id));
-        const pendingLocalPosts = currentLocalPosts.filter(lp => lp && lp.id && !supaPostIds.has(lp.id) && !lp.isDeleted && !isTestArtifact(lp));
-        const mergedPosts = [...pendingLocalPosts, ...sanitizedPosts];
-
-        setPosts(mergedPosts);
-        setStoredItem(STORAGE_KEYS.POSTS, mergedPosts);
+        setPosts(sanitizedPosts);
       }
 
       // 3. Sync Live Stories with resilient fallback
@@ -821,22 +813,8 @@ function MainApp() {
           };
         });
 
-        // Source of truth: Supabase. Do not keep deleted stories from other users.
-        setStories(prevStories => {
-          const freshIds = new Set(freshStories.map(s => s.id));
-          const now = Date.now();
-          const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-          const localUnsynced = (prevStories || []).filter(localS => {
-            if (freshIds.has(localS.id)) return false;
-            const isMyPendingDraft = (localS.userId === currentUser?.id || localS.isLocalPending || String(localS.id).startsWith('local_')) && !localS.isDeleted;
-            if (!isMyPendingDraft) return false;
-            const storyTimestamp = localS.createdAtTimestamp || (localS.created_at ? new Date(localS.created_at).getTime() : (localS.expires_at ? new Date(localS.expires_at).getTime() - ONE_DAY_MS : now));
-            return (now - storyTimestamp) < ONE_DAY_MS;
-          });
-          const merged = [...localUnsynced, ...freshStories];
-          setStoredItem(STORAGE_KEYS.STORIES, merged);
-          return merged;
-        });
+        // Source of truth: Supabase.
+        setStories(freshStories);
       }
     } catch (e) { console.error("Suppressed error:", e); }
   }, [currentUser, allUsers, language]);
@@ -845,16 +823,6 @@ function MainApp() {
     soundEngine.playPopSound();
     if (isSupabaseConfigured()) {
       await syncPostsStoriesAndProfiles();
-    } else {
-      const freshPosts = getStoredItem(STORAGE_KEYS.POSTS, []);
-      const freshStories = getStoredItem(STORAGE_KEYS.STORIES, []);
-      const freshChats = getStoredItem(STORAGE_KEYS.CHATS, []);
-      const freshUsers = getStoredItem(STORAGE_KEYS.USERS, []);
-
-      setPosts(freshPosts);
-      setStories(freshStories);
-      setChats(freshChats);
-      setAllUsers(freshUsers);
     }
   };
 
@@ -896,550 +864,328 @@ function MainApp() {
       const welcomeSeenKey = `stagelink_welcome_shown_${currentUser.id}`;
 
       const loadInitialData = async () => {
-        // Check cache version to force clean old formats
-        const CACHE_VERSION = 'v10'; // Bumped to force complete purge and guarantee clean virgin production state
-        const storedVersion = localStorage.getItem('stagelink_cache_version');
-        if (storedVersion !== CACHE_VERSION) {
-          localStorage.removeItem(STORAGE_KEYS.CHATS);
-          localStorage.removeItem(STORAGE_KEYS.POSTS);
-          localStorage.removeItem(STORAGE_KEYS.STORIES);
-          // NOTE: Do NOT purge STORAGE_KEYS.USERS — profile data should survive cache resets
-          localStorage.removeItem(STORAGE_KEYS.MATCHES);
-          localStorage.setItem('stagelink_cache_version', CACHE_VERSION);
-        }
+        if (!isSupabaseConfigured()) return;
 
-        let loadedPosts = getStoredItem(STORAGE_KEYS.POSTS, []).filter(p => !isTestArtifact(p));
-        let loadedStories = getStoredItem(STORAGE_KEYS.STORIES, []).filter(s => !isTestArtifact(s));
-        let loadedMatches = getStoredItem(STORAGE_KEYS.MATCHES, []);
-        let loadedUsers = getStoredItem(STORAGE_KEYS.USERS, []);
-        let loadedChats = getStoredItem(STORAGE_KEYS.CHATS, []);
+        try {
+          await supabase.auth.getSession();
+        } catch (_) {}
 
-        // Ensure the current authenticated user is always seeded into the users list
-        if (currentUser?.id && !loadedUsers.some(u => String(u.id) === String(currentUser.id))) {
-          loadedUsers.push({
-            id: currentUser.id,
-            name: currentUser.name || currentUser.full_name || (currentUser.email ? currentUser.email.split('@')[0] : 'Artiste'),
-            userName: currentUser.userName || currentUser.name || '',
-            full_name: currentUser.name || currentUser.full_name || '',
-            username: currentUser.userName || '',
-            email: currentUser.email || '',
-            role: currentUser.role || 'Artiste',
-            userRole: currentUser.role || 'Artiste',
-            company: currentUser.company || '',
-            avatar: currentUser.avatar || currentUser.avatar_url || '',
-            avatar_url: currentUser.avatar || currentUser.avatar_url || '',
-            verified: currentUser.verified || false,
-            badgeType: currentUser.badgeType || 'none',
-            bio: currentUser.bio || '',
-            location: currentUser.location || '',
-            instruments: Array.isArray(currentUser.instruments) ? currentUser.instruments : [],
-            genres: Array.isArray(currentUser.genres) ? currentUser.genres : [],
-            gear: Array.isArray(currentUser.gear) ? currentUser.gear : []
-          });
-          setStoredItem(STORAGE_KEYS.USERS, loadedUsers);
-        }
-
-        // Compute real match cards from community users for Match Pro deck
-        const otherUsersInitial = loadedUsers.filter(u => u && u.id !== currentUser?.id && (!currentUser?.email || u.email !== currentUser?.email));
-        const initialMatchCards = otherUsersInitial.map(u => ({
-          id: `match_${u.id}`,
-          userId: u.id,
-          title: u.name || u.full_name || u.username || 'Artiste',
-          name: u.name || u.full_name || u.username || 'Artiste',
-          role: u.role || 'Artiste',
-          category: u.role || 'Artiste',
-          location: u.location || 'Paris & En ligne',
-          matchPercentage: 92 + Math.floor(Math.random() * 7),
-          image: u.cover_url || u.avatar || u.avatar_url || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800',
-          avatar: u.avatar || u.avatar_url || '',
-          cover_url: u.cover_url || '',
-          bio: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
-          description: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
-          skills: [...(Array.isArray(u.genres) ? u.genres : []), ...(Array.isArray(u.instruments) ? u.instruments : [])],
-          company: u.company || '',
-          creator: u.name || u.full_name || 'Artiste',
-          creatorAvatar: u.avatar || '',
-          verified: u.verified,
-          badgeType: u.badgeType,
-          rawUser: u
-        }));
-
-        // Optimistic UI: Render the app instantly from local cache while Supabase fetches in the background
-        setAllUsers(loadedUsers);
-        setPosts(loadedPosts);
-        setStories(loadedStories);
-        setMatches(initialMatchCards.length > 0 ? initialMatchCards : loadedMatches);
-        setChats(loadedChats);
-
-        if (isSupabaseConfigured()) {
-          // CRITICAL: Wait for Supabase to restore the auth session so the JWT token
-          // is attached to all subsequent requests. Without this, RLS policies that
-          // require 'authenticated' role will return 0 rows.
-          try {
-            await supabase.auth.getSession();
-          } catch (_) {}
-
-          try {
-            // Fetch authoritative profile from Supabase Database for the current user
-            if (currentUser?.id && refreshUserProfile) {
-              refreshUserProfile().catch(() => {});
-            }
-
-            // Fetch live profiles from Supabase
-            const { data: supaProfiles, error: supaProfilesErr } = await supabase.from('profiles').select('*').limit(150);
-            if (supaProfilesErr) {
-              console.warn('Supabase live profiles fetch returned error:', supaProfilesErr.message);
-            } else {
-              let mappedSupaUsers = [];
-              if (supaProfiles && supaProfiles.length > 0) {
-                mappedSupaUsers = supaProfiles
-                  .filter(p => {
-                    const name = (p.full_name || p.username || '').toLowerCase();
-                    const email = (p.email || '').toLowerCase();
-                    const id = String(p.id || '').toLowerCase();
-                    return !name.includes('test subagent') && !name.includes('subagent') && !email.includes('subagent') && !id.includes('subagent');
-                  })
-                  .map(p => ({
-                    id: p.id,
-                    name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
-                    userName: p.username || p.full_name || (p.email ? p.email.split('@')[0] : 'Artiste'),
-                    full_name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
-                    username: p.username || '',
-                    email: p.email || '',
-                    role: p.role || 'Artiste',
-                    userRole: p.role || 'Artiste',
-                    company: p.company || '',
-                    avatar: p.avatar_url || '',
-                    avatar_url: p.avatar_url || '',
-                    userAvatar: p.avatar_url || '',
-                    verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
-                    badgeType: p.verified_badge || 'none',
-                    bio: p.bio || '',
-                    location: p.location || '',
-                    instruments: Array.isArray(p.instruments) ? p.instruments : [],
-                    genres: Array.isArray(p.genres) ? p.genres : [],
-                    gear: Array.isArray(p.gear) ? p.gear : []
-                  }));
-              }
-
-              // Merge live Supabase profiles with local users seamlessly
-              if (mappedSupaUsers.length > 0) {
-                const mergedMap = new Map();
-                (loadedUsers || []).filter(u => u && u.id && !isTestArtifact(u)).forEach(u => {
-                  mergedMap.set(String(u.id), u);
-                });
-                mappedSupaUsers.filter(u => u && u.id && !isTestArtifact(u)).forEach(u => {
-                  const existing = mergedMap.get(String(u.id)) || {};
-                  mergedMap.set(String(u.id), { ...existing, ...u });
-                });
-                loadedUsers = Array.from(mergedMap.values()).filter(u => !isTestArtifact(u));
-              } else {
-                loadedUsers = (loadedUsers || []).filter(u => u && u.id && !isTestArtifact(u));
-              }
-
-              // ALWAYS ensure the current authenticated user is present in the list
-              if (currentUser?.id && !loadedUsers.some(u => String(u.id) === String(currentUser.id))) {
-                loadedUsers.push({
-                  id: currentUser.id,
-                  name: currentUser.name || currentUser.full_name || (currentUser.email ? currentUser.email.split('@')[0] : 'Artiste'),
-                  userName: currentUser.userName || currentUser.name || (currentUser.email ? currentUser.email.split('@')[0] : 'Artiste'),
-                  full_name: currentUser.name || currentUser.full_name || (currentUser.email ? currentUser.email.split('@')[0] : 'Artiste'),
-                  username: currentUser.userName || '',
-                  email: currentUser.email || '',
-                  role: currentUser.role || 'Artiste',
-                  userRole: currentUser.role || 'Artiste',
-                  company: currentUser.company || '',
-                  avatar: currentUser.avatar || currentUser.avatar_url || '',
-                  avatar_url: currentUser.avatar || currentUser.avatar_url || '',
-                  userAvatar: currentUser.avatar || currentUser.avatar_url || '',
-                  verified: currentUser.verified || false,
-                  badgeType: currentUser.badgeType || 'none',
-                  bio: currentUser.bio || '',
-                  location: currentUser.location || '',
-                  instruments: Array.isArray(currentUser.instruments) ? currentUser.instruments : [],
-                  genres: Array.isArray(currentUser.genres) ? currentUser.genres : [],
-                  gear: Array.isArray(currentUser.gear) ? currentUser.gear : []
-                });
-              }
-
-              setStoredItem(STORAGE_KEYS.USERS, loadedUsers);
-              setAllUsers(loadedUsers);
-
-              // Recompute matches from all available users
-              const otherUsersLive = loadedUsers.filter(u => u && u.id !== currentUser?.id && (!currentUser?.email || u.email !== currentUser?.email));
-              const liveMatchCards = otherUsersLive.map(u => ({
-                id: `match_${u.id}`,
-                userId: u.id,
-                title: u.name || u.full_name || u.username || 'Artiste',
-                name: u.name || u.full_name || u.username || 'Artiste',
-                role: u.role || 'Artiste',
-                category: u.role || 'Artiste',
-                location: u.location || 'Paris & En ligne',
-                matchPercentage: 94,
-                image: u.cover_url || u.avatar || u.avatar_url || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800',
-                avatar: u.avatar || u.avatar_url || '',
-                cover_url: u.cover_url || '',
-                bio: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
-                description: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
-                skills: [...(Array.isArray(u.genres) ? u.genres : []), ...(Array.isArray(u.instruments) ? u.instruments : [])],
-                company: u.company || '',
-                creator: u.name || u.full_name || 'Artiste',
-                creatorAvatar: u.avatar || '',
-                verified: u.verified,
-                badgeType: u.badgeType,
-                rawUser: u
-              }));
-              if (liveMatchCards.length > 0) {
-                setMatches(liveMatchCards);
-                setStoredItem(STORAGE_KEYS.MATCHES, liveMatchCards);
-              }
-            }
-          } catch (err) {
-            console.warn('Supabase live profiles fetch note:', err.message);
+        try {
+          // Fetch authoritative profile from Supabase Database for the current user
+          if (currentUser?.id && refreshUserProfile) {
+            refreshUserProfile().catch(() => {});
           }
 
+          // 1. Fetch live profiles from Supabase
+          let loadedUsers = [];
+          const { data: supaProfiles, error: supaProfilesErr } = await supabase.from('profiles').select('*').limit(150);
+          if (!supaProfilesErr && supaProfiles && supaProfiles.length > 0) {
+            loadedUsers = supaProfiles
+              .filter(p => !isTestArtifact(p))
+              .map(p => ({
+                id: p.id,
+                name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
+                userName: p.username || p.full_name || (p.email ? p.email.split('@')[0] : 'Artiste'),
+                full_name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
+                username: p.username || '',
+                email: p.email || '',
+                role: p.role || 'Artiste',
+                userRole: p.role || 'Artiste',
+                company: p.company || '',
+                avatar: p.avatar_url || '',
+                avatar_url: p.avatar_url || '',
+                userAvatar: p.avatar_url || '',
+                verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+                badgeType: p.verified_badge || 'none',
+                bio: p.bio || '',
+                location: p.location || '',
+                instruments: Array.isArray(p.instruments) ? p.instruments : [],
+                genres: Array.isArray(p.genres) ? p.genres : [],
+                gear: Array.isArray(p.gear) ? p.gear : []
+              }));
+
+            setAllUsers(loadedUsers);
+
+            // Recompute matches from all available users
+            const otherUsersLive = loadedUsers.filter(u => u && u.id !== currentUser?.id && (!currentUser?.email || u.email !== currentUser?.email));
+            const liveMatchCards = otherUsersLive.map(u => ({
+              id: `match_${u.id}`,
+              userId: u.id,
+              title: u.name || u.full_name || u.username || 'Artiste',
+              name: u.name || u.full_name || u.username || 'Artiste',
+              role: u.role || 'Artiste',
+              category: u.role || 'Artiste',
+              location: u.location || 'Paris & En ligne',
+              matchPercentage: 94,
+              image: u.cover_url || u.avatar || u.avatar_url || 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800',
+              avatar: u.avatar || u.avatar_url || '',
+              cover_url: u.cover_url || '',
+              bio: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
+              description: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
+              skills: [...(Array.isArray(u.genres) ? u.genres : []), ...(Array.isArray(u.instruments) ? u.instruments : [])],
+              company: u.company || '',
+              creator: u.name || u.full_name || 'Artiste',
+              creatorAvatar: u.avatar || '',
+              verified: u.verified,
+              badgeType: u.badgeType,
+              rawUser: u
+            }));
+            if (liveMatchCards.length > 0) {
+              setMatches(liveMatchCards);
+            }
+          }
+
+          // 2. Fetch live posts with resilient join & fallback
+          let supaPosts = null;
           try {
-            // 1. Fetch live posts with resilient join & fallback
-            let supaPosts = null;
-            try {
-              const res = await supabase
-                .from('posts')
-                .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge), post_likes(user_id), post_comments(id, user_id, content, created_at, profiles:user_id(full_name))')
-                .order('created_at', { ascending: false }).limit(50);
-              if (res.data && !res.error) {
-                supaPosts = res.data;
-              } else {
-                const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(50);
-                if (simpleRes.data) supaPosts = simpleRes.data;
-              }
-            } catch (pe) {
+            const res = await supabase
+              .from('posts')
+              .select('*, profiles:user_id(full_name, avatar_url, role, verified_badge), post_likes(user_id), post_comments(id, user_id, content, created_at, profiles:user_id(full_name))')
+              .order('created_at', { ascending: false }).limit(50);
+            if (res.data && !res.error) {
+              supaPosts = res.data;
+            } else {
               const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(50);
               if (simpleRes.data) supaPosts = simpleRes.data;
             }
+          } catch (pe) {
+            const simpleRes = await supabase.from('posts').select('*').order('created_at', { ascending: false }).limit(50);
+            if (simpleRes.data) supaPosts = simpleRes.data;
+          }
 
-            if (Array.isArray(supaPosts)) {
-              const userLookup = new Map((loadedUsers || []).map(u => [u.id, u]));
-              const mappedSupaPosts = supaPosts.map(p => {
-                const authorProfile = userLookup.get(p.user_id) || p.profiles || {};
-                const isCurrentUser = p.user_id === currentUser?.id;
-                const authorName = isCurrentUser ? (currentUser.name || currentUser.full_name || authorProfile.full_name || 'Artiste') : (authorProfile.name || authorProfile.full_name || p.profiles?.full_name || 'Artiste');
-                const authorAvatar = isCurrentUser ? (currentUser.avatar || currentUser.avatar_url || authorProfile.avatar_url || '') : (authorProfile.avatar || authorProfile.avatar_url || p.profiles?.avatar_url || '');
-                const authorRole = isCurrentUser ? (currentUser.role || 'Artiste') : (authorProfile.role || p.profiles?.role || 'Membre StageLink');
-                const isVerified = isCurrentUser ? (currentUser.verified || currentUser.badgeType === 'gold' || currentUser.badgeType === 'blue') : (authorProfile.verified || authorProfile.verified_badge === 'gold' || authorProfile.verified_badge === 'blue' || p.profiles?.verified_badge === 'gold');
-                const badgeType = isCurrentUser ? (currentUser.badgeType || 'none') : (authorProfile.badgeType || authorProfile.verified_badge || p.profiles?.verified_badge || 'none');
+          if (Array.isArray(supaPosts)) {
+            const userLookup = new Map((loadedUsers || []).map(u => [u.id, u]));
+            const mappedSupaPosts = supaPosts.map(p => {
+              const authorProfile = userLookup.get(p.user_id) || p.profiles || {};
+              const isCurrentUser = p.user_id === currentUser?.id;
+              const authorName = isCurrentUser ? (currentUser.name || currentUser.full_name || authorProfile.full_name || 'Artiste') : (authorProfile.name || authorProfile.full_name || p.profiles?.full_name || 'Artiste');
+              const authorAvatar = isCurrentUser ? (currentUser.avatar || currentUser.avatar_url || authorProfile.avatar_url || '') : (authorProfile.avatar || authorProfile.avatar_url || p.profiles?.avatar_url || '');
+              const authorRole = isCurrentUser ? (currentUser.role || 'Artiste') : (authorProfile.role || p.profiles?.role || 'Membre StageLink');
+              const isVerified = isCurrentUser ? (currentUser.verified || currentUser.badgeType === 'gold' || currentUser.badgeType === 'blue') : (authorProfile.verified || authorProfile.verified_badge === 'gold' || authorProfile.verified_badge === 'blue' || p.profiles?.verified_badge === 'gold');
+              const badgeType = isCurrentUser ? (currentUser.badgeType || 'none') : (authorProfile.badgeType || authorProfile.verified_badge || p.profiles?.verified_badge || 'none');
 
-                let textContent = p.content || '';
-                let proServiceData = p.metadata?.proServiceData || null;
-                if (textContent.includes('___PRO_SERVICE___:')) {
-                  const parts = textContent.split('___PRO_SERVICE___:');
-                  textContent = parts[0].trim();
-                  try {
-                    proServiceData = JSON.parse(parts[1]);
-                  } catch(e) {}
-                }
-
-                const isVideo = isVideoMediaUrl(p.media_url);
-                const rawUrl = p.media_url && typeof p.media_url === 'string' && p.media_url !== 'null' && p.media_url !== 'undefined' && p.media_url.trim() !== '' ? p.media_url : null;
-                const postMediaList = Array.isArray(p.metadata?.mediaList) && p.metadata.mediaList.length > 0
-                  ? p.metadata.mediaList.filter(m => m && m.url && m.url !== 'null' && m.url !== 'undefined' && m.url.trim() !== '')
-                  : (rawUrl ? [{ type: isVideo ? 'video' : 'image', url: rawUrl }] : []);
-
-                const postCreatedAt = p.created_at || new Date().toISOString();
-
-                return {
-                  id: p.id,
-                  userId: p.user_id,
-                  userName: authorName,
-                  userRole: authorRole,
-                  userAvatar: authorAvatar,
-                  isVerified: isVerified,
-                  badgeType: badgeType,
-                  text: textContent,
-                  image: !isVideo ? rawUrl : null,
-                  video: isVideo ? rawUrl : null,
-                  media_url: rawUrl,
-                  mediaList: postMediaList,
-                  proServiceData: proServiceData,
-                  hasAudio: Boolean(p.audio_url),
-                  audioTitle: p.audio_title || 'Extrait Audio',
-                  audioUrl: p.audio_url || null,
-                  likesCount: p.post_likes ? p.post_likes.length : (p.likes_count || 0),
-                  isLiked: p.post_likes ? p.post_likes.some(l => l.user_id === currentUser?.id) : false,
-                  commentsCount: p.post_comments ? p.post_comments.length : (p.comments_count || (p.comments ? p.comments.length : 0)),
-                  comments: p.post_comments ? p.post_comments.map(c => ({
-                    id: c.id,
-                    userId: c.user_id,
-                    userName: c.profiles?.full_name || userLookup.get(c.user_id)?.name || 'Artiste',
-                    text: c.content,
-                    time: formatTimeAgo(c.created_at, language)
-                  })) : [],
-                  created_at: postCreatedAt,
-                  createdAt: postCreatedAt,
-                  timeAgo: formatTimeAgo(postCreatedAt, language)
-                };
-              });
-
-              // CRITICAL: Preserve any pending local optimistic posts created recently by current user
-              const supaPostIds = new Set(mappedSupaPosts.map(sp => sp.id));
-              const currentLocalPosts = getStoredItem(STORAGE_KEYS.POSTS, []) || [];
-              const pendingLocalPosts = currentLocalPosts.filter(lp => lp && lp.id && !supaPostIds.has(lp.id) && !lp.isDeleted && !isTestArtifact(lp));
-              loadedPosts = [...pendingLocalPosts, ...mappedSupaPosts];
-              setPosts(loadedPosts);
-              setStoredItem(STORAGE_KEYS.POSTS, loadedPosts);
-            }
-
-            // 2. Fetch live active stories with resilient join & fallback
-            let supaStories = null;
-            let storyFetchOk = false;
-            try {
-              const res = await supabase
-                .from('stories')
-                .select('*, profiles:user_id(full_name, avatar_url), story_views(viewer_id, profiles:viewer_id(full_name, avatar_url, role)), story_likes(user_id)')
-                .order('created_at', { ascending: false }).limit(50);
-              if (res.data && !res.error) {
-                supaStories = res.data;
-                storyFetchOk = true;
-              } else {
-                const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false }).limit(50);
-                if (simpleRes.data && !simpleRes.error) {
-                  supaStories = simpleRes.data;
-                  storyFetchOk = true;
-                }
+              let textContent = p.content || '';
+              let proServiceData = p.metadata?.proServiceData || null;
+              if (textContent.includes('___PRO_SERVICE___:')) {
+                const parts = textContent.split('___PRO_SERVICE___:');
+                textContent = parts[0].trim();
+                try {
+                  proServiceData = JSON.parse(parts[1]);
+                } catch(e) {}
               }
-            } catch (se) {
+
+              const isVideo = isVideoMediaUrl(p.media_url);
+              const rawUrl = p.media_url && typeof p.media_url === 'string' && p.media_url !== 'null' && p.media_url !== 'undefined' && p.media_url.trim() !== '' ? p.media_url : null;
+              const postMediaList = Array.isArray(p.metadata?.mediaList) && p.metadata.mediaList.length > 0
+                ? p.metadata.mediaList.filter(m => m && m.url && m.url !== 'null' && m.url !== 'undefined' && m.url.trim() !== '')
+                : (rawUrl ? [{ type: isVideo ? 'video' : 'image', url: rawUrl }] : []);
+
+              const postCreatedAt = p.created_at || new Date().toISOString();
+
+              return {
+                id: p.id,
+                userId: p.user_id,
+                userName: authorName,
+                userRole: authorRole,
+                userAvatar: authorAvatar,
+                isVerified: isVerified,
+                badgeType: badgeType,
+                text: textContent,
+                image: !isVideo ? rawUrl : null,
+                video: isVideo ? rawUrl : null,
+                media_url: rawUrl,
+                mediaList: postMediaList,
+                proServiceData: proServiceData,
+                hasAudio: Boolean(p.audio_url),
+                audioTitle: p.audio_title || 'Extrait Audio',
+                audioUrl: p.audio_url || null,
+                likesCount: p.post_likes ? p.post_likes.length : (p.likes_count || 0),
+                isLiked: p.post_likes ? p.post_likes.some(l => l.user_id === currentUser?.id) : false,
+                commentsCount: p.post_comments ? p.post_comments.length : (p.comments_count || (p.comments ? p.comments.length : 0)),
+                comments: p.post_comments ? p.post_comments.map(c => ({
+                  id: c.id,
+                  userId: c.user_id,
+                  userName: c.profiles?.full_name || userLookup.get(c.user_id)?.name || 'Artiste',
+                  text: c.content,
+                  time: formatTimeAgo(c.created_at, language)
+                })) : [],
+                created_at: postCreatedAt,
+                createdAt: postCreatedAt,
+                timeAgo: formatTimeAgo(postCreatedAt, language)
+              };
+            });
+
+            const sanitizedPosts = mappedSupaPosts.filter(p => !isTestArtifact(p));
+            setPosts(sanitizedPosts);
+          }
+
+          // 3. Fetch live active stories with resilient join & fallback
+          let supaStories = null;
+          let storyFetchOk = false;
+          try {
+            const res = await supabase
+              .from('stories')
+              .select('*, profiles:user_id(full_name, avatar_url), story_views(viewer_id, profiles:viewer_id(full_name, avatar_url, role)), story_likes(user_id)')
+              .order('created_at', { ascending: false }).limit(50);
+            if (res.data && !res.error) {
+              supaStories = res.data;
+              storyFetchOk = true;
+            } else {
               const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false }).limit(50);
               if (simpleRes.data && !simpleRes.error) {
                 supaStories = simpleRes.data;
                 storyFetchOk = true;
               }
             }
-
-            if (storyFetchOk && Array.isArray(supaStories)) {
-              const userLookup = new Map((loadedUsers || []).map(u => [u.id, u]));
-              const mappedSupa = supaStories.map(s => {
-                const authorProfile = userLookup.get(s.user_id) || s.profiles || {};
-                const isCurrentUser = s.user_id === currentUser?.id;
-                const authorName = isCurrentUser ? (currentUser?.name || 'Moi') : (authorProfile.name || authorProfile.full_name || s.profiles?.full_name || 'Artiste');
-                const authorAvatar = isCurrentUser ? (currentUser?.avatar || '') : (authorProfile.avatar || authorProfile.avatar_url || s.profiles?.avatar_url || '');
-                const rawStoryMedia = s.media_url && typeof s.media_url === 'string' && s.media_url !== 'null' && s.media_url !== 'undefined' && s.media_url.trim() !== '' ? s.media_url : null;
-                const isText = !rawStoryMedia || rawStoryMedia === '';
-                const storyCreatedAt = s.created_at || new Date().toISOString();
-
-                return {
-                  id: s.id,
-                  userId: s.user_id,
-                  userName: authorName,
-                  avatar: authorAvatar,
-                  userAvatar: authorAvatar,
-                  hasUnread: s.story_views ? !s.story_views.some(v => v.viewer_id === currentUser?.id) : true,
-                  storyMedia: isText ? null : rawStoryMedia,
-                  mediaUrl: isText ? '' : rawStoryMedia,
-                  isTextStory: isText,
-                  mediaType: isText ? 'text' : (s.is_video ? 'video' : ((rawStoryMedia && (rawStoryMedia.includes('.mp4') || rawStoryMedia.includes('.webm') || rawStoryMedia.includes('.mov') || rawStoryMedia.startsWith('data:video'))) ? 'video' : 'image')),
-                  isVideo: s.is_video || (rawStoryMedia && (rawStoryMedia.includes('.mp4') || rawStoryMedia.includes('.webm') || rawStoryMedia.includes('.mov'))),
-                  caption: s.caption || '',
-                  likesCount: s.story_likes ? s.story_likes.length : 0,
-                  isLiked: s.story_likes ? s.story_likes.some(l => l.user_id === currentUser?.id) : false,
-                  viewers: s.story_views ? s.story_views.map(v => ({
-                    id: v.viewer_id,
-                    name: v.profiles?.full_name || userLookup.get(v.viewer_id)?.name || 'Artiste',
-                    avatar: v.profiles?.avatar_url || userLookup.get(v.viewer_id)?.avatar || '',
-                    role: v.profiles?.role || 'Artiste'
-                  })) : [],
-                  created_at: storyCreatedAt,
-                  createdAt: storyCreatedAt,
-                  createdAtTimestamp: new Date(storyCreatedAt).getTime(),
-                  time: formatTimeAgo(storyCreatedAt, language)
-                };
-              });
-
-              // Supabase is the source of truth for remote stories.
-              // Only keep local pending drafts created by the current user that are not yet synced.
-              const freshIds = new Set(mappedSupa.map(s => s.id));
-              const now = Date.now();
-              const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-              const localUnsynced = (loadedStories || []).filter(ls => {
-                if (freshIds.has(ls.id)) return false;
-                const isMyPendingDraft = (ls.userId === currentUser?.id || ls.isLocalPending || String(ls.id).startsWith('local_')) && !ls.isDeleted;
-                if (!isMyPendingDraft) return false;
-                const storyTimestamp = ls.createdAtTimestamp || (ls.created_at ? new Date(ls.created_at).getTime() : (ls.expires_at ? new Date(ls.expires_at).getTime() - ONE_DAY_MS : now));
-                return (now - storyTimestamp) < ONE_DAY_MS;
-              });
-              loadedStories = [...localUnsynced, ...mappedSupa];
-              setStories(loadedStories);
-              setStoredItem(STORAGE_KEYS.STORIES, loadedStories);
+          } catch (se) {
+            const simpleRes = await supabase.from('stories').select('*').order('created_at', { ascending: false }).limit(50);
+            if (simpleRes.data && !simpleRes.error) {
+              supaStories = simpleRes.data;
+              storyFetchOk = true;
             }
+          }
 
-            // Generate real Match Pro cards strictly from real Supabase / database profiles
-            const otherUsers = (loadedUsers || []).filter(u => u.id !== currentUser?.id && u.email !== currentUser?.email);
-            loadedMatches = otherUsers.map(u => {
-              const combinedSkills = [
-                ...(Array.isArray(u.genres) ? u.genres : []),
-                ...(Array.isArray(u.instruments) ? u.instruments : []),
-                ...(Array.isArray(u.skills) ? u.skills : [])
-              ];
+          if (storyFetchOk && Array.isArray(supaStories)) {
+            const userLookup = new Map((loadedUsers || []).map(u => [u.id, u]));
+            const mappedSupa = supaStories.map(s => {
+              const authorProfile = userLookup.get(s.user_id) || s.profiles || {};
+              const isCurrentUser = s.user_id === currentUser?.id;
+              const authorName = isCurrentUser ? (currentUser?.name || 'Moi') : (authorProfile.name || authorProfile.full_name || s.profiles?.full_name || 'Artiste');
+              const authorAvatar = isCurrentUser ? (currentUser?.avatar || '') : (authorProfile.avatar || authorProfile.avatar_url || s.profiles?.avatar_url || '');
+              const rawStoryMedia = s.media_url && typeof s.media_url === 'string' && s.media_url !== 'null' && s.media_url !== 'undefined' && s.media_url.trim() !== '' ? s.media_url : null;
+              const isText = !rawStoryMedia || rawStoryMedia === '';
+              const storyCreatedAt = s.created_at || new Date().toISOString();
 
               return {
-                id: `match_${u.id}`,
-                userId: u.id,
-                title: u.name || u.full_name || u.username || 'Artiste',
-                name: u.name || u.full_name || u.username || 'Artiste',
-                role: u.role || 'Artiste',
-                category: u.role || 'Artiste',
-                location: u.location || 'Studio & En ligne',
-                matchPercentage: 94,
-                image: u.cover_url || u.avatar || u.avatar_url || '',
-                avatar: u.avatar || u.avatar_url || '',
-                cover_url: u.cover_url || '',
-                bio: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
-                description: u.bio || `Artiste ${u.role || ''} sur StageLink.`,
-                skills: combinedSkills.length > 0 ? combinedSkills : [u.role || 'Artiste'],
-                company: u.company || '',
-                creator: u.name || u.full_name || 'Artiste',
-                creatorAvatar: u.avatar || '',
-                verified: u.verified || u.badgeType === 'gold' || u.badgeType === 'blue',
-                badgeType: u.badgeType || 'none',
-                rawUser: u
+                id: s.id,
+                userId: s.user_id,
+                userName: authorName,
+                avatar: authorAvatar,
+                userAvatar: authorAvatar,
+                hasUnread: s.story_views ? !s.story_views.some(v => v.viewer_id === currentUser?.id) : true,
+                storyMedia: isText ? null : rawStoryMedia,
+                mediaUrl: isText ? '' : rawStoryMedia,
+                isTextStory: isText,
+                mediaType: isText ? 'text' : (s.is_video ? 'video' : ((rawStoryMedia && (rawStoryMedia.includes('.mp4') || rawStoryMedia.includes('.webm') || rawStoryMedia.includes('.mov') || rawStoryMedia.startsWith('data:video'))) ? 'video' : 'image')),
+                isVideo: s.is_video || (rawStoryMedia && (rawStoryMedia.includes('.mp4') || rawStoryMedia.includes('.webm') || rawStoryMedia.includes('.mov'))),
+                caption: s.caption || '',
+                likesCount: s.story_likes ? s.story_likes.length : 0,
+                isLiked: s.story_likes ? s.story_likes.some(l => l.user_id === currentUser?.id) : false,
+                viewers: s.story_views ? s.story_views.map(v => ({
+                  id: v.viewer_id,
+                  name: v.profiles?.full_name || userLookup.get(v.viewer_id)?.name || 'Artiste',
+                  avatar: v.profiles?.avatar_url || userLookup.get(v.viewer_id)?.avatar || '',
+                  role: v.profiles?.role || 'Artiste'
+                })) : [],
+                created_at: storyCreatedAt,
+                createdAt: storyCreatedAt,
+                createdAtTimestamp: new Date(storyCreatedAt).getTime(),
+                time: formatTimeAgo(storyCreatedAt, language)
               };
             });
-            setStoredItem(STORAGE_KEYS.MATCHES, loadedMatches);
 
-            // Fetch live messages for currentUser from Supabase
-            try {
-              const { data: supaMessages } = await supabase
-                .from('messages')
-                .select('*, sender:sender_id(id, full_name, avatar_url, role), recipient:receiver_id(id, full_name, avatar_url, role)')
-                .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
-                .order('created_at', { ascending: true });
-
-              if (supaMessages && supaMessages.length > 0) {
-                const chatMap = new Map();
-
-                supaMessages.forEach(msg => {
-                  const isMeSender = msg.sender_id === currentUser.id;
-                  const partnerId = isMeSender ? msg.receiver_id : msg.sender_id;
-                  const partnerProfile = isMeSender ? msg.recipient : msg.sender;
-                  const partnerUser = (loadedUsers || []).find(u => u.id === partnerId);
-
-                  const partnerName = partnerProfile?.full_name || partnerUser?.name || 'Artiste';
-                  const partnerAvatar = partnerProfile?.avatar_url || partnerUser?.avatar || '';
-                  const partnerRole = partnerProfile?.role || partnerUser?.role || 'Artiste';
-
-                  const chatId = `chat_${partnerId}`;
-
-                  const msgObj = {
-                    id: msg.id,
-                    sender: isMeSender ? 'current' : 'other',
-                    senderId: msg.sender_id,
-                    text: msg.content || '',
-                    mediaUrl: msg.media_url || null,
-                    audioUrl: msg.audio_url || null,
-                    isAudio: msg.metadata?.isAudio || Boolean(msg.audio_url),
-                    isVideo: msg.metadata?.isVideo || Boolean(msg.metadata?.videoUrl),
-                    videoUrl: msg.metadata?.videoUrl || msg.media_url,
-                    fileName: msg.metadata?.fileName || null,
-                    audioDuration: msg.metadata?.audioDuration || null,
-                    quotedMessage: msg.metadata?.quotedMessage || null,
-                    documentName: msg.metadata?.documentName || null,
-                    isCallNotice: msg.metadata?.isCallNotice || Boolean(msg.content && (msg.content.includes('Appel') || msg.content.includes('📞') || msg.content.includes('📹'))),
-                    callStatus: msg.metadata?.callStatus || null,
-                    isAudioOnly: msg.metadata?.isAudioOnly || false,
-                    timestamp: new Date(msg.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    createdAtTimestamp: new Date(msg.created_at || Date.now()).getTime(),
-                    isRead: msg.is_read !== false
-                  };
-
-                  if (!chatMap.has(chatId)) {
-                    chatMap.set(chatId, {
-                      id: chatId,
-                      participant: {
-                        id: partnerId,
-                        name: partnerName,
-                        avatar: partnerAvatar,
-                        online: false,
-                        role: partnerRole
-                      },
-                      unreadCount: (!isMeSender && !msg.is_read) ? 1 : 0,
-                      lastMessageTime: 'Récemment',
-                      messages: [msgObj]
-                    });
-                  } else {
-                    const existingChat = chatMap.get(chatId);
-                    existingChat.messages.push(msgObj);
-                    if (!isMeSender && !msg.is_read) {
-                      existingChat.unreadCount = (existingChat.unreadCount || 0) + 1;
-                    }
-                  }
-                });
-
-                let supaChats = Array.from(chatMap.values());
-                
-                // Fetch chat states for filtering (archived, deleted, unread overrides)
-                try {
-                  const { data: statesData } = await supabase.from('chat_states').select('*').eq('user_id', currentUser.id);
-                  if (statesData && statesData.length > 0) {
-                    supaChats = supaChats.map(c => {
-                      const state = statesData.find(s => s.partner_id === c.participant.id);
-                      if (state) {
-                        return {
-                          ...c,
-                          isArchived: state.is_archived,
-                          isDeleted: state.is_deleted,
-                          unreadCount: state.force_unread ? Math.max(1, c.unreadCount) : c.unreadCount
-                        };
-                      }
-                      return c;
-                    }).filter(c => !c.isDeleted && !c.isArchived);
-                  }
-                } catch (stateErr) {
-                  console.warn('Supabase chat_states fetch note:', stateErr.message);
-                }
-
-                loadedChats = supaChats;
-              }
-            } catch (me) {
-              console.warn('Supabase live messages fetch note:', me.message);
-            }
-          } catch (err) {
-            console.warn('Supabase live data fetch note:', err.message);
+            setStories(mappedSupa);
           }
-        }
 
-        setAllUsers(loadedUsers);
-        setPosts(prevPosts => {
-          const freshPostIds = new Set((loadedPosts || []).map(p => p.id));
-          const currentPending = (prevPosts || []).filter(p => p && p.id && !freshPostIds.has(p.id) && !p.isDeleted && !isTestArtifact(p));
-          const combined = [...currentPending, ...(loadedPosts || [])];
-          setStoredItem(STORAGE_KEYS.POSTS, combined);
-          return combined;
-        });
-        setStories(loadedStories);
-        setMatches(loadedMatches);
-        setChats(prevChats => {
-          const mergedChats = [...loadedChats];
-          prevChats.forEach(pc => {
-            const matchingLoaded = mergedChats.find(lc => lc.id === pc.id);
-            if (!matchingLoaded) {
-              mergedChats.push(pc);
-            } else {
-              const existingMsgs = pc.messages || [];
-              const loadedMsgs = matchingLoaded.messages || [];
-              const combined = [...loadedMsgs];
-              existingMsgs.forEach(em => {
-                if (!combined.some(lm => lm.id === em.id)) {
-                  combined.push(em);
+          // 4. Fetch live messages for currentUser from Supabase
+          try {
+            const { data: supaMessages } = await supabase
+              .from('messages')
+              .select('*, sender:sender_id(id, full_name, avatar_url, role), recipient:receiver_id(id, full_name, avatar_url, role)')
+              .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+              .order('created_at', { ascending: true });
+
+            if (supaMessages && supaMessages.length > 0) {
+              const chatMap = new Map();
+
+              supaMessages.forEach(msg => {
+                const isMeSender = msg.sender_id === currentUser.id;
+                const partnerId = isMeSender ? msg.receiver_id : msg.sender_id;
+                const partnerProfile = isMeSender ? msg.recipient : msg.sender;
+                const partnerUser = (loadedUsers || []).find(u => u.id === partnerId);
+
+                const partnerName = partnerProfile?.full_name || partnerUser?.name || 'Artiste';
+                const partnerAvatar = partnerProfile?.avatar_url || partnerUser?.avatar || '';
+                const partnerRole = partnerProfile?.role || partnerUser?.role || 'Artiste';
+
+                const chatId = `chat_${partnerId}`;
+
+                const msgObj = {
+                  id: msg.id,
+                  sender: isMeSender ? 'current' : 'other',
+                  senderId: msg.sender_id,
+                  text: msg.content || '',
+                  mediaUrl: msg.media_url || null,
+                  audioUrl: msg.audio_url || null,
+                  isAudio: msg.metadata?.isAudio || Boolean(msg.audio_url),
+                  isVideo: msg.metadata?.isVideo || Boolean(msg.metadata?.videoUrl),
+                  videoUrl: msg.metadata?.videoUrl || msg.media_url,
+                  fileName: msg.metadata?.fileName || null,
+                  audioDuration: msg.metadata?.audioDuration || null,
+                  quotedMessage: msg.metadata?.quotedMessage || null,
+                  documentName: msg.metadata?.documentName || null,
+                  isCallNotice: msg.metadata?.isCallNotice || Boolean(msg.content && (msg.content.includes('Appel') || msg.content.includes('📞') || msg.content.includes('📹'))),
+                  callStatus: msg.metadata?.callStatus || null,
+                  isAudioOnly: msg.metadata?.isAudioOnly || false,
+                  timestamp: new Date(msg.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  createdAtTimestamp: new Date(msg.created_at || Date.now()).getTime(),
+                  isRead: msg.is_read !== false
+                };
+
+                if (!chatMap.has(chatId)) {
+                  chatMap.set(chatId, {
+                    id: chatId,
+                    participant: {
+                      id: partnerId,
+                      name: partnerName,
+                      avatar: partnerAvatar,
+                      online: false,
+                      role: partnerRole
+                    },
+                    unreadCount: (!isMeSender && !msg.is_read) ? 1 : 0,
+                    lastMessageTime: 'Récemment',
+                    messages: [msgObj]
+                  });
+                } else {
+                  const existingChat = chatMap.get(chatId);
+                  existingChat.messages.push(msgObj);
+                  if (!isMeSender && !msg.is_read) {
+                    existingChat.unreadCount = (existingChat.unreadCount || 0) + 1;
+                  }
                 }
               });
-              combined.sort((a, b) => (a.createdAtTimestamp || 0) - (b.createdAtTimestamp || 0));
-              matchingLoaded.messages = combined;
-              if (combined.length > 0) {
-                matchingLoaded.lastMessage = combined[combined.length - 1].text || matchingLoaded.lastMessage;
+
+              let supaChats = Array.from(chatMap.values());
+              
+              // Fetch chat states for filtering (archived, deleted, unread overrides)
+              try {
+                const { data: statesData } = await supabase.from('chat_states').select('*').eq('user_id', currentUser.id);
+                if (statesData && statesData.length > 0) {
+                  supaChats = supaChats.map(c => {
+                    const state = statesData.find(s => s.partner_id === c.participant.id);
+                    if (state) {
+                      return {
+                        ...c,
+                        isArchived: state.is_archived,
+                        isDeleted: state.is_deleted,
+                        unreadCount: state.force_unread ? Math.max(1, c.unreadCount) : c.unreadCount
+                      };
+                    }
+                    return c;
+                  }).filter(c => !c.isDeleted && !c.isArchived);
+                }
+              } catch (stateErr) {
+                console.warn('Supabase chat_states fetch note:', stateErr.message);
               }
+
+              setChats(supaChats);
             }
-          });
-          setStoredItem(STORAGE_KEYS.CHATS, mergedChats);
-          return mergedChats;
-        });
+          } catch (me) {
+            console.warn('Supabase live messages fetch note:', me.message);
+          }
+        } catch (err) {
+          console.warn('Supabase live data fetch note:', err.message);
+        }
       };
 
       loadInitialData();
@@ -1703,8 +1449,6 @@ function MainApp() {
                     }
                   });
 
-                  setStoredItem(STORAGE_KEYS.CHATS, finalMerged);
-
                   setSelectedChat(prev => {
                     if (prev) {
                       const updatedActive = finalMerged.find(c => c.id === prev.id || (prev.participant?.id && c.participant?.id === prev.participant.id));
@@ -1733,11 +1477,7 @@ function MainApp() {
               if (payload.eventType === 'DELETE') {
                 const deletedId = payload.old?.id;
                 if (deletedId) {
-                  setPosts(prev => {
-                    const updated = (prev || []).filter(p => p.id !== deletedId);
-                    setStoredItem(STORAGE_KEYS.POSTS, updated);
-                    return updated;
-                  });
+                  setPosts(prev => (prev || []).filter(p => p.id !== deletedId));
                 }
               }
               syncPostsStoriesAndProfiles().catch(() => {});
@@ -1750,9 +1490,7 @@ function MainApp() {
                 if (isTestArtifact(incomingPost)) return;
                 setPosts(prev => {
                   if ((prev || []).some(p => p.id === incomingPost.id)) return prev;
-                  const updated = [incomingPost, ...(prev || [])];
-                  setStoredItem(STORAGE_KEYS.POSTS, updated);
-                  return updated;
+                  return [incomingPost, ...(prev || [])];
                 });
               }
               syncPostsStoriesAndProfiles().catch(() => {});
@@ -1760,11 +1498,7 @@ function MainApp() {
             .on('broadcast', { event: 'delete_post' }, (payload) => {
               if (payload.payload && payload.payload.id) {
                 const deletedId = payload.payload.id;
-                setPosts(prev => {
-                  const updated = (prev || []).filter(p => p.id !== deletedId);
-                  setStoredItem(STORAGE_KEYS.POSTS, updated);
-                  return updated;
-                });
+                setPosts(prev => (prev || []).filter(p => p.id !== deletedId));
               }
               syncPostsStoriesAndProfiles().catch(() => {});
             })
@@ -1776,11 +1510,7 @@ function MainApp() {
               if (payload.eventType === 'DELETE') {
                 const deletedId = payload.old?.id;
                 if (deletedId) {
-                  setStories(prev => {
-                    const updated = (prev || []).filter(s => s.id !== deletedId);
-                    setStoredItem(STORAGE_KEYS.STORIES, updated);
-                    return updated;
-                  });
+                  setStories(prev => (prev || []).filter(s => s.id !== deletedId));
                   setActiveStory(cur => cur?.id === deletedId ? null : cur);
                   setActiveStoryUserList(prev => (prev || []).filter(s => s.id !== deletedId));
                 }
@@ -1794,9 +1524,7 @@ function MainApp() {
                 const incomingStory = payload.payload;
                 setStories(prev => {
                   if ((prev || []).some(s => s.id === incomingStory.id)) return prev;
-                  const updated = [incomingStory, ...(prev || [])];
-                  setStoredItem(STORAGE_KEYS.STORIES, updated);
-                  return updated;
+                  return [incomingStory, ...(prev || [])];
                 });
               }
               syncPostsStoriesAndProfiles().catch(() => {});
@@ -1804,11 +1532,7 @@ function MainApp() {
             .on('broadcast', { event: 'delete_story' }, (payload) => {
               if (payload.payload && payload.payload.id) {
                 const deletedId = payload.payload.id;
-                setStories(prev => {
-                  const updated = (prev || []).filter(s => s.id !== deletedId);
-                  setStoredItem(STORAGE_KEYS.STORIES, updated);
-                  return updated;
-                });
+                setStories(prev => (prev || []).filter(s => s.id !== deletedId));
                 setActiveStory(cur => cur?.id === deletedId ? null : cur);
                 setActiveStoryUserList(prev => (prev || []).filter(s => s.id !== deletedId));
               }
@@ -2153,7 +1877,6 @@ function MainApp() {
                     messages: [formattedMsg]
                   });
                 }
-                setStoredItem(STORAGE_KEYS.CHATS, updated);
                 return updated;
               });
 
@@ -2236,7 +1959,6 @@ function MainApp() {
                     messages: [formattedMsg]
                   });
                 }
-                setStoredItem(STORAGE_KEYS.CHATS, updated);
                 return updated;
               });
             }
@@ -2355,12 +2077,10 @@ function MainApp() {
               if (!oldMsg || !oldMsg.id) return;
               
               setChats(prevChats => {
-                const updated = prevChats.map(c => ({
+                return prevChats.map(c => ({
                   ...c,
                   messages: (c.messages || []).filter(m => m.id !== oldMsg.id)
                 }));
-                setStoredItem(STORAGE_KEYS.CHATS, updated);
-                return updated;
               });
 
               setSelectedChat(prev => {
@@ -2508,7 +2228,6 @@ function MainApp() {
     });
 
     setChats(updatedChats);
-    setStoredItem(STORAGE_KEYS.CHATS, updatedChats);
 
     const active = updatedChats.find((c) => c.id === chat.id);
     setSelectedChat(active || { ...chat, unreadCount: 0 });
@@ -2749,7 +2468,6 @@ function MainApp() {
     }
 
     setChats(updatedChatsList);
-    setStoredItem(STORAGE_KEYS.CHATS, updatedChatsList);
 
     // Only navigate away if explicitly initiated from viewers list interaction
     if (isFromViewersList) {
@@ -2794,7 +2512,6 @@ function MainApp() {
   const handleDeletePost = async (postId) => {
     const updated = posts.filter((p) => p.id !== postId);
     setPosts(updated);
-    setStoredItem(STORAGE_KEYS.POSTS, updated);
 
     if (isSupabaseConfigured()) {
       try {
@@ -2826,7 +2543,6 @@ function MainApp() {
       return p;
     });
     setPosts(updated);
-    setStoredItem(STORAGE_KEYS.POSTS, updated);
 
     if (isSupabaseConfigured() && targetPost && currentUser) {
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -2885,7 +2601,6 @@ function MainApp() {
       return p;
     });
     setPosts(updated);
-    setStoredItem(STORAGE_KEYS.POSTS, updated);
 
     if (isSupabaseConfigured() && targetPost && currentUser) {
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -3038,12 +2753,10 @@ function MainApp() {
       comments: []
     };
 
-    // 3. INSTANT OPTIMISTIC STATE & LOCAL STORAGE UPDATE (0ms)
+    // 3. INSTANT OPTIMISTIC STATE UPDATE (0ms)
     setPosts(prev => {
       const filtered = (prev || []).filter(p => p.id !== postUuid);
-      const updated = [optimisticPost, ...filtered];
-      setStoredItem(STORAGE_KEYS.POSTS, updated);
-      return updated;
+      return [optimisticPost, ...filtered];
     });
 
     // 4. Play subtle success sound chime & show sleek minimalist toast
@@ -3099,7 +2812,7 @@ function MainApp() {
           }];
         }
 
-        // Silently update the post in state & storage with final storage URLs
+        // Silently update the post in state with final storage URLs
         const finalizedPost = {
           ...optimisticPost,
           image: !isVideoMedia ? sanitizeMedia(finalMediaUrl) : null,
@@ -3109,11 +2822,7 @@ function MainApp() {
           mediaList: finalMediaList
         };
 
-        setPosts(prev => {
-          const mapped = (prev || []).map(p => p.id === postUuid ? finalizedPost : p);
-          setStoredItem(STORAGE_KEYS.POSTS, mapped);
-          return mapped;
-        });
+        setPosts(prev => (prev || []).map(p => p.id === postUuid ? finalizedPost : p));
 
         let textContent = newPostData.text || '';
         if (newPostData.proServiceData) {
@@ -3304,11 +3013,7 @@ function MainApp() {
       }
 
       // Optimistic instant UI update ONLY if db insert succeeds
-      setStories(prev => {
-        const list = [newStory, ...(prev || []).filter(s => s.id !== storyUuid)];
-        setStoredItem(STORAGE_KEYS.STORIES, list);
-        return list;
-      });
+      setStories(prev => [newStory, ...(prev || []).filter(s => s.id !== storyUuid)]);
 
       // Success Notification Toast
       setToastNotification({
@@ -3383,8 +3088,6 @@ function MainApp() {
           messages: [newMsg]
         });
       }
-
-      setStoredItem(STORAGE_KEYS.CHATS, updatedChats);
 
       return updatedChats;
     });
@@ -3545,7 +3248,6 @@ function MainApp() {
       return c;
     });
     setChats(updatedChats);
-    setStoredItem(STORAGE_KEYS.CHATS, updatedChats);
 
     const active = updatedChats.find((c) => c.id === chatId);
     if (active) setSelectedChat(active);
@@ -3618,7 +3320,6 @@ function MainApp() {
       return c;
     });
     setChats(updatedChats);
-    setStoredItem(STORAGE_KEYS.CHATS, updatedChats);
 
     const active = updatedChats.find((c) => c.id === chatId);
     if (active) setSelectedChat(active);
@@ -3710,7 +3411,6 @@ function MainApp() {
     });
 
     setChats(updatedChats);
-    setStoredItem(STORAGE_KEYS.CHATS, updatedChats);
   };
 
   const handleConnectUser = async (targetUserId) => {
@@ -3824,7 +3524,6 @@ function MainApp() {
           }));
 
           setAllUsers(mappedUsers);
-          setStoredItem(STORAGE_KEYS.USERS, mappedUsers);
 
           const otherUsers = mappedUsers.filter(u => u.id !== currentUser?.id && u.email !== currentUser?.email);
           const realMatchCards = otherUsers.map(u => {
@@ -3859,7 +3558,6 @@ function MainApp() {
           });
 
           setMatches(realMatchCards);
-          setStoredItem(STORAGE_KEYS.MATCHES, realMatchCards);
         }
       } catch (err) {
         console.warn('Error refreshing matches:', err);
@@ -3928,7 +3626,6 @@ function MainApp() {
                   const targetIds = new Set(targetList.map(s => s.id));
                   const updated = stories.map((s) => targetIds.has(s.id) ? { ...s, hasUnread: false } : s);
                   setStories(updated);
-                  setStoredItem(STORAGE_KEYS.STORIES, updated);
                   setActiveStory({ ...st, hasUnread: false });
                   setActiveStoryUserList(targetList);
                 }}
@@ -4120,7 +3817,6 @@ function MainApp() {
           onDeleteStory={async (storyId) => {
             const updated = (stories || []).filter((s) => s.id !== storyId);
             setStories(updated);
-            setStoredItem(STORAGE_KEYS.STORIES, updated);
             setActiveStory(null);
             setActiveStoryUserList((prev) => (prev || []).filter((s) => s.id !== storyId));
 

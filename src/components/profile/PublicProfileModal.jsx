@@ -65,21 +65,12 @@ export default function PublicProfileModal({
     return unsubscribe;
   }, [user]);
 
-  // Hydrate user with fresh localStorage / Supabase profile data
+  // Hydrate user with fresh Supabase profile data
   useEffect(() => {
     if (!user) return;
     const targetId = user.id || user.userId;
 
-    let initial = { ...user };
-    try {
-      const storedUsers = JSON.parse(localStorage.getItem('stagelink_users') || '[]');
-      const matchedStored = storedUsers.find(u => u.id === targetId || u.userId === targetId);
-      if (matchedStored) {
-        initial = { ...matchedStored, ...initial };
-      }
-    } catch (e) {}
-
-    setHydratedUser(initial);
+    setHydratedUser({ ...user });
 
     // Fetch live profile from Supabase
     if (isSupabaseConfigured() && targetId) {

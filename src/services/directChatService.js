@@ -542,22 +542,6 @@ export const directChatService = {
   async markAsRead(conversationId, currentUserId) {
     if (!conversationId || !currentUserId) return;
     
-    // 0. Update LocalStorage conversation cache immediately (0ms instant UI badge update)
-    try {
-      const cacheKey = `stagelink_cached_conversations_${currentUserId}`;
-      const cachedStr = localStorage.getItem(cacheKey);
-      if (cachedStr) {
-        const cached = JSON.parse(cachedStr);
-        const updated = cached.map(c => {
-          if (c.id === conversationId) {
-            return { ...c, unreadCount: 0, isUnread: false };
-          }
-          return c;
-        });
-        localStorage.setItem(cacheKey, JSON.stringify(updated));
-      }
-    } catch (_) {}
-
     // Dispatch UI refresh event immediately
     window.dispatchEvent(new CustomEvent('update_conversation_local', { detail: { conversationId, unreadCount: 0 } }));
 
@@ -622,49 +606,10 @@ export const directChatService = {
       }
     }
 
-    // 0. Update LocalStorage conversation cache immediately (0ms instant UI removal)
-    try {
-      const cacheKey = `stagelink_cached_conversations_${userId}`;
-      const cachedStr = localStorage.getItem(cacheKey);
-      if (cachedStr) {
-        const cached = JSON.parse(cachedStr);
-        const updated = cached.filter(c => {
-          if (String(c.id) === String(conversationId)) return false;
-          const cPartnerId = c.partner?.id || c.participant?.id || c.partnerId;
-          if (effectivePartnerId && cPartnerId && String(cPartnerId) === String(effectivePartnerId)) return false;
-          return true;
-        });
-        localStorage.setItem(cacheKey, JSON.stringify(updated));
-      }
-
-      // Also clean up chats cache
-      const chatsCacheKey = `stagelink_chats_${userId}`;
-      const cachedChatsStr = localStorage.getItem(chatsCacheKey);
-      if (cachedChatsStr) {
-        const cachedChats = JSON.parse(cachedChatsStr);
-        const updatedChats = cachedChats.filter(c => {
-          if (String(c.id) === String(conversationId)) return false;
-          const cPartnerId = c.participant?.id || c.partner?.id || c.partnerId;
-          if (effectivePartnerId && cPartnerId && String(cPartnerId) === String(effectivePartnerId)) return false;
-          return true;
-        });
-        localStorage.setItem(chatsCacheKey, JSON.stringify(updatedChats));
-      }
-
-      // Clean up cached message threads
-      localStorage.removeItem(`stagelink_cached_msgs_${conversationId}`);
-      if (effectivePartnerId) {
-        localStorage.removeItem(`stagelink_cached_msgs_conv_${effectivePartnerId}`);
-        localStorage.removeItem(`stagelink_cached_msgs_chat_${effectivePartnerId}`);
-        localStorage.removeItem(`chat_messages_${userId}_${effectivePartnerId}`);
-        localStorage.removeItem(`chat_messages_${effectivePartnerId}_${userId}`);
-      }
-    } catch (_) {}
-
     // Dispatch UI refresh events immediately
     window.dispatchEvent(new CustomEvent('conversation_deleted', { detail: { conversationId, partnerId: effectivePartnerId } }));
     window.dispatchEvent(new CustomEvent('delete_chat_local', { detail: { conversationId, partnerId: effectivePartnerId } }));
-    window.dispatchEvent(new CustomEvent('refresh_conversations'));
+    window.dispatchEvent(new Event('refresh_conversations'));
 
     if (!isSupabaseConfigured()) return { success: true };
 

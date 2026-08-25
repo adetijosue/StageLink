@@ -1,6 +1,6 @@
 /**
- * StageLink Mock Database & Persistence Engine
- * 100% Music Industry Roles, Musician Specialties, and Creative Opportunities.
+ * StageLink Storage & Legacy Artifact Sanitizer
+ * Pure Supabase Backend — Zero Local Entity Persistence
  */
 
 const STORAGE_KEYS = {
@@ -17,13 +17,8 @@ const STORAGE_KEYS = {
   PRO_EVENTS: 'stagelink_services_events'
 };
 
-// Clean Virgin State for Production (Real Authenticated Supabase Users Only)
+// Clean State: No mock users, posts, or stories (Real Authenticated Supabase Database Only)
 const INITIAL_USERS = [];
-
-const INITIAL_STORIES = [];
-const INITIAL_POSTS = [];
-const INITIAL_SWIPE_MATCHES = [];
-const INITIAL_CHATS = [];
 
 // Helper to detect test/dummy artifacts & legacy mock accounts
 export const isTestArtifact = (item) => {
@@ -66,7 +61,7 @@ export const isTestArtifact = (item) => {
   return false;
 };
 
-// Local Storage Helper Functions with Quota Protection and Auto Test Purging
+// Safe Local Storage Helper Functions
 export const getStoredItem = (key, fallback) => {
   try {
     const data = localStorage.getItem(key);
@@ -77,7 +72,6 @@ export const getStoredItem = (key, fallback) => {
     }
     return parsed;
   } catch (e) {
-    console.warn(`Reading ${key} fallback:`, e.message);
     return fallback;
   }
 };
@@ -89,139 +83,45 @@ export const setStoredItem = (key, value) => {
       : value;
     localStorage.setItem(key, JSON.stringify(sanitized));
   } catch (e) {
-    console.warn(`Storage Quota note for ${key}:`, e.message);
-    try {
-      if (key === STORAGE_KEYS.CURRENT_USER) {
-        // Clear secondary cache items to prioritize the active user profile
-        try {
-          localStorage.removeItem('stagelink_posts');
-          localStorage.removeItem('stagelink_stories');
-        } catch (_) {}
-        localStorage.setItem(key, JSON.stringify(value));
-      } else if (Array.isArray(value)) {
-        const pruned = value.filter(item => !isTestArtifact(item)).map(item => {
-          if (item.video && typeof item.video === 'string' && item.video.startsWith('data:')) {
-            return { ...item, video: null };
-          }
-          if (item.image && typeof item.image === 'string' && item.image.startsWith('data:')) {
-            return { ...item, image: null };
-          }
-          if (item.mediaUrl && typeof item.mediaUrl === 'string' && item.mediaUrl.startsWith('data:')) {
-            return { ...item, mediaUrl: '' };
-          }
-          return item;
-        });
-        localStorage.setItem(key, JSON.stringify(pruned));
-      }
-    } catch (innerErr) {
-      console.warn('Pruned storage save note:', innerErr.message);
-    }
+    console.warn(`Storage note for ${key}:`, e.message);
   }
 };
 
-// Initialize seed storage - 100% Clean state for real authenticated users
+// Storage Purge & Clean Initialization: Guarantees 100% Supabase-first live state
 export const initializeStorage = () => {
-  // 1. Permanently purge any legacy mock/fake items from previous versions
-  const serviceKeys = [
-    { key: STORAGE_KEYS.PRO_WORKS, prefix: 'work_' },
-    { key: STORAGE_KEYS.PRO_SERVICES, prefix: 'service_' },
-    { key: STORAGE_KEYS.PRO_COURSES, prefix: 'course_' },
-    { key: STORAGE_KEYS.PRO_EVENTS, prefix: 'event_' }
+  if (typeof localStorage === 'undefined') return;
+
+  const legacyEntityKeys = [
+    STORAGE_KEYS.POSTS,
+    STORAGE_KEYS.STORIES,
+    STORAGE_KEYS.MATCHES,
+    STORAGE_KEYS.CHATS,
+    STORAGE_KEYS.USERS,
+    STORAGE_KEYS.PRO_WORKS,
+    STORAGE_KEYS.PRO_SERVICES,
+    STORAGE_KEYS.PRO_COURSES,
+    STORAGE_KEYS.PRO_EVENTS
   ];
 
-  serviceKeys.forEach(({ key, prefix }) => {
+  legacyEntityKeys.forEach(key => {
     try {
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          const authenticOnly = parsed.filter(item => {
-            if (isTestArtifact(item)) return false;
-            const itemId = String(item.id || item.work_id || item.course_id || item.event_id || '');
-            return !itemId.startsWith(prefix);
-          });
-          localStorage.setItem(key, JSON.stringify(authenticOnly));
-        }
-      }
-    } catch (e) {}
+      localStorage.removeItem(key);
+    } catch (_) {}
   });
 
+  // Purge any stale cached conversation fragments
   try {
-    const rawMatches = localStorage.getItem(STORAGE_KEYS.MATCHES);
-    if (rawMatches) {
-      const parsed = JSON.parse(rawMatches);
-      if (Array.isArray(parsed)) {
-        const authenticMatches = parsed.filter(m => m && m.id && !isTestArtifact(m) && !String(m.id).startsWith('match_'));
-        localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(authenticMatches));
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key && (
+        key.startsWith('stagelink_cached_conversations') || 
+        key.startsWith('stagelink_cached_notes') ||
+        key.startsWith('stagelink_cached_msgs')
+      )) {
+        localStorage.removeItem(key);
       }
     }
-  } catch (e) {}
-
-  try {
-    const rawPosts = localStorage.getItem(STORAGE_KEYS.POSTS);
-    if (rawPosts) {
-      const parsed = JSON.parse(rawPosts);
-      if (Array.isArray(parsed)) {
-        const clean = parsed.filter(item => !isTestArtifact(item));
-        localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(clean));
-      }
-    }
-    const rawStories = localStorage.getItem(STORAGE_KEYS.STORIES);
-    if (rawStories) {
-      const parsed = JSON.parse(rawStories);
-      if (Array.isArray(parsed)) {
-        const clean = parsed.filter(item => !isTestArtifact(item));
-        localStorage.setItem(STORAGE_KEYS.STORIES, JSON.stringify(clean));
-      }
-    }
-    const rawChats = localStorage.getItem(STORAGE_KEYS.CHATS);
-    if (rawChats) {
-      const parsed = JSON.parse(rawChats);
-      if (Array.isArray(parsed)) {
-        const clean = parsed.filter(item => !isTestArtifact(item));
-        localStorage.setItem(STORAGE_KEYS.CHATS, JSON.stringify(clean));
-      }
-    }
-
-    // Purge cached conversations
-    if (typeof localStorage !== 'undefined') {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith('stagelink_cached_conversations') || key.startsWith('stagelink_cached_notes'))) {
-          try {
-            const rawVal = localStorage.getItem(key);
-            if (rawVal) {
-              const parsedVal = JSON.parse(rawVal);
-              if (Array.isArray(parsedVal)) {
-                const cleanVal = parsedVal.filter(item => !isTestArtifact(item));
-                localStorage.setItem(key, JSON.stringify(cleanVal));
-              }
-            }
-          } catch (_) {}
-        }
-      }
-    }
-  } catch (e) {}
-
-  const existingUsers = getStoredItem(STORAGE_KEYS.USERS, []);
-  let cleanUsers = [];
-  if (Array.isArray(existingUsers)) {
-    cleanUsers = existingUsers.filter(u => u && u.id && !isTestArtifact(u));
-  }
-  setStoredItem(STORAGE_KEYS.USERS, cleanUsers);
-
-  if (!localStorage.getItem(STORAGE_KEYS.POSTS)) {
-    setStoredItem(STORAGE_KEYS.POSTS, INITIAL_POSTS);
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.STORIES)) {
-    setStoredItem(STORAGE_KEYS.STORIES, INITIAL_STORIES);
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.MATCHES)) {
-    setStoredItem(STORAGE_KEYS.MATCHES, INITIAL_SWIPE_MATCHES);
-  }
-  if (!localStorage.getItem(STORAGE_KEYS.CHATS)) {
-    setStoredItem(STORAGE_KEYS.CHATS, INITIAL_CHATS);
-  }
+  } catch (_) {}
 };
 
 export { STORAGE_KEYS, INITIAL_USERS };

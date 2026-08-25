@@ -8,6 +8,7 @@ import {
 import { soundEngine } from '../../services/audioService';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import SellWorkModal from './SellWorkModal';
 import OfferServiceModal from './OfferServiceModal';
 import PublishCourseModal from './PublishCourseModal';
@@ -27,52 +28,71 @@ export default function ProServicesView({ onShareToFeed, onStartChat, onOpenProf
   const [selectedTag, setSelectedTag] = useState('Tous');
   const [playingId, setPlayingId] = useState(null);
 
-  // Clean Virgin state: only retain authentic items created by real users
-  const sanitizeList = (key, prefix) => {
-    try {
-      const saved = localStorage.getItem(key);
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed)) return [];
-      // Eliminate any legacy mock items
-      const authentic = parsed.filter(
-        item => item && item.id && String(item.id).startsWith(prefix) && item.createdAt
-      );
-      return authentic;
-    } catch {
-      return [];
-    }
-  };
+  const [worksList, setWorksList] = useState([]);
+  const [servicesList, setServicesList] = useState([]);
+  const [coursesList, setCoursesList] = useState([]);
+  const [eventsList, setEventsList] = useState([]);
 
-  const [worksList, setWorksList] = useState(() => sanitizeList('stagelink_services_works', 'work_'));
-  const [servicesList, setServicesList] = useState(() => sanitizeList('stagelink_services_list', 'service_'));
-  const [coursesList, setCoursesList] = useState(() => sanitizeList('stagelink_services_courses', 'course_'));
-  const [eventsList, setEventsList] = useState(() => sanitizeList('stagelink_services_events', 'event_'));
-
-  // Save changes to localStorage
+  // Load authentic pro services published to Supabase posts
   useEffect(() => {
-    try {
-      localStorage.setItem('stagelink_services_works', JSON.stringify(worksList));
-    } catch (e) { console.error(e); }
-  }, [worksList]);
+    if (!isSupabaseConfigured()) return;
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('stagelink_services_list', JSON.stringify(servicesList));
-    } catch (e) { console.error(e); }
-  }, [servicesList]);
+    const loadProServices = async () => {
+      try {
+        const { data: supaPosts, error } = await supabase
+          .from('posts')
+          .select('*, profiles:user_id(full_name, avatar_url, role)')
+          .order('created_at', { ascending: false })
+          .limit(100);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('stagelink_services_courses', JSON.stringify(coursesList));
-    } catch (e) { console.error(e); }
-  }, [coursesList]);
+        if (!error && supaPosts) {
+          const works = [];
+          const services = [];
+          const courses = [];
+          const events = [];
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('stagelink_services_events', JSON.stringify(eventsList));
-    } catch (e) { console.error(e); }
-  }, [eventsList]);
+          supaPosts.forEach(p => {
+            let proData = p.metadata?.proServiceData || null;
+            if (!proData && p.content && p.content.includes('___PRO_SERVICE___:')) {
+              try {
+                const parts = p.content.split('___PRO_SERVICE___:');
+                proData = JSON.parse(parts[1]);
+              } catch (_) {}
+            }
+
+            if (proData) {
+              const authorName = p.profiles?.full_name || 'Artiste';
+              const authorAvatar = p.profiles?.avatar_url || '';
+              const normalized = {
+                ...proData,
+                id: proData.id || `pro_${p.id}`,
+                postId: p.id,
+                userId: p.user_id,
+                author: proData.author || proData.provider || proData.instructor || authorName,
+                authorAvatar: proData.authorAvatar || authorAvatar,
+                createdAt: p.created_at || new Date().toISOString()
+              };
+
+              const type = proData.proType || (proData.type === 'Exclusive' || proData.type === 'Lease' ? 'work' : 'service');
+              if (type === 'work') works.push(normalized);
+              else if (type === 'service') services.push(normalized);
+              else if (type === 'course') courses.push(normalized);
+              else if (type === 'event') events.push(normalized);
+            }
+          });
+
+          setWorksList(works);
+          setServicesList(services);
+          setCoursesList(courses);
+          setEventsList(events);
+        }
+      } catch (err) {
+        console.warn('Load pro services note:', err);
+      }
+    };
+
+    loadProServices();
+  }, []);
 
   // Reset selected category filter when switching subtabs
   useEffect(() => {

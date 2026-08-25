@@ -22,6 +22,8 @@ import { soundEngine } from '../../services/audioService';
 import { presenceService } from '../../services/presenceService';
 import { useLanguage } from '../../context/LanguageContext';
 
+import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
+
 const SwipeMatching = React.memo(function SwipeMatching({ 
   matches = [], 
   onApplyMatch, 
@@ -44,33 +46,37 @@ const SwipeMatching = React.memo(function SwipeMatching({
     return unsubscribe;
   }, []);
 
-  // Stored Match IDs
-  const [matchedIds, setMatchedIds] = useState(() => {
-    try {
-      const saved = localStorage.getItem('stagelink_applied_matches');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.warn("Storage read error (applied matches):", e);
-      return [];
-    }
-  });
-
-  // Stored Favorite Artist IDs
-  const [favoriteIds, setFavoriteIds] = useState(() => {
-    try {
-      const saved = localStorage.getItem('stagelink_favorite_artists');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.warn("Storage read error (favorite artists):", e);
-      return [];
-    }
-  });
+  // Stored Match IDs & Favorite IDs in memory + Supabase
+  const [matchedIds, setMatchedIds] = useState([]);
+  const [favoriteIds, setFavoriteIds] = useState([]);
 
   // Touch & Mouse Drag Gesture States
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const cardRef = useRef(null);
+
+  // Load matches & favorites live from Supabase
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !currentUser?.id) return;
+    const loadMatchesAndFavorites = async () => {
+      try {
+        const [{ data: matchRows }, { data: followRows }] = await Promise.all([
+          supabase.from('matches').select('target_id').eq('candidate_id', currentUser.id),
+          supabase.from('followers').select('following_id').eq('follower_id', currentUser.id)
+        ]);
+        if (matchRows) {
+          setMatchedIds(matchRows.map(m => m.target_id));
+        }
+        if (followRows) {
+          setFavoriteIds(followRows.map(f => f.following_id));
+        }
+      } catch (err) {
+        console.warn('Load matches/favorites note:', err);
+      }
+    };
+    loadMatchesAndFavorites();
+  }, [currentUser?.id]);
 
   // Filter real user match cards based on musical categories
   const filteredMatches = useMemo(() => {
@@ -118,24 +124,6 @@ const SwipeMatching = React.memo(function SwipeMatching({
   const safeIndex = (filteredMatches.length > 0 && currentIndex >= filteredMatches.length) ? 0 : currentIndex;
   const currentCard = filteredMatches[safeIndex] || filteredMatches[0];
   const isCurrentFavorite = currentCard && (favoriteIds.includes(currentCard.id) || (currentCard.userId && favoriteIds.includes(currentCard.userId)));
-
-  // Save matched IDs to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('stagelink_applied_matches', JSON.stringify(matchedIds));
-    } catch (e) {
-      console.warn("Storage write error (applied matches):", e);
-    }
-  }, [matchedIds]);
-
-  // Save favorite IDs to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('stagelink_favorite_artists', JSON.stringify(favoriteIds));
-    } catch (e) {
-      console.warn("Storage write error (favorite artists):", e);
-    }
-  }, [favoriteIds]);
 
   // Confetti trigger
   const triggerConfetti = () => {

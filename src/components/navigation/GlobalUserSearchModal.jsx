@@ -7,7 +7,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { supabase, isSupabaseConfigured } from '../../services/supabaseClient';
 import { presenceService } from '../../services/presenceService';
 
-import { getStoredItem, STORAGE_KEYS, INITIAL_USERS, isTestArtifact } from '../../services/mockData';
+import { isTestArtifact } from '../../services/mockData';
 
 const normalizeStr = (str) => {
   return String(str || '')
@@ -185,10 +185,8 @@ export default function GlobalUserSearchModal({ isOpen, onClose, users, onOpenPu
 
   const safeLocalUsers = Array.isArray(users) ? users : [];
   const combinedUsers = useMemo(() => {
-    const storedUsers = getStoredItem(STORAGE_KEYS.USERS, []);
-
     const map = new Map();
-    [...INITIAL_USERS, ...(Array.isArray(storedUsers) ? storedUsers : []), ...safeLocalUsers, ...remoteUsers].forEach(u => {
+    [...safeLocalUsers, ...remoteUsers].forEach(u => {
       if (u && u.id && !isTestArtifact(u)) {
         if (!map.has(u.id)) {
           map.set(u.id, u);
