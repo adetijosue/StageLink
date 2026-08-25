@@ -305,7 +305,26 @@ export function AuthProvider({ children }) {
           .eq('id', supaRes.user.id)
           .maybeSingle();
 
-        normalizedUser = buildUserFromProfile(profile || null, supaRes.user);
+        if (!profile) {
+          const defaultName = supaRes.user.user_metadata?.full_name || supaRes.user.name || (supaRes.user.email ? supaRes.user.email.split('@')[0] : 'Artiste');
+          const defaultRole = supaRes.user.user_metadata?.role || supaRes.user.role || 'Artiste';
+          const defaultUsername = supaRes.user.email?.split('@')[0]?.replace(/[^a-zA-Z0-9]/g, '_') || 'user_' + supaRes.user.id.slice(0, 6);
+          const { data: createdProf } = await supabase.from('profiles').upsert({
+            id: supaRes.user.id,
+            full_name: defaultName,
+            username: defaultUsername,
+            email: supaRes.user.email,
+            role: defaultRole,
+            avatar_url: '',
+            bio: `Membre ${defaultRole} sur StageLink`,
+            verified_badge: 'none',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'id' }).select().maybeSingle();
+          normalizedUser = buildUserFromProfile(createdProf || null, supaRes.user);
+        } else {
+          normalizedUser = buildUserFromProfile(profile, supaRes.user);
+        }
       } catch (_) {
         normalizedUser = buildUserFromProfile(null, supaRes.user);
       }
@@ -329,6 +348,25 @@ export function AuthProvider({ children }) {
 
     const supaRes = await signUpUser({ ...userData, email: cleanEmail, password: cleanPassword, name: cleanName });
     if (supaRes.success && supaRes.user) {
+      try {
+        const defaultUsername = cleanEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, '_') + '_' + Math.floor(Date.now() % 10000);
+        await supabase.from('profiles').upsert({
+          id: supaRes.user.id,
+          email: cleanEmail,
+          full_name: cleanName,
+          username: defaultUsername,
+          role: userData.role || 'Artiste',
+          gender: userData.gender || 'male',
+          avatar_url: '',
+          bio: `Membre ${userData.role || 'Artiste'} sur StageLink`,
+          verified_badge: 'none',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' });
+      } catch (err) {
+        console.warn('Signup profile sync note:', err);
+      }
+
       const newUser = { ...supaRes.user, isNewRegistration: true };
       setStoredItem(STORAGE_KEYS.CURRENT_USER, newUser);
       setCurrentUser(newUser);

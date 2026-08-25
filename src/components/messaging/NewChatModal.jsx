@@ -76,6 +76,50 @@ export default function NewChatModal({ isOpen, onClose, onStartChatWithUser, onS
     };
   }, [isOpen]);
 
+  // Realtime subscription to profiles table for live signup synchronization
+  useEffect(() => {
+    if (!isOpen || !isSupabaseConfigured()) return;
+
+    const channel = supabase
+      .channel(`new_chat_profiles_${Date.now()}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+        if (payload.new && payload.new.id) {
+          const p = payload.new;
+          const mappedUser = {
+            id: p.id,
+            name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
+            userName: p.username || p.full_name || (p.email ? p.email.split('@')[0] : 'Artiste'),
+            full_name: p.full_name || p.username || (p.email ? p.email.split('@')[0] : 'Artiste'),
+            username: p.username || '',
+            role: p.role || 'Artiste',
+            userRole: p.role || 'Artiste',
+            avatar: p.avatar_url || '',
+            avatar_url: p.avatar_url || '',
+            userAvatar: p.avatar_url || '',
+            verified: p.verified_badge === 'gold' || p.verified_badge === 'blue',
+            badgeType: p.verified_badge || 'none',
+            location: p.location || '',
+            company: p.company || '',
+            bio: p.bio || '',
+            email: p.email || '',
+            instruments: Array.isArray(p.instruments) ? p.instruments : [],
+            genres: Array.isArray(p.genres) ? p.genres : []
+          };
+          setRemoteUsers(prev => {
+            const map = new Map();
+            (prev || []).forEach(u => map.set(u.id, u));
+            map.set(mappedUser.id, { ...(map.get(mappedUser.id) || {}), ...mappedUser });
+            return Array.from(map.values());
+          });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isOpen]);
+
   // Live remote search when user types in searchQuery
   useEffect(() => {
     if (!isOpen || !isSupabaseConfigured() || !searchQuery.trim()) {
